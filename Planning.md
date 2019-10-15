@@ -32,16 +32,6 @@ Arg      ::= Expr
 
 ```
 type ::= i{N}
-       | u{N}
-       | f32
-       | f64
-       | d32
-       | d64
-       | ex A. type
-       | mu A. type
-       | A
-       | ref <type ...>
-       | box H
 ```
 {N} specifies a natural number unequal zero.
 
