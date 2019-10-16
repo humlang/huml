@@ -20,6 +20,8 @@ struct source_range
 
   void widen(const source_range& range);
 
+  std::string to_string() const;
+
   friend std::ostream& operator<<(std::ostream& os, const source_range& src_range);
 };
 

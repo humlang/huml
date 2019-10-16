@@ -14,12 +14,16 @@ void source_range::widen(const source_range& other)
   row_end = std::max(row_end, other.row_end);
 }
 
+std::string source_range::to_string() const
+{
+  return std::string(module) + ":"
+    + std::to_string(column_beg) + ":"
+    + std::to_string(row_beg);
+}
+
 std::ostream& operator<<(std::ostream& os, const source_range& src_range)
 {
-  os << src_range.module << ":" << src_range.column_beg
-                         << ":" << src_range.row_beg
-                         << ":";
-  return os;
+  return os << src_range.to_string();
 }
 
 source_range operator+(const source_range& left, const source_range& right)

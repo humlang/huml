@@ -1,13 +1,10 @@
-#include "reader.hpp"
-#include "ast.hpp"
+#include <reader.hpp>
+#include <token.hpp>
+#include <ast.hpp>
 
 #include <cassert>
 #include <istream>
 #include <queue>
-
-reader::token::token(token_kind kind, symbol data, source_range range)
-  : kind(kind), data(data), loc(range)
-{  }
 
 reader::reader(const char* module, std::istream& is)
   : module(module), is(is), linebuf(), col(0), row(1)
@@ -16,6 +13,7 @@ reader::reader(const char* module, std::istream& is)
 template<>
 char reader::get<char>()
 {
+  // yields the next char that is not a basic whitespace character i.e. NOT stuff like zero width space
   char ch = 0;
   bool skipped_line = false;
   do
@@ -66,7 +64,7 @@ char reader::get<char>()
 
 
 template<>
-reader::token reader::get<reader::token>()
+token reader::get<token>()
 {
   symbol data("");
   token_kind kind = token_kind::Undef;
@@ -80,30 +78,48 @@ reader::token reader::get<reader::token>()
   default:
     {
       // Optimistically allow any kind of identifier to allow for unicode
-      std::uint_fast32_t hash = ch;
       std::string name;
       name.push_back(ch);
       while(col < linebuf.size())
       {
+        // don't use get<char>() here, identifiers are not connected with a '\n'
         ch = linebuf[col++];
 
         // break if we hit whitespace (or other control chars) or any other token char
-        if(std::iscntrl(ch) || std::isspace(ch) || ch == '(' || ch == ')')
+        if(std::iscntrl(ch) || std::isspace(ch)) // || ch == '(' || ch == ')')
         {
           col--;
           break;
         }
         name.push_back(ch);
-        hash ^= (hash * 31) + ch;
       }
-      kind = token_kind::Atom;
+      kind = token_kind::Identifier;
       data = symbol(name);
     } break;
 
-  case '(':
-  case ')':
-      kind = static_cast<token_kind>(ch);
-    break;
+  case '0': case '1': case '2': case '3': case '4': case '5':
+  case '6': case '7': case '8': case '9':
+    {
+      // read until there is no number anymore. Disallow 000840
+      std::string name;
+      name.push_back(ch);
+      while(col < linebuf.size())
+      {
+        // don't use get<char>() here, numbers are not connected with a '\n'
+        ch = linebuf[col++];
+
+        // break if we hit anything besides '0'..'9'
+        if(std::isdigit(ch))
+        {
+          col--;
+          break;
+        }
+        name.push_back(ch);
+      }
+      kind = token_kind::LiteralNumber;
+      data = symbol(name);
+    } break;
+
   case EOF:
       kind = token_kind::EndOfFile;
     break;
@@ -111,74 +127,36 @@ reader::token reader::get<reader::token>()
   return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row});
 }
 
-std::vector<std::shared_ptr<expression>> reader::read(const char* module, std::istream& is)
+std::vector<ast_type> reader::read(const char* module, std::istream& is)
 {
   reader r(module, is);
 
-  //Parse
-  std::vector<std::shared_ptr<expression>> ast;
-  std::queue<std::shared_ptr<list>> lists;
+  std::vector<ast_type> ast;
   token tok(token_kind::Undef, "", {});
   while(tok.kind != token_kind::EndOfFile)
   {
-    tok = r.get<reader::token>();
+    tok = r.get<token>();
+
     switch(tok.kind)
     {
-    case token_kind::L_Paren:
-      {
-        if(lists.empty())
-        {
-          auto l = std::make_shared<list>(tok.loc);
-          ast.push_back(l);
-          lists.push(l);
-        }
-        else
-        {
-          auto l = std::make_shared<list>(tok.loc);
-          lists.front()->add(l);
-          lists.push(l);
-        }
-      } break;
-
-    case token_kind::R_Paren:
-      {
-        if(lists.empty())
-        {
-          // parse error, what do?
-          assert(false);
-        }    
-        else
-        {
-          lists.front()->change_location(lists.front()->location() + tok.loc);
-          lists.pop();
-        }
-      } break;
-
-    case token_kind::Atom:
-      {
-        if(lists.empty())
-        {
-          ast.push_back(std::make_shared<atom>(tok.loc, tok.data));
-        }
-        else
-        {
-          lists.front()->add(std::make_shared<atom>(tok.loc, tok.data));
-        }
-      } break;
-
-    case token_kind::Undef:
-      {
-        // tokenize error, what do?
-        assert(false);
-      } break;
+    default:
+    {
+      // unknown token, emit an error
+      assert(false);
+    } break;
 
     case token_kind::EndOfFile:
-      break;
+    break;
+
+    case token_kind::LiteralNumber:
+    {
+      ast.push_back(literal(ast_tags::literal, tok));
+    } break;
     }
   }
-  if(!lists.empty())
+  if(ast.empty())
   {
-    // parse error, what do?
+    // empty module, what do?
     assert(false);
   }
   return ast;
