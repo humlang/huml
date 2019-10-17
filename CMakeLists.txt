@@ -18,13 +18,14 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
 # tests
 find_package(Catch2 REQUIRED)
 
-add_executable(h-lang_tests test/test.cpp)
-target_link_libraries(h-lang_tests Catch2::Catch2 fmt::fmt)
-set_property(TARGET h-lang_tests PROPERTY CXX_STANDARD 17)
+add_executable(h-lang_parsing_tests test/parsing_and_tokenization.cpp
+  "${h-lang_files}")
+target_link_libraries(h-lang_parsing_tests Catch2::Catch2 fmt::fmt)
+set_property(TARGET h-lang_parsing_tests PROPERTY CXX_STANDARD 17)
 
 include(CTest)
 include(ParseAndAddCatchTests)
-ParseAndAddCatchTests(h-lang_tests)
+ParseAndAddCatchTests(h-lang_parsing_tests)
 
 # main program
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")

@@ -112,7 +112,7 @@ token reader::get<token>()
         ch = linebuf[col++];
 
         // break if we hit anything besides '0'..'9'
-        if(std::isdigit(ch))
+        if(!std::isdigit(ch))
         {
           col--;
           break;
@@ -127,7 +127,7 @@ token reader::get<token>()
       kind = token_kind::EndOfFile;
     break;
   }
-  return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row});
+  return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
 }
 
 std::vector<ast_type> reader::read(const char* module, std::istream& is)
