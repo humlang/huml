@@ -1,3 +1,4 @@
+#include <diagnostic.hpp>
 #include <reader.hpp>
 #include <token.hpp>
 #include <ast.hpp>
@@ -5,6 +6,7 @@
 #include <ast_printer.hpp>
 
 #include <iostream>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -28,4 +30,7 @@ int main(int argc, char** argv)
   {
     std::visit(ast_printer<print>, v);
   }
+
+  diagnostic.print(stdout);
+  return diagnostic.error_code();
 }

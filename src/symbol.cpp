@@ -1,25 +1,6 @@
 #include <symbol.hpp>
 #include <tmp.hpp>
 
-template<typename T, typename H = std::uint_fast32_t>
-constexpr H hash_string(T str)
-{
-  if constexpr(has_method_empty<T>())
-  {
-    // probably a std::string like thing
-    if(str.empty()) return 0;
-  }
-  else
-  {
-    // probably a c style string thing    (could also use a trait and throw error if this interface is also not provided)
-    if(!str) return 0;
-  }
-  H hash = str[0];
-  for(auto* p = &str[0]; p && *p != '\0'; p++)
-    hash ^= (hash * 31) + (*p);
-  return hash;
-}
-
 thread_local std::unordered_map<std::uint_fast32_t, std::string> symbol::symbols = {};
 
 symbol::symbol(const std::string& str)

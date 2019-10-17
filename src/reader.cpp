@@ -1,3 +1,6 @@
+#include <diagnostic.hpp>
+#include <diagnostic_db.hpp>
+
 #include <reader.hpp>
 #include <token.hpp>
 #include <ast.hpp>
@@ -141,8 +144,7 @@ std::vector<ast_type> reader::read(const char* module, std::istream& is)
     {
     default:
     {
-      // unknown token, emit an error
-      assert(false);
+      diagnostic <<= (diagnostic_db::parser::unknown_token(tok.data.get_string()) + tok.loc);
     } break;
 
     case token_kind::EndOfFile:
@@ -156,8 +158,7 @@ std::vector<ast_type> reader::read(const char* module, std::istream& is)
   }
   if(ast.empty())
   {
-    // empty module, what do?
-    assert(false);
+    diagnostic <<= (-diagnostic_db::parser::empty_module);
   }
   return ast;
 }

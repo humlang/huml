@@ -3,42 +3,54 @@
 #include <fmt/format.h>
 #include <fmt/color.h>
 
-diagnostic_message::diagnostic_message(diagnostic_message::level lv, source_range loc, symbol msg)
-  : lv(lv), location(loc), message(msg)
-{  }
+#include <cassert>
 
-void diagnostic_message::print(std::FILE* file) const
+bool diagnostic_message::print(std::FILE* file) const
 {
-
   fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}:{}:{}: ",
       location.module,
       location.row_beg, location.column_beg);
 
-  const std::string type = (lv == level::info ? "info"
-      : (lv == level::warn ? "warning"
-      : (lv == level::error ? "error"
-      : (lv == level::fixit ? "fixit" : "undefined"))));
-  switch(lv)
+  if(diagnostic.print_codes())
   {
-  default:
-  case level::error: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::red), "error: ", type); break;
-
-  case level::info: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::gray), "info: ", type); break;
-
-  case level::warn: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::alice_blue), "warning: ", type); break;
-
-  case level::fixit: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::sea_green), "fixit: ", type); break;
+    fmt::print(file, fg(fmt::color::cornsilk), "(HE-{}) ", data.human_referrable_code);
   }
 
-  fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}\n", message.get_string());
+  switch(data.level)
+  {
+  default:
+  case diag_level::error: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::red), "error: "); break;
 
-  // TODO: print context?
+  case diag_level::info: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::gray), "info: "); break;
+
+  case diag_level::warn: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::alice_blue), "warning: "); break;
+
+  case diag_level::fixit: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::sea_green), "fixit: "); break;
+  }
+
+  fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}", data.msg_template);
+  // TODO: how to generically reference needed data for diagnostic?
+  
+  
+  fmt::print(file, fg(fmt::color::white), "\n");
+  return data.level == diag_level::error ? false : true;
+}
+
+diagnostic_message operator+(diagnostic_db::diag_db_entry data, source_range range)
+{ return diagnostic_message(range, data, {}); }
+
+diagnostic_message operator+(source_range range, diagnostic_db::diag_db_entry data)
+{ return diagnostic_message(range, data, {}); }
+
+diagnostic_message& operator|(diagnostic_message& msg0, diagnostic_message msg1)
+{
+  msg0.sub_messages.push_back(msg1);
+  return msg0;
 }
 
 diagnostics_manager::~diagnostics_manager()
 {
-  for(auto& v : data)
-    v.print(file);
+  assert(printed && "Messages have been printed.");
 }
 
 diagnostics_manager& diagnostics_manager::operator<<=(diagnostic_message msg)
@@ -47,4 +59,32 @@ diagnostics_manager& diagnostics_manager::operator<<=(diagnostic_message msg)
 
   return *this;
 }
+
+void diagnostics_manager::do_not_print_codes()
+{
+  _print_codes = false;
+}
+
+bool diagnostics_manager::print_codes() const
+{
+  return _print_codes;
+}
+
+void diagnostics_manager::print(std::FILE* file)
+{
+  diagnostic_db::ignore ign;
+  for(auto& v : data)
+  {
+    if(!ign.has(v.data.level))
+    {
+      if(!(v.print(file)))
+        err = 1;
+      ign = v.data.ign;
+    }
+  }
+  printed = true;
+}
+
+int diagnostics_manager::error_code() const
+{ return err; }
 

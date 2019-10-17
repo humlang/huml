@@ -1,8 +1,7 @@
 #pragma once
 
-// template hacks
-
 #include <type_traits>
+#include <cstdint>
 
 struct nonesuch {
   ~nonesuch() = delete;
@@ -37,53 +36,23 @@ template<typename T>
 constexpr bool has_method_empty()
 { return is_detected<has_method_empty_trait, T>::value; }
 
-namespace detail
+
+template<typename T, typename H = std::uint_fast32_t>
+constexpr H hash_string(T str)
 {
-  template<class L, class R>
-  inline L* scast(R* r) {
-    static_assert(std::is_base_of<R, L>::value, "R is not a base type of L");
-    assert((!r || dynamic_cast<L*>(r)) && "cast not possible" );
-    return static_cast<L*>(r);
+  if constexpr(has_method_empty<T>())
+  {
+    // probably a std::string like thing
+    if(str.empty()) return 0;
   }
-
-  template<class L, class R>
-  inline const L* scast(const R* r) { return const_cast<const L*>(scast<L, R>(const_cast<R*>(r))); }
-
-  template<class L, class R>
-  inline L* dcast(R* u) {
-    static_assert(std::is_base_of<R, L>::value, "R is not a base type of L");
-    return dynamic_cast<L*>(u);
+  else
+  {
+    // probably a c style string thing    (could also use a trait and throw error if this interface is also not provided)
+    if(!str) return 0;
   }
-
-  template<class L, class R>
-  inline const L* dcast(const R* r) { return const_cast<const L*>(dcast<L, R>(const_cast<R*>(r))); }
-
-  template<class L, class R>
-  inline L bcast(const R& from) {
-    static_assert(sizeof(R) == sizeof(L), "size mismatch for bitcast");
-    L to;
-    memcpy(&to, &from, sizeof(L));
-    return to;
-  }
+  H hash = str[0];
+  for(auto* p = &str[0]; p && *p != '\0'; p++)
+    hash ^= (hash * 31) + (*p);
+  return hash;
 }
-
-template<class D>
-class runtime_cast {
-public:
-  template<class T>
-  T* as()
-  { return detail::scast<T>(static_cast<D*>(this)); }
-
-  template<class T>
-  T* isa()
-  { return detail::dcast<T>(static_cast<D*>(this)); }
-
-  template<class T>
-  const T* as() const
-  { return detail::scast<T>(static_cast<const D*>(this)); }
-
-  template<class T>
-  const T* isa() const
-  { return detail::dcast<T>(static_cast<const D*>(this)); }
-};
 
