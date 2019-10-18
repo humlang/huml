@@ -81,6 +81,7 @@ restart_get:
   switch(ch)
   {
   default:
+    if(!std::iscntrl(ch) && !std::isspace(ch))
     {
       // Optimistically allow any kind of identifier to allow for unicode
       std::string name;
@@ -100,7 +101,12 @@ restart_get:
       }
       kind = token_kind::Identifier;
       data = symbol(name);
-    } break;
+    }
+    else
+    {
+      assert(false && "Control or space character leaked into get<token>!");
+    }
+    break;
 
   case '0': starts_with_zero = true; case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
