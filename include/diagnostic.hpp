@@ -109,13 +109,20 @@ public:
 
   void print(std::FILE* file);
   int error_code() const;
+
+  const std::vector<diagnostic_message>& get_all() const
+  { return data; }
 private:
   std::vector<diagnostic_message> data;
 
-  bool printed { false };
   int err { 0 };
-
   bool _print_codes { true };
+
+#ifndef H_LANG_TESTING
+  bool printed { false };
+#else
+  bool printed { true  };
+#endif
 };
 
 inline thread_local diagnostics_manager diagnostic;

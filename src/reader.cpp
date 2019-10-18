@@ -69,6 +69,7 @@ char reader::get<char>()
 template<>
 token reader::get<token>()
 {
+restart_get:
   symbol data("");
   token_kind kind = token_kind::Undef;
 
@@ -76,6 +77,7 @@ token reader::get<token>()
   std::size_t beg_row = row;
   std::size_t beg_col = col - 1;
 
+  bool starts_with_zero = false;
   switch(ch)
   {
   default:
@@ -100,12 +102,13 @@ token reader::get<token>()
       data = symbol(name);
     } break;
 
-  case '0': case '1': case '2': case '3': case '4': case '5':
-  case '6': case '7': case '8': case '9':
+  case '0': starts_with_zero = true; case '1': case '2': case '3': case '4':
+  case '5': case '6': case '7': case '8': case '9':
     {
       // read until there is no number anymore. Disallow 000840
       std::string name;
       name.push_back(ch);
+      bool emit_starts_with_zero_error = false;
       while(col < linebuf.size())
       {
         // don't use get<char>() here, numbers are not connected with a '\n'
@@ -117,7 +120,14 @@ token reader::get<token>()
           col--;
           break;
         }
+        if(starts_with_zero)
+          emit_starts_with_zero_error = true;
         name.push_back(ch);
+      }
+      if(emit_starts_with_zero_error)
+      {
+        diagnostic <<= (diagnostic_db::parser::leading_zeros(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1));
+        goto restart_get; // <- SO WHAT
       }
       kind = token_kind::LiteralNumber;
       data = symbol(name);
