@@ -3,6 +3,7 @@
 #include <fmt/format.h>
 #include <fmt/color.h>
 
+#include <algorithm>
 #include <cassert>
 
 bool diagnostic_message::print(std::FILE* file) const
@@ -57,6 +58,9 @@ diagnostics_manager& diagnostics_manager::operator<<=(diagnostic_message msg)
 {
   data.push_back(msg);
 
+  std::sort(data.begin(), data.end(), [](const diagnostic_message& a, const diagnostic_message& b)
+                                      { return std::string_view(a.location.module) < std::string_view(b.location.module); });
+
   return *this;
 }
 
@@ -86,5 +90,7 @@ void diagnostics_manager::print(std::FILE* file)
 }
 
 int diagnostics_manager::error_code() const
-{ return err; }
+{
+  return err;
+}
 
