@@ -56,6 +56,8 @@ diagnostics_manager::~diagnostics_manager()
 
 diagnostics_manager& diagnostics_manager::operator<<=(diagnostic_message msg)
 {
+  std::lock_guard<std::mutex> guard(mut);
+
   data.push_back(msg);
 
   std::sort(data.begin(), data.end(), [](const diagnostic_message& a, const diagnostic_message& b)
@@ -66,6 +68,7 @@ diagnostics_manager& diagnostics_manager::operator<<=(diagnostic_message msg)
 
 void diagnostics_manager::do_not_print_codes()
 {
+  std::lock_guard<std::mutex> guard(mut);
   _print_codes = false;
 }
 
@@ -76,6 +79,9 @@ bool diagnostics_manager::print_codes() const
 
 void diagnostics_manager::print(std::FILE* file)
 {
+  if(printed)
+    return;
+  std::lock_guard<std::mutex> guard(mut);
   diagnostic_db::ignore ign;
   for(auto& v : data)
   {

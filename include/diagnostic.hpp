@@ -6,6 +6,7 @@
 
 #include <string_view>
 #include <vector>
+#include <mutex>
 #include <queue>
 
 enum class diag_level : std::uint_fast8_t
@@ -111,12 +112,13 @@ public:
   int error_code() const;
 
   const std::vector<diagnostic_message>& get_all() const
-  { return data; }
+  { /*no need to lock*/ return data; }
 private:
   std::vector<diagnostic_message> data;
 
   int err { 0 };
   bool _print_codes { true };
+  std::mutex mut;
 
 #ifndef H_LANG_TESTING
   bool printed { false };
@@ -125,5 +127,5 @@ private:
 #endif
 };
 
-inline thread_local diagnostics_manager diagnostic;
+static diagnostics_manager diagnostic;
 
