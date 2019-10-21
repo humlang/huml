@@ -1,5 +1,6 @@
 #include <diagnostic.hpp>
 #include <diagnostic_db.hpp>
+#include <stream_lookup.hpp>
 
 #include <reader.hpp>
 #include <token.hpp>
@@ -9,9 +10,12 @@
 #include <istream>
 #include <queue>
 
-reader::reader(const char* module, std::istream& is)
-  : module(module), is(is), linebuf(), col(0), row(1)
+reader::reader(const char* module)
+  : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1)
 {  }
+
+reader::~reader()
+{ stream_lookup.drop(module); }
 
 template<>
 char reader::get<char>()
@@ -132,7 +136,8 @@ restart_get:
       }
       if(emit_starts_with_zero_error)
       {
-        diagnostic <<= (diagnostic_db::parser::leading_zeros(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1));
+        diagnostic <<= (diagnostic_db::parser::leading_zeros(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
+          | source_context(0);
         goto restart_get; // <- SO WHAT
       }
       kind = token_kind::LiteralNumber;
@@ -146,9 +151,10 @@ restart_get:
   return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
 }
 
-std::vector<ast_type> reader::read(const char* module, std::istream& is)
+std::vector<ast_type> reader::read(const char* module)
 {
-  reader r(module, is);
+  reader r(module);
+
 
   std::vector<ast_type> ast;
   token tok(token_kind::Undef, "", {});
@@ -160,7 +166,8 @@ std::vector<ast_type> reader::read(const char* module, std::istream& is)
     {
     default:
     {
-      diagnostic <<= (diagnostic_db::parser::unknown_token(tok.data.get_string()) + tok.loc);
+      diagnostic <<= (diagnostic_db::parser::unknown_token(tok.data.get_string()) + tok.loc)
+                    | source_context(0);
     } break;
 
     case token_kind::EndOfFile:

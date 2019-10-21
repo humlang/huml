@@ -49,16 +49,15 @@ diagnostic_message operator+(diagnostic_db::diag_db_entry data, source_range ran
 diagnostic_message operator+(source_range range, diagnostic_db::diag_db_entry data)
 { return diagnostic_message(range, data, {}); }
 
-diagnostic_message& operator|(diagnostic_message& msg0, diagnostic_message msg1)
+diagnostic_message&& operator|(diagnostic_message&& msg0, diagnostic_message&& msg1)
 {
-  msg0.sub_messages.push_back(msg1);
-  return msg0;
+  msg0.sub_messages.emplace_back(std::forward<diagnostic_message>(msg1));
+  return std::forward<diagnostic_message>(msg0);
 }
 
-diagnostic_message& operator|(diagnostic_message& msg, diagnostic_source_info_t)
+diagnostic_message&& operator|(diagnostic_message&& msg, diagnostic_source_info_t)
 {
-  diagnostic_message info_msg(msg.location, diagnostic_db::source_information(msg.location), {});
-  return msg | info_msg;
+  return std::forward<diagnostic_message>(msg) | diagnostic_message(msg.location, diagnostic_db::source_information(msg.location), {});
 }
 
 diagnostics_manager::~diagnostics_manager()

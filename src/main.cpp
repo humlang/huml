@@ -6,6 +6,7 @@
 #include <ast_printer.hpp>
 
 #include <iostream>
+#include <sstream>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -25,7 +26,8 @@ int main(int argc, char** argv)
   for(int i = 1; i < argc; ++i)
     args.push_back(argv[i - 1]);
 
-  auto w = reader::read("STDIN", std::cin);
+
+  auto w = reader::read("STDIN");
   for(auto& v : w)
   {
     std::visit(ast_printer<print>, v);

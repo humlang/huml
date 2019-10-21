@@ -94,8 +94,15 @@ static constexpr auto normal_print_fn_g = [](std::string_view msg)
 }
 
 struct diagnostic_source_info_t
-{  };
-static constexpr diagnostic_source_info_t diagnostic_source_info = {};
+{
+  constexpr diagnostic_source_info_t(std::size_t prev_rows)
+    : prev_rows(prev_rows)
+  {  }
+
+  std::size_t prev_rows;
+};
+constexpr auto source_context = [](std::size_t prev_rows)
+  { return diagnostic_source_info_t(prev_rows); };
 
 struct diagnostic_message
 {
@@ -113,14 +120,15 @@ private:
   friend diagnostic_message diagnostic_db::diag_db_entry::operator-() const;
   friend diagnostic_message operator+(diagnostic_db::diag_db_entry, source_range);
   friend diagnostic_message operator+(source_range, diagnostic_db::diag_db_entry);
-  friend diagnostic_message& operator|(diagnostic_message& msg0, diagnostic_message msg1);
-  friend diagnostic_message& operator|(diagnostic_message& msg, diagnostic_source_info_t);
+
+  friend diagnostic_message&& operator|(diagnostic_message&& msg0, diagnostic_message&& msg1);
+  friend diagnostic_message&& operator|(diagnostic_message&& msg, diagnostic_source_info_t);
 };
 diagnostic_message operator+(diagnostic_db::diag_db_entry data, source_range range);
 diagnostic_message operator+(source_range range, diagnostic_db::diag_db_entry data);
 
-diagnostic_message& operator|(diagnostic_message& msg0, diagnostic_message msg1);
-diagnostic_message& operator|(diagnostic_message& msg, diagnostic_source_info_t);
+diagnostic_message&& operator|(diagnostic_message&& msg0, diagnostic_message&& msg1);
+diagnostic_message&& operator|(diagnostic_message&& msg, diagnostic_source_info_t);
 
 inline diagnostic_message diagnostic_db::diag_db_entry::operator-() const
 {

@@ -8,6 +8,7 @@ set(h-lang_files src/reader.cpp
   src/symbol.cpp
   src/source_range.cpp
   src/diagnostic.cpp
+  src/stream_lookup.cpp
   )
 
 find_package(fmt REQUIRED)
@@ -22,7 +23,8 @@ find_package(Catch2 REQUIRED)
 
 add_executable(h-lang_parsing_tests test/parsing_and_tokenization.cpp
   "${h-lang_files}")
-target_link_libraries(h-lang_parsing_tests Catch2::Catch2 fmt::fmt)
+target_compile_definitions(h-lang_parsing_tests PUBLIC -DH_LANG_TESTING)
+target_link_libraries(h-lang_parsing_tests Catch2::Catch2 fmt::fmt stdc++fs)
 set_property(TARGET h-lang_parsing_tests PROPERTY CXX_STANDARD 17)
 
 include(CTest)
@@ -32,6 +34,6 @@ ParseAndAddCatchTests(h-lang_parsing_tests)
 # main program
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 add_executable(h-lang src/main.cpp "${h-lang_files}")
-target_link_libraries(h-lang PRIVATE fmt::fmt-header-only)
+target_link_libraries(h-lang PRIVATE fmt::fmt-header-only stdc++fs)
 set_property(TARGET h-lang PROPERTY CXX_STANDARD 17)
 

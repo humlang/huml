@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
-#define H_LANG_TESTING
 
+#include <stream_lookup.hpp>
 #include <diagnostic.hpp>
 #include <reader.hpp>
 
@@ -11,8 +11,8 @@ TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
   
   SECTION( "single-digit" ) {
 
-    std::stringstream ss("0 1 2 3 4 5 6 7 8 9");
-    auto w = reader::read("TESTSTREAM", ss);
+    stream_lookup.write_test("0 1 2 3 4 5 6 7 8 9");
+    auto w = reader::read("TESTSTREAM");
 
     std::size_t i = 0;
     std::size_t col = 1;
@@ -41,8 +41,8 @@ TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
 
   SECTION( "no trailing zero" ) {
 
-    std::stringstream ss("000123 2");
-    auto w = reader::read("TESTSTREAM", ss);
+    stream_lookup.write_test("000123 2");
+    auto w = reader::read("TESTSTREAM");
 
     REQUIRE( w.size() == 1 );
     for(auto& v : w)
