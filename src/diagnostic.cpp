@@ -1,14 +1,16 @@
+#include <diagnostic_db.hpp>
 #include <diagnostic.hpp>
 
-#include <fmt/format.h>
 #include <fmt/color.h>
 
 #include <algorithm>
 #include <cassert>
 
-bool diagnostic_message::print(std::FILE* file) const
+bool diagnostic_message::print(std::FILE* file, std::size_t indent_depth) const
 {
-  fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}:{}:{}: ",
+  const std::string indentation(indent_depth * 4, ' ');
+  fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}{}:{}:{}: ",
+      indentation,
       location.module,
       location.row_beg, location.column_beg);
 
@@ -29,12 +31,16 @@ bool diagnostic_message::print(std::FILE* file) const
   case diag_level::fixit: fmt::print(file, fmt::emphasis::bold | fg(fmt::color::sea_green), "fixit: "); break;
   }
 
-  fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}", data.msg_template);
-  // TODO: how to generically reference needed data for diagnostic?
-  
-  
+  fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "");
+    data.fn(file); 
   fmt::print(file, fg(fmt::color::white), "\n");
-  return data.level == diag_level::error ? false : true;
+
+  const bool to_return = data.level == diag_level::error ? false : true;
+  for(auto& v : sub_messages)
+  {
+    v.print(file, indent_depth + 1);
+  }
+  return to_return;
 }
 
 diagnostic_message operator+(diagnostic_db::diag_db_entry data, source_range range)
@@ -47,6 +53,12 @@ diagnostic_message& operator|(diagnostic_message& msg0, diagnostic_message msg1)
 {
   msg0.sub_messages.push_back(msg1);
   return msg0;
+}
+
+diagnostic_message& operator|(diagnostic_message& msg, diagnostic_source_info_t)
+{
+  diagnostic_message info_msg(msg.location, diagnostic_db::source_information(msg.location), {});
+  return msg | info_msg;
 }
 
 diagnostics_manager::~diagnostics_manager()

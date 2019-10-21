@@ -4,7 +4,10 @@
 #include <symbol.hpp>
 #include <tmp.hpp>
 
+#include <fmt/format.h>
+
 #include <string_view>
+#include <functional>
 #include <vector>
 #include <mutex>
 #include <queue>
@@ -48,31 +51,55 @@ namespace diagnostic_db
     std::uint_fast8_t lvs;
   };
 
+  namespace detail
+  {
+static constexpr auto normal_print_fn_g = [](std::string_view msg)
+        { return [msg](std::FILE* f) { return fmt::print(f, msg); }; };
+  }
+
   struct diag_db_entry
   {
+    std::function<void(std::FILE* file)> fn;
     std::string_view human_referrable_code;
-    std::string_view msg_template;
     diag_level level;
     ignore ign;
 
-    constexpr diag_db_entry(diag_level lv, std::string_view code, std::string_view msg)
-      : human_referrable_code(code), msg_template(msg), level(lv), ign()
+    diag_db_entry(diag_level lv, std::string_view code, std::string_view msg)
+      : fn(detail::normal_print_fn_g(msg)),
+        human_referrable_code(code), level(lv), ign()
     {  }
 
-    constexpr diag_db_entry(diag_level lv, std::string_view code, std::string_view msg, ignore ign)
-      : human_referrable_code(code), msg_template(msg), level(lv), ign(ign)
+    diag_db_entry(diag_level lv, std::string_view code, std::string_view msg, ignore ign)
+      : fn(detail::normal_print_fn_g(msg)),
+        human_referrable_code(code), level(lv), ign(ign)
     {  }
 
-    constexpr std::uint_fast32_t code() const
+    diag_db_entry(diag_level lv, std::string_view code, std::function<void(std::FILE*)> f)
+      : fn(f),
+        human_referrable_code(code), level(lv), ign()
+    {  }
+
+    diag_db_entry(diag_level lv, std::string_view code, std::function<void(std::FILE*)> f, ignore ign)
+      : fn(f),
+        human_referrable_code(code), level(lv), ign(ign)
+    {  }
+
+    std::uint_fast32_t code() const
     { return hash_string(human_referrable_code); }
 
     diagnostic_message operator-() const;
   };
+  auto make_db_entry = [](diag_level lv, std::string_view code, auto&& tmp, ignore ign)
+  { return diag_db_entry(lv, code, std::forward<decltype(tmp)>(tmp), ign); };
 }
+
+struct diagnostic_source_info_t
+{  };
+static constexpr diagnostic_source_info_t diagnostic_source_info = {};
 
 struct diagnostic_message
 {
-  bool print(std::FILE* file) const;
+  bool print(std::FILE* file, std::size_t indent_depth = 0) const;
 
   source_range location;
   diagnostic_db::diag_db_entry data;
@@ -87,11 +114,13 @@ private:
   friend diagnostic_message operator+(diagnostic_db::diag_db_entry, source_range);
   friend diagnostic_message operator+(source_range, diagnostic_db::diag_db_entry);
   friend diagnostic_message& operator|(diagnostic_message& msg0, diagnostic_message msg1);
+  friend diagnostic_message& operator|(diagnostic_message& msg, diagnostic_source_info_t);
 };
 diagnostic_message operator+(diagnostic_db::diag_db_entry data, source_range range);
 diagnostic_message operator+(source_range range, diagnostic_db::diag_db_entry data);
 
-diagnostic_message operator|(diagnostic_message msg0, diagnostic_message msg1);
+diagnostic_message& operator|(diagnostic_message& msg0, diagnostic_message msg1);
+diagnostic_message& operator|(diagnostic_message& msg, diagnostic_source_info_t);
 
 inline diagnostic_message diagnostic_db::diag_db_entry::operator-() const
 {
@@ -100,8 +129,13 @@ inline diagnostic_message diagnostic_db::diag_db_entry::operator-() const
 
 struct diagnostics_manager
 {
+private:
+  diagnostics_manager() {  }
 public:
   ~diagnostics_manager();
+
+  static diagnostics_manager make()
+  { return diagnostics_manager(); }
 
   diagnostics_manager& operator<<=(diagnostic_message msg);
 
@@ -127,5 +161,5 @@ private:
 #endif
 };
 
-static diagnostics_manager diagnostic;
+inline diagnostics_manager diagnostic = diagnostics_manager::make();
 
