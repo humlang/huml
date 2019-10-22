@@ -69,5 +69,21 @@ TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
     REQUIRE( diag[0].data.level == diag_level::error );
     REQUIRE( diag[0].data.human_referrable_code == "PA-LZ-000" );
   }
+
+  SECTION( "literal around number" ) {
+
+    stream_lookup.write_test("0a a0");
+    auto w = reader::read("TESTSTREAM");
+
+    REQUIRE( w.size() == 0 );
+    const auto& diag = diagnostic.get_all();
+
+    REQUIRE( diag.size() == 2);
+    REQUIRE( diag[0].data.level == diag_level::error );
+    REQUIRE( diag[0].data.human_referrable_code == "PA-NN-000" );
+
+    REQUIRE( diag[1].data.level == diag_level::error );
+    REQUIRE( diag[1].data.human_referrable_code == "PA-NN-000" );
+  }
 }
 

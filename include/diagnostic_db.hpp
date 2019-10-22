@@ -49,6 +49,11 @@ constexpr static const auto leading_zeros = [](auto t) {
   return make_db_entry(diag_level::error, "PA-LZ-000", err.get_string(), {});
 };
 
+constexpr static const auto no_number = [](auto t) {
+  symbol err(format(FMT_STRING("\"{}\" is not a number."), t));
+  return make_db_entry(diag_level::error, "PA-NN-000", err.get_string(), {});
+};
+
   }
 }
 
