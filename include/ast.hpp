@@ -46,14 +46,22 @@ public:
   literal(tag, token tok);
 };
 
+struct identifier : base<identifier>
+{
+public:
+  identifier(tag, token tok);
+};
+
 
 // Final AST-Type
 using ast_type = std::variant<std::monostate,
-      literal>;
+      literal,
+      identifier>;
 
 // Tag definitions
 namespace ast_tags
 {
   static constexpr inline tag<literal> literal = {};
+  static constexpr inline tag<identifier> identifier = {};
 }
 

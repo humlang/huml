@@ -14,6 +14,10 @@ inline static constexpr auto ast_printer = overloaded {
 
   [](literal lit) { PrinterFn print;
     print("literal token at " + lit.loc().to_string());
+  },
+
+  [](identifier id) { PrinterFn print;
+    print("identifier token at " + id.loc().to_string());
   }
 };
 

@@ -118,19 +118,22 @@ restart_get:
       // read until there is no number anymore. Disallow 000840
       std::string name;
       name.push_back(ch);
+      bool emit_not_a_number_error = false;
       bool emit_starts_with_zero_error = false;
       while(col < linebuf.size())
       {
         // don't use get<char>() here, numbers are not connected with a '\n'
         ch = linebuf[col++];
 
-        // break if we hit anything besides '0'..'9'
-        if(!std::isdigit(ch))
+        // break if we hit whitespace (or other control chars) or any other token char
+        if(std::iscntrl(ch) || std::isspace(ch)) // || ch == '(' || ch == ')'
         {
           col--;
           break;
         }
-        if(starts_with_zero)
+        if(!std::isdigit(ch))
+          emit_not_a_number_error = true;
+        if(starts_with_zero && !emit_not_a_number_error)
           emit_starts_with_zero_error = true;
         name.push_back(ch);
       }
@@ -139,6 +142,12 @@ restart_get:
         diagnostic <<= (diagnostic_db::parser::leading_zeros(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
           | source_context(0);
         goto restart_get; // <- SO WHAT
+      }
+      if(emit_not_a_number_error)
+      {
+        diagnostic <<= (diagnostic_db::parser::no_number(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
+                      | source_context(0);
+        goto restart_get;
       }
       kind = token_kind::LiteralNumber;
       data = symbol(name);
@@ -172,6 +181,11 @@ std::vector<ast_type> reader::read(const char* module)
 
     case token_kind::EndOfFile:
     break;
+
+    case token_kind::Identifier:
+    {
+      ast.push_back(identifier(ast_tags::identifier, tok));
+    } break;
 
     case token_kind::LiteralNumber:
     {
