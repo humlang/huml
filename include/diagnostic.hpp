@@ -155,6 +155,10 @@ public:
 
   const std::vector<diagnostic_message>& get_all() const
   { /*no need to lock*/ return data; }
+
+#ifdef H_LANG_TESTING
+  inline void reset() { err = 0; _print_codes = true; data.clear(); }
+#endif
 private:
   std::vector<diagnostic_message> data;
 

@@ -10,7 +10,7 @@
 TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
   
   SECTION( "single-digit" ) {
-
+    diagnostic.reset();
     stream_lookup.write_test("0 1 2 3 4 5 6 7 8 9");
     auto w = reader::read("TESTSTREAM");
 
@@ -40,7 +40,7 @@ TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
   }
 
   SECTION( "no trailing zero" ) {
-
+    diagnostic.reset();
     stream_lookup.write_test("000123 2");
     auto w = reader::read("TESTSTREAM");
 
@@ -71,7 +71,7 @@ TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
   }
 
   SECTION( "literal around number" ) {
-
+    diagnostic.reset();
     stream_lookup.write_test("0a a0");
     auto w = reader::read("TESTSTREAM");
 
