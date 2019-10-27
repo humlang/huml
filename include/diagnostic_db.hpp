@@ -26,10 +26,10 @@ constexpr static const auto source_information = [](auto loc) {
       //indent
       fmt::print(file, std::string(loc.column_beg + 1, ' '));
 
-      for(std::size_t c = loc.column_beg; c < loc.column_end; ++c)
-      {
-        fmt::print("^");
-      }
+      // print marker
+      fmt::print(file, fmt::emphasis::bold | fg(fmt::color::forest_green), std::string(loc.column_end - loc.column_beg, '^'));
+
+      // we don't need the stream anymore
       stream_lookup.drop(loc.module);
     }, {});
 };
