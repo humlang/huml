@@ -9,6 +9,7 @@ set(h-lang_files src/reader.cpp
   src/source_range.cpp
   src/diagnostic.cpp
   src/stream_lookup.cpp
+  src/argument_parser.cpp
   )
 
 find_package(fmt REQUIRED)

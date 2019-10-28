@@ -126,7 +126,7 @@ restart_get:
         ch = linebuf[col++];
 
         // break if we hit whitespace (or other control chars) or any other token char
-        if(std::iscntrl(ch) || std::isspace(ch)) // || ch == '(' || ch == ')'
+        if(std::iscntrl(ch) || std::isspace(ch))
         {
           col--;
           break;
