@@ -21,22 +21,12 @@ struct print
   }
 };
 
-void print_help();
-
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
-  std::vector<std::string> args;
-  args.reserve(argc - 1);
-  for(int i = 1; i < argc; ++i)
-    args.push_back(argv[i]);
-
-  arguments::parse(args);
+  arguments::parse(argc, argv, stdout);
 
   if(config.print_help)
-  {
-    print_help();
     return 0;
-  }
 
   auto w = reader::read("STDIN");
   for(auto& v : w)
@@ -46,12 +36,5 @@ int main(int argc, char** argv)
 
   diagnostic.print(stdout);
   return diagnostic.error_code();
-}
-
-void print_help()
-{
-  std::cout << "h-lang -[h|?|-help]\n";
-  std::cout << "  Arguments:\n";
-  std::cout << "    -h -? --help      Prints this text.\n";
 }
 
