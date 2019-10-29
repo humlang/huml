@@ -18,7 +18,7 @@ void parse(const std::vector<std::string>& args)
     {
       // must be a file or error
       std::fstream file(v, std::ios::in);
-      if(!file)
+      if(!(file.good()))
       {
         // could not open file TODO
         assert(false);
