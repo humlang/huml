@@ -4,6 +4,8 @@
 
 #include <fmt/format.h>
 
+#include <cx/cx_json_parser.h>
+
 #include <cassert>
 
 namespace arguments

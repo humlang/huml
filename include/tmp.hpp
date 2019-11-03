@@ -2,6 +2,7 @@
 
 #include <type_traits>
 #include <cstdint>
+#include <array>
 
 struct nonesuch {
   ~nonesuch() = delete;
