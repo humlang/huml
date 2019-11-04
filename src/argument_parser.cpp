@@ -4,8 +4,6 @@
 
 #include <fmt/format.h>
 
-#include <cx/cx_json_parser.h>
-
 #include <cassert>
 
 namespace arguments
@@ -31,15 +29,27 @@ void parse(int argc, const char** argv, std::FILE* out)
 namespace detail
 {
 
-constexpr CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string_view opts, std::string_view description)
+CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string_view opt_list, std::string_view description)
 {
+  std::vector<std::string_view> opts;
+  auto it = opt_list.find(',');
+  while(it != std::string::npos)
+  {
+    std::string_view opt = opt_list;
+    opt.remove_suffix(it);
+    opt_list.remove_suffix(it);
 
+    opts.emplace_back(opt);
+    it = opt_list.find(',', it);
+  }
+
+  ot->data.push_back(CmdOption { opts, description });
   return *this;
 }
 
-constexpr CmdOptions::CmdOptionsAdder CmdOptions::add_options()
+CmdOptions::CmdOptionsAdder CmdOptions::add_options()
 {
-  return {};
+  return { this };
 }
 
 std::map<std::string, std::any> CmdOptions::parse(int argc, const char** argv)
