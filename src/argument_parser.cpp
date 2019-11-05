@@ -48,12 +48,24 @@ CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string
 }
 
 CmdOptions::CmdOptionsAdder CmdOptions::add_options()
-{
-  return { this };
-}
+{ return { this }; }
 
 std::map<std::string, std::any> CmdOptions::parse(int argc, const char** argv)
 {
+  for(int i = 1; i < argc; ++i)
+  {
+    const std::string str = argv[i];
+    for(auto v : data)
+    {
+      bool matches = false;
+      for(auto f : v.opt)
+      {
+        if(f == str)
+          matches = true;
+      }
+      // TODO: smartly parse all other args
+    }
+  }
   return {};
 }
 
