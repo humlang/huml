@@ -72,6 +72,17 @@ std::map<std::string, std::any> CmdOptions::parse(int argc, const char** argv)
 void CmdOptions::print_help(std::FILE* f) const
 {
   fmt::print(f, "{}  -  {}\n", name, description);
+
+  for(auto v : data)
+  {
+    std::string args;
+    for(auto f : v.opt)
+    {
+      args += f;
+      args += " or ";
+    }
+    fmt::print(f, "{}    {}\n", args, v.description);
+  }
 }
 
 }
