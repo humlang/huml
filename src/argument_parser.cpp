@@ -13,8 +13,8 @@ void parse(int argc, const char** argv, std::FILE* out)
 {
   detail::CmdOptions options("h-lang", "The compiler for the h-language.");
   options.add_options()
-    ("h,?,help", "Prints this text.")
-    ("", "Accepts arbitrary list of files.")
+    ("h,?,help", "Prints this text.", [](auto){})
+    ("", "Accepts arbitrary list of files.", [](auto){})
     ;
 
   auto map = options.parse(argc, argv);
@@ -29,7 +29,7 @@ void parse(int argc, const char** argv, std::FILE* out)
 namespace detail
 {
 
-CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string_view opt_list, std::string_view description)
+CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string_view opt_list, std::string_view description, const std::function<void(const std::vector<std::string>&)>& f)
 {
   std::vector<std::string_view> opts;
   auto it = opt_list.find(',');
@@ -43,7 +43,7 @@ CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string
     it = opt_list.find(',', it);
   }
 
-  ot->data.push_back(CmdOption { opts, description });
+  ot->data.push_back(CmdOption { opts, description, f });
   return *this;
 }
 
@@ -52,18 +52,37 @@ CmdOptions::CmdOptionsAdder CmdOptions::add_options()
 
 std::map<std::string, std::any> CmdOptions::parse(int argc, const char** argv)
 {
+  std::map<std::string, std::any> map;
   for(int i = 1; i < argc; ++i)
   {
-    const std::string str = argv[i];
-    for(auto v : data)
+    std::vector<std::string> optargs;
+    std::optional<CmdOption> cur_opt;
+    bool matches = false;
+    while(!matches && i < argc)
     {
-      bool matches = false;
-      for(auto f : v.opt)
+      const std::string str = argv[i];
+      for(auto v : data)
       {
-        if(f == str)
-          matches = true;
+        for(auto f : v.opt)
+        {
+          if(f == str)
+          {
+            matches = true;
+            cur_opt = v;
+          }
+        }
       }
-      // TODO: smartly parse all other args
+      if(!matches)
+        optargs.push_back(str);
+    }
+    if(cur_opt.has_value())
+    {
+      (*cur_opt).parser(optargs);
+    }
+    else
+    {
+      // TODO: do it more smartly
+      assert(false && "unrecognized command line argument");
     }
   }
   return {};

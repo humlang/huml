@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 #include <tuple>
@@ -18,13 +19,14 @@ namespace detail
   {
     std::vector<std::string_view> opt;
     std::string_view description;
+    std::function<void(const std::vector<std::string>&)> parser;
   };
   struct CmdOptions
   {
   private:
     struct CmdOptionsAdder
     {
-      CmdOptionsAdder& operator()(std::string_view opts, std::string_view description);
+      CmdOptionsAdder& operator()(std::string_view opts, std::string_view description, const std::function<void(const std::vector<std::string>&)>& f);
 
       CmdOptions* ot;
     };
