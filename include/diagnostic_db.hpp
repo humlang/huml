@@ -34,6 +34,13 @@ constexpr static const auto source_information = [](auto loc) {
     }, {});
 };
 
+  namespace args
+  {
+
+static const auto unknown_arg = make_db_entry(diag_level::error, "AR-UN-000", "Unknown command line argument!", {});
+
+  }
+
   namespace parser
   {
 

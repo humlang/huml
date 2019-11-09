@@ -19,14 +19,14 @@ namespace detail
   {
     std::vector<std::string_view> opt;
     std::string_view description;
-    std::function<void(const std::vector<std::string>&)> parser;
+    std::function<std::any(const std::vector<std::string>&)> parser;
   };
   struct CmdOptions
   {
   private:
     struct CmdOptionsAdder
     {
-      CmdOptionsAdder& operator()(std::string_view opts, std::string_view description, const std::function<void(const std::vector<std::string>&)>& f);
+      CmdOptionsAdder& operator()(std::string_view opts, std::string_view description, const std::function<std::any(const std::vector<std::string>&)>& f);
 
       CmdOptions* ot;
     };
@@ -37,7 +37,7 @@ namespace detail
 
     CmdOptionsAdder add_options();
 
-    std::map<std::string, std::any> parse(int argc, const char** argv);
+    std::map<std::string_view, std::any> parse(int argc, const char** argv);
 
     void print_help(std::FILE* f) const;
   private:

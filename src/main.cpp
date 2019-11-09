@@ -26,14 +26,17 @@ int main(int argc, const char** argv)
   arguments::parse(argc, argv, stdout);
 
   if(config.print_help)
-    return 0;
+    goto end;
 
+  {
   auto w = reader::read("STDIN");
   for(auto& v : w)
   {
     std::visit(ast_printer<print>, v);
   }
+  }
 
+end:
   diagnostic.print(stdout);
   return diagnostic.error_code();
 }
