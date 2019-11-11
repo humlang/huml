@@ -15,8 +15,9 @@ void parse(int argc, const char** argv, std::FILE* out)
 {
   detail::CmdOptions options("h-lang", "The compiler for the h-language.");
   options.add_options()
-    ("h,?,help", "Prints this text.", [](auto x){ return std::make_any<bool>(true); })
-    ("", "Accepts arbitrary list of files.", [](auto){ return std::make_any<std::string>(); })
+    ("h,?,-help", "Prints this text.", std::make_any<bool>(false), [](auto x){ return std::make_any<bool>(true); })
+    (",f,-files", "Accepts arbitrary list of files.", std::make_any<std::string>(),
+      [out](auto x){ for(auto v : x) fmt::print(out, "{}\n", v); return std::make_any<std::string>(); })
     ;
 
   auto map = options.parse(argc, argv);
@@ -32,7 +33,7 @@ namespace detail
 {
 
 CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string_view opt_list, std::string_view description,
-    const std::function<std::any(const std::vector<std::string>&)>& f)
+    std::any default_value, const std::function<std::any(const std::vector<std::string>&)>& f)
 {
   std::vector<std::string_view> opts;
   auto it = opt_list.find(',');
@@ -48,7 +49,7 @@ CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string
   if(!opt_list.empty())
     opts.emplace_back(opt_list);
 
-  ot->data.push_back(CmdOption { opts, description, f });
+  ot->data.push_back(CmdOption { opts, description, default_value, f });
   return *this;
 }
 
@@ -75,6 +76,7 @@ std::map<std::string_view, std::any> CmdOptions::parse(int argc, const char** ar
             matches = true;
             cur_opt = v;
           }
+          map[f] = v.default_value;
         }
       }
       if(!matches)
