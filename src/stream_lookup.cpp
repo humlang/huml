@@ -24,11 +24,6 @@ stream_lookup_t::stream_lookup_t()
   ,test_module((fs::temp_directory_path() / ("TEST_" + cur_time())).string())
 #endif
 {
-#ifndef H_LANG_TESTING
-  // TODO: do not do this if we don't care about stdin
-  std::ofstream output_writer(stdin_module);
-  output_writer << std::cin.rdbuf();
-#endif
 }
 
 stream_lookup_t::~stream_lookup_t()
@@ -36,10 +31,21 @@ stream_lookup_t::~stream_lookup_t()
   assert(map.empty() && "All streams must be dropped.");
 }
 
+void stream_lookup_t::process_stdin()
+{
+#ifndef H_LANG_TESTING
+  std::ofstream output_writer(stdin_module);
+  output_writer << std::cin.rdbuf();
+  stdin_processed = true;
+#endif
+}
+
 std::istream& stream_lookup_t::operator[](std::string_view str)
 {
   if(str == "STDIN")
   {
+    if(!stdin_processed)
+      process_stdin();
     str = stdin_module;
   }
 #ifdef H_LANG_TESTING

@@ -19,6 +19,8 @@ struct stream_lookup_t
   void write_test(std::string_view str);
 #endif
 private:
+  void process_stdin();
+private:
   std::vector<std::unique_ptr<std::ifstream>> files;
 
   std::unordered_map<std::string_view, std::vector<std::unique_ptr<std::ifstream>>::iterator> map;
@@ -27,6 +29,8 @@ private:
 #ifdef H_LANG_TESTING
   std::string test_module;
 #endif
+
+  bool stdin_processed { false };
 };
 
 inline stream_lookup_t stream_lookup;
