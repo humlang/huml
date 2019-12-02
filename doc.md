@@ -1,9 +1,9 @@
 ## Module Definitions
 
-A module a single translation unit. There two kinds of modules:
+A module a single translation unit. There are two kinds of modules:
 
 1. Meta-Module - defines operators, substitution rules, or may contain theorems.
-2. Module - general purpose module that needs an associated meta-module
+2. Module - general purpose module that needs an associated meta-module.
 
 The filename determines the name of the module.
 A file with the extension `.hl` is a general purpose module.
