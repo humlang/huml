@@ -4,6 +4,3 @@
 [submodule "lib/fmt"]
 	path = lib/fmt
 	url = https://github.com/fmtlib/fmt.git
-[submodule "lib/function_ref"]
-	path = lib/function_ref
-	url = https://github.com/TartanLlama/function_ref.git

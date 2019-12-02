@@ -17,8 +17,6 @@ find_package(fmt REQUIRED)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
 
-include_directories(lib/function_ref/include)
-
 # tests
 find_package(Catch2 REQUIRED)
 
