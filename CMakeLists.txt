@@ -26,6 +26,8 @@ target_compile_definitions(h-lang_parsing_tests PUBLIC -DH_LANG_TESTING)
 target_link_libraries(h-lang_parsing_tests Catch2::Catch2 fmt::fmt stdc++fs)
 set_property(TARGET h-lang_parsing_tests PROPERTY CXX_STANDARD 17)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/lib/Catch2/contrib/")
+
 include(CTest)
 include(ParseAndAddCatchTests)
 ParseAndAddCatchTests(h-lang_parsing_tests)
