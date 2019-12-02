@@ -23,4 +23,5 @@ jobs:
         cd ../../..
         cmake -B./build -H. -Dfmt_DIR=./lib/fmt/build -DCatch2_DIR=./catch_install/lib/cmake/Catch2
         cd build
+        make -j8
         make test
