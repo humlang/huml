@@ -18,6 +18,8 @@ jobs:
         sudo ldconfig
         git submodule update --init --recursive
         git submodule update --remote
+        export CC=/usr/bin/clang
+        export CXX=/usr/bin/clang++
         cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=./catch_install
         cd lib/Catch2/build
         make install
