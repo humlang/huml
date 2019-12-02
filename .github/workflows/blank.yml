@@ -12,6 +12,7 @@ jobs:
     - name: Build and run tests
       run: |
         git submodule update --init --recursive
+        git submodule update --remote
         cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF
         cmake -B./lib/fmt/build -H./lib/fmt -DFMT_TEST=OFF
         cd lib/fmt/build
