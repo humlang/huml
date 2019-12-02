@@ -13,6 +13,7 @@ jobs:
       run: |
         git submodule update --init --recursive
         cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF
+        cmake -B./lib/fmt/build -H./lib/fmt
         cmake -B./build -H. 
         cd build
         make test
