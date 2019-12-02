@@ -1,0 +1,18 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build and run tests
+      run: |
+        git submodule update --init --recursive
+        cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF
+        cmake -B./build -H. 
+        cd build
+        make test
