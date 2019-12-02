@@ -12,6 +12,8 @@ jobs:
     - name: Build and run tests
       run: |
         git submodule update --init --recursive
-        cmake .
+        mkdir build
+        cd build
+        cmake ..
         make
         make test
