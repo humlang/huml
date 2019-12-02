@@ -12,8 +12,7 @@ jobs:
     - name: Build and run tests
       run: |
         git submodule update --init --recursive
-        cd lib/Catch2
-        mkdir build
+        mkdir lib/Catch2/build
         cmake ..
         make
         cd ../../..
