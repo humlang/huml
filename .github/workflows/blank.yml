@@ -14,6 +14,9 @@ jobs:
         git submodule update --init --recursive
         cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF
         cmake -B./lib/fmt/build -H./lib/fmt
+        cd lib/fmt/build
+        make -j8
+        cd ../../..
         cmake -B./build -H. -Dfmt_DIR=./lib/fmt
         cd build
         make test
