@@ -11,6 +11,12 @@ jobs:
     - uses: actions/checkout@v1
     - name: Build and run tests
       run: |
+        sudo apt install build-essential xz-utils curl
+        curl -SL http://releases.llvm.org/9.0.0/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz | tar -xJC .
+        cp -r clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-18.04/ /usr/local/clang-9.0.0
+        export LD_LIBRARY_PATH=/usr/local/clang-9.0.0/lib:$LD_LIBRARY_PATH
+        export PATH=/usr/local/clang-9.0.0/bin:$PATH
+        ldconfig
         git submodule update --init --recursive
         git submodule update --remote
         cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=./catch_install
