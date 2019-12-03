@@ -17,8 +17,8 @@ jobs:
         sudo apt install -y gcc-9
         git submodule update --init --recursive
         git submodule update --remote
-        export CXX=/usr/bin/g++
-        export CC=/usr/bin/gcc
+        export CXX=/usr/bin/clang++-9
+        export CC=/usr/bin/clang-9
         cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=./catch_install
         cd lib/Catch2/build
         make install
