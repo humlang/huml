@@ -14,10 +14,9 @@ jobs:
         sudo add-apt-repository ppa:jonathonf/gcc-9.0
         sudo apt update
         sudo apt install gcc-9
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
         git submodule update --init --recursive
         git submodule update --remote
-        export CC=/usr/bin/clang
-        export CXX=/usr/bin/clang++
         cmake -B./lib/Catch2/build -H./lib/Catch2/ -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=./catch_install
         cd lib/Catch2/build
         make install
