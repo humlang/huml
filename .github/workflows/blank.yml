@@ -12,8 +12,9 @@ jobs:
     - name: Build and run tests
       run: |
         sudo add-apt-repository ppa:jonathonf/gcc-9.0
+        bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
         sudo apt update
-        sudo apt install -y clang-9.0 lld-9.0 gcc-9 llvm-toolchain-9
+        sudo apt install -y gcc-9
         git submodule update --init --recursive
         git submodule update --remote
         export CXX=/usr/bin/g++
