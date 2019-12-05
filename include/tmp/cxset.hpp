@@ -6,12 +6,22 @@
 #include <cassert>
 #include <cstring>
 
-template<typename Key, typename Value, class Compare = std::less<Key>, std::size_t Size = 2>
-struct map
+// TODO: make this to a HAT-trie
+//       i.e.:
+//
+//       [ 0 ][ 1 ]...[ 'h' ]...[ 254 ][ 255 ]
+//                      / \
+//                    /     \
+//                  "e        [ 0 ][ 1 ]...[ 'o' ]...[254][255]
+//                   l                       / \
+//                   l                     "p   "l
+//                   o"                     e"   e"
+
+template<typename Key, class Compare = std::less<Key>, std::size_t Size = 2>
+struct set
 {
   using key_type = Key;
-  using mapped_type = Value;
-  using value_type = cxpair<Key, Value>;
+  using value_type = Key;
   using size_type = std::size_t;
   using difference_type = std::ptrdiff_t;
   using key_compare = Compare;
@@ -22,12 +32,12 @@ struct map
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  constexpr map(value_type(&&p)[Size])
-    : map(std::begin(p), std::end(p))
+  constexpr set(value_type(&&p)[Size])
+    : set(std::begin(p), std::end(p))
   { }
 
   template<typename Itr>
-  constexpr map(Itr begin, const Itr &end, Compare comp = Compare {})
+  constexpr set(Itr begin, const Itr &end, Compare comp = Compare {})
   {
     while(begin != end)
     {
@@ -36,15 +46,15 @@ struct map
     }
   }
 
-  constexpr map(map&& other)
+  constexpr set(set&& other)
     : data(other.data), capacity(other.capacity), cmp(other.cmp)
   {  }
 
-  constexpr map(const map& other)
+  constexpr set(const set& other)
     : data(other.data), capacity(other.capacity), cmp(other.cmp)
   {  }
 
-  constexpr map& operator=(map&& other)
+  constexpr set& operator=(set&& other)
   {
     data = other.data;
     capacity = other.capacity;
@@ -53,7 +63,7 @@ struct map
     return *this;
   }
 
-  constexpr map& operator=(const map& other)
+  constexpr set& operator=(const set& other)
   {
     data = other.data;
     capacity = other.capacity;
@@ -62,10 +72,10 @@ struct map
     return *this;
   }
 
-  constexpr map& operator=(cxpair<Key, Value>(&&p)[Size])
+  constexpr set& operator=(Key(&&p)[Size])
   {
     capacity = 0;
-    auto begin = std::begin<Key, Value>(p);
+    auto begin = std::begin<Key>(p);
     const auto end = std::end(p);
     while(begin != end)
     {
@@ -76,10 +86,10 @@ struct map
     return *this;
   }
 
-  constexpr map& operator=(const cxpair<Key, Value>(&p)[Size])
+  constexpr set& operator=(const Key(&p)[Size])
   {
     capacity = 0;
-    auto begin = std::begin<Key, Value>(p);
+    auto begin = std::begin<Key>(p);
     const auto end = std::end(p);
     while(begin != end)
     {
@@ -90,35 +100,35 @@ struct map
     return *this;
   }
 
-  constexpr mapped_type& at(const key_type& key)
+  constexpr value_type& at(const key_type& key)
   {
     for(auto& v : data)
-      if(!cmp(v.first, key) && !cmp(key, v.first))
-        return v.second;
+      if(!cmp(v, key) && !cmp(key, v))
+        return v;
     throw std::out_of_range("Element not found");
   }
 
-  constexpr const mapped_type& at(const key_type& key) const
+  constexpr const value_type& at(const key_type& key) const
   {
     for(auto& v : data)
-      if(!cmp(v.first, key) && !cmp(key, v.first))
-        return v.second;
+      if(!cmp(v, key) && !cmp(key, v))
+        return v;
     throw std::out_of_range("Element not found");
   }
 
-  constexpr mapped_type& operator[](const key_type& key)
+  constexpr value_type& operator[](const key_type& key)
   {
     for(auto& v : data)
-      if(!cmp(v.first, key) && !cmp(key, v.first))
-        return v.second;
+      if(!cmp(v, key) && !cmp(key, v))
+        return v;
     assert(false && "Element not found");
   }
 
-  constexpr const mapped_type& operator[](const key_type& key) const
+  constexpr const value_type& operator[](const key_type& key) const
   {
     for(auto& v : data)
-      if(!cmp(v.first, key) && !cmp(key, v.first))
-        return v.second;
+      if(!cmp(v, key) && !cmp(key, v))
+        return v;
     assert(false && "Element not found");
   }
 
@@ -153,7 +163,7 @@ struct map
   {
     std::size_t i = 0;
     for(auto& v : data)
-      if(!cmp(v.first, x) && !cmp(x, v.first))
+      if(!cmp(v, x) && !cmp(x, v))
         ++i;
     assert(i == 0 || i == 1);
     return i;
@@ -403,7 +413,7 @@ struct map
   constexpr iterator erase(iterator pos)
   {
     if(capacity == 0)
-        throw std::runtime_error("Can't erase anything from empty map");
+        throw std::runtime_error("Can't erase anything from empty set");
     auto dist = std::distance(pos, end());
     if(dist > 0)
     {
@@ -416,7 +426,7 @@ struct map
   constexpr iterator erase(const_iterator first, const_iterator last)
   {
     if(capacity == 0)
-      throw std::runtime_error("Can't erase anything from empty map");
+      throw std::runtime_error("Can't erase anything from empty set");
     auto dist = std::distance(first, last);
 
     if(capacity <= dist) // <- shouldn't this be an assertion?
@@ -443,57 +453,57 @@ struct map
     return 0;
   }
 
-  constexpr void swap(map& other) noexcept(std::is_nothrow_swappable<Compare>::value)
+  constexpr void swap(set& other) noexcept(std::is_nothrow_swappable<Compare>::value)
   { std::swap(other.data, data); std::swap(other.capacity, capacity); std::swap(other.cmp, cmp); }
 
   template<class C2, std::size_t s>
-  constexpr void merge(map<Key, Value, C2, s>& source)
+  constexpr void merge(set<Key, C2, s>& source)
   {
     if(capacity + source.capacity < Size)
-      throw std::out_of_range("Capacity is too small to merge maps");
+      throw std::out_of_range("Capacity is too small to merge sets");
     for(auto it = source.begin(); it != source.end(); ++it)
       insert(it);
   }
 
   template<class C2, std::size_t s>
-  constexpr void merge(map<Key, Value, C2, s>&& source)
+  constexpr void merge(set<Key, C2, s>&& source)
   {
     if(capacity + source.capacity < Size)
-      throw std::out_of_range("Capacity is too small to merge maps");
+      throw std::out_of_range("Capacity is too small to merge sets");
     for(auto it = source.begin(); it != source.end(); ++it)
       insert(it);
   }
 
   template<class Compare1, std::size_t S1>
-  friend constexpr bool operator==(const map<Key,Value,Compare,Size>& lhs, const map<Key,Value,Compare1,S1>& rhs);
+  friend constexpr bool operator==(const set<Key,Compare,Size>& lhs, const set<Key,Compare1,S1>& rhs);
 
   template<class Compare1, std::size_t S1>
-  friend constexpr bool operator!=(const map<Key,Value,Compare,Size>& lhs, const map<Key,Value,Compare1,S1>& rhs);
+  friend constexpr bool operator!=(const set<Key,Compare,Size>& lhs, const set<Key,Compare1,S1>& rhs);
 
   template<class Compare1, std::size_t S1>
-  friend constexpr bool operator<(const map<Key,Value,Compare,Size>& lhs, const map<Key,Value,Compare1,S1>& rhs);
+  friend constexpr bool operator<(const set<Key,Compare,Size>& lhs, const set<Key,Compare1,S1>& rhs);
 
   template<class Compare1, std::size_t S1>
-  friend constexpr bool operator<=(const map<Key,Value,Compare,Size>& lhs, const map<Key,Value,Compare1,S1>& rhs);
+  friend constexpr bool operator<=(const set<Key,Compare,Size>& lhs, const set<Key,Compare1,S1>& rhs);
 
   template<class Compare1, std::size_t S1>
-  friend constexpr bool operator>(const map<Key,Value,Compare,Size>& lhs, const map<Key,Value,Compare1,S1>& rhs);
+  friend constexpr bool operator>(const set<Key,Compare,Size>& lhs, const set<Key,Compare1,S1>& rhs);
 
   template<class Compare1, std::size_t S1>
-  friend constexpr bool operator>=(const map<Key,Value,Compare,Size>& lhs, const map<Key,Value,Compare1,S1>& rhs);
+  friend constexpr bool operator>=(const set<Key,Compare,Size>& lhs, const set<Key,Compare1,S1>& rhs);
 
   template<class K, class V, class C, std::size_t S, class C1, std::size_t S1>
-  friend void swap(map<Key,Value,C,S>& lhs, map<Key,Value,C1,S1>& rhs)
-    noexcept(std::declval<map<Key,Value,C,S>>().swap(std::declval<Key, Value, C1, S1>()));
+  friend void swap(set<Key,C,S>& lhs, set<Key,C1,S1>& rhs)
+    noexcept(std::declval<set<Key,C,S>>().swap(std::declval<Key, C1, S1>()));
 
   template<class Pred>
-  friend void erase_if(map<Key,Value,Compare,Size>& c, Pred pred);
+  friend void erase_if(set<Key,Compare,Size>& c, Pred pred);
 private:
   template<typename Itr>
   constexpr void push(Itr it)
   {
     if(capacity >= Size)
-      throw std::range_error("Index past end of map's capacity");
+      throw std::range_error("Index past end of set's capacity");
     else
     {
       auto& v = data[capacity++];
@@ -508,37 +518,37 @@ private:
   Compare cmp { };
 };
 
-template<class Key, class T, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
-constexpr bool operator==(const map<Key,T,Compare0,S0>& lhs, const map<Key,T,Compare1,S1>& rhs)
+template<class Key, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
+constexpr bool operator==(const set<Key,Compare0,S0>& lhs, const set<Key,Compare1,S1>& rhs)
 { return S0 == S1 && lhs.data == rhs.data; }
 
-template<class Key, class T, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
-constexpr bool operator!=(const map<Key,T,Compare0,S0>& lhs, const map<Key,T,Compare1,S1>& rhs)
+template<class Key, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
+constexpr bool operator!=(const set<Key,Compare0,S0>& lhs, const set<Key,Compare1,S1>& rhs)
 { return S0 != S1 || lhs.data != rhs.data; }
 
-template<class Key, class T, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
-constexpr bool operator<(const map<Key,T,Compare0,S0>& lhs, const map<Key,T,Compare1,S1>& rhs)
+template<class Key, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
+constexpr bool operator<(const set<Key,Compare0,S0>& lhs, const set<Key,Compare1,S1>& rhs)
 { return S0 < S1 && lhs.data < rhs.data; }
 
-template<class Key, class T, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
-constexpr bool operator<=(const map<Key,T,Compare0,S0>& lhs, const map<Key,T,Compare1,S1>& rhs)
+template<class Key, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
+constexpr bool operator<=(const set<Key,Compare0,S0>& lhs, const set<Key,Compare1,S1>& rhs)
 { return S0 <= S1 && lhs.data <= rhs.data; }
 
-template<class Key, class T, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
-constexpr bool operator>(const map<Key,T,Compare0,S0>& lhs, const map<Key,T,Compare1,S1>& rhs)
+template<class Key, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
+constexpr bool operator>(const set<Key,Compare0,S0>& lhs, const set<Key,Compare1,S1>& rhs)
 { return S0 > S1 && lhs.data > rhs.data; }
 
-template<class Key, class T, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
-constexpr bool operator>=(const map<Key,T,Compare0,S0>& lhs, const map<Key,T,Compare1,S1>& rhs)
+template<class Key, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
+constexpr bool operator>=(const set<Key,Compare0,S0>& lhs, const set<Key,Compare1,S1>& rhs)
 { return S0 >= S1 && lhs.data >= rhs.data; }
 
-template<class Key, class Value, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
-void swap(map<Key,Value,Compare0,S0>& lhs, map<Key,Value,Compare1,S1>& rhs)
-    noexcept(std::declval<map<Key,Value,Compare0,S0>>().swap(std::declval<Key, Value, Compare1, S1>()))
+template<class Key, class Compare0, class Compare1, std::size_t S0, std::size_t S1>
+void swap(set<Key,Compare0,S0>& lhs, set<Key,Compare1,S1>& rhs)
+    noexcept(std::declval<set<Key,Compare0,S0>>().swap(std::declval<Key, Compare1, S1>()))
 { lhs.swap(rhs); }
 
-template<class Key, class Value, class Compare, std::size_t Size, class Pred>
-void erase_if(map<Key,Value,Compare,Size>& c, Pred pred)
+template<class Key, class Compare, std::size_t Size, class Pred>
+void erase_if(set<Key,Compare,Size>& c, Pred pred)
 {
   for(auto i = c.begin(), last = c.end(); i != last; )
   {
@@ -552,26 +562,25 @@ void erase_if(map<Key,Value,Compare,Size>& c, Pred pred)
 template<class InputIt,
         class Comp = std::less<std::remove_const_t<typename std::iterator_traits<InputIt>::value_type::first_type>>,
         std::size_t Size = 2>
-map(InputIt, InputIt, Comp = Comp())
-        -> map<std::remove_const_t<typename std::iterator_traits<InputIt>::value_type::first_type>,
-                typename std::iterator_traits<InputIt>::value_type::second_type, Comp, Size>;
+set(InputIt, InputIt, Comp = Comp())
+        -> set<std::remove_const_t<typename std::iterator_traits<InputIt>::value_type::first_type>, Comp, Size>;
 
-template<class Key, class Value, std::size_t Size>
-map(cxpair<Key, Value>(&&)[Size])
-        -> map<Key, Value, std::less<Key>, Size>;
+template<class Key, std::size_t Size>
+set(Key(&&)[Size])
+        -> set<Key, std::less<Key>, Size>;
 
-template<class Key, class Value, class Comparator, std::size_t Size>
-map(cxpair<Key, Value>(&&)[Size], const Comparator& cmp)
-        -> map<Key, Value, Comparator, Size>;
+template<class Key, class Comparator, std::size_t Size>
+set(Key(&&)[Size], const Comparator& cmp)
+        -> set<Key, Comparator, Size>;
 
 
-template<typename Key, typename Value, std::size_t Size>
-constexpr auto make_map(cxpair<Key, Value>(&&m)[Size])
-        -> map<Key, Value, std::less<Key>, Size>
-{ return map<Key, Value, std::less<Key>, Size>(std::begin(m), std::end(m)); }
+template<class Key, std::size_t Size>
+constexpr auto make_set(Key(&&m)[Size])
+        -> set<Key, std::less<Key>, Size>
+{ return set<Key, std::less<Key>, Size>(std::begin(m), std::end(m)); }
 
-template<typename Key, typename Value, typename Comparator, std::size_t Size>
-constexpr auto make_map(cxpair<Key, Value>(&&m)[Size])
-        -> map<Key, Value, Comparator, Size>
-{ return map<Key, Value, Comparator, Size>(std::begin(m), std::end(m)); }
+template<class Key, typename Comparator, std::size_t Size>
+constexpr auto make_set(Key(&&m)[Size])
+        -> set<Key, Comparator, Size>
+{ return set<Key, Comparator, Size>(std::begin(m), std::end(m)); }
 

@@ -45,7 +45,9 @@ struct bounded_array_iterator
     return (*arr)[pos];
   }
 
-  friend constexpr void swap(bounded_array_iterator& lhs, bounded_array_iterator& rhs);
+  template<class D, std::size_t S, bool c>
+  friend constexpr void swap(bounded_array_iterator<D, S, c>& lhs,
+                             bounded_array_iterator<D, S, c>& rhs);
 
   constexpr bounded_array_iterator operator++(int) //post
   {
@@ -61,8 +63,11 @@ struct bounded_array_iterator
     return &((*arr)[pos]);
   }
 
-  friend constexpr bool operator==(const bounded_array_iterator&, const bounded_array_iterator&);
-  friend constexpr bool operator!=(const bounded_array_iterator&, const bounded_array_iterator&);
+  template<class D, std::size_t S, bool c>
+  friend constexpr bool operator==(const bounded_array_iterator<D, S, c>&, const bounded_array_iterator<T, S, c>&);
+
+  template<class D, std::size_t S, bool c>
+  friend constexpr bool operator!=(const bounded_array_iterator<D, S, c>&, const bounded_array_iterator<D, S, c>&);
 
   constexpr bounded_array_iterator& operator--() //pref
   {

@@ -2,13 +2,21 @@
 #include <diagnostic_db.hpp>
 #include <stream_lookup.hpp>
 
+#include <tmp/cxset.hpp>
+
 #include <reader.hpp>
 #include <token.hpp>
 #include <ast.hpp>
 
+#include <string_view>
 #include <cassert>
 #include <istream>
 #include <queue>
+
+using namespace std::literals::string_view_literals;
+
+constexpr auto keyword_set = make_set<std::string_view>({ "import"sv });
+
 
 reader::reader(const char* module)
   : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1)
