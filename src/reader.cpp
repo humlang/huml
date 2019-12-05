@@ -15,7 +15,16 @@
 
 using namespace std::literals::string_view_literals;
 
-constexpr auto keyword_set = make_set<std::string_view>({ "import"sv });
+constexpr auto keyword_set = make_set<std::string_view>({
+
+    // modules
+    "import"sv
+});
+
+constexpr auto operator_symbols_set = make_set<std::string_view>({
+
+    "."sv
+});
 
 
 reader::reader(const char* module)
@@ -103,8 +112,8 @@ restart_get:
         // don't use get<char>() here, identifiers are not connected with a '\n'
         ch = linebuf[col++];
 
-        // break if we hit whitespace (or other control chars) or any other token char
-        if(std::iscntrl(ch) || std::isspace(ch)) // || ch == '(' || ch == ')')
+        // break if we hit whitespace (or other control chars) or any other operator symbol char
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_set.contains(name.c_str()))
         {
           col--;
           break;
