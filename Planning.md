@@ -1,10 +1,10 @@
-h-lang - Road to Version 0.0.1 (alpha)
+## h-lang - Road to Version 0.0.1 (alpha)
 
 
 
-#### Step 1 to conquering the world
+### Step 1 to conquering the world
 
-- [ ] FOR (as in basic theoretical cs course) AST node     # for 5 { /*runs 5 times*/ }
+- [ ] FOR (as in basic theoretical cs course) AST node     `for 5 { /*runs 5 times*/ }`
 - [ ] basic arithmetic expressions
   - [ ] parsing of +, -, *     (Precedence Climbing)
   - [ ] nodes for binary expressions
