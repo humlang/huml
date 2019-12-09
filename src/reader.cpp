@@ -3,6 +3,7 @@
 #include <stream_lookup.hpp>
 
 #include <tmp/cxset.hpp>
+#include <tmp/cxmap.hpp>
 
 #include <reader.hpp>
 #include <token.hpp>
@@ -21,9 +22,9 @@ constexpr auto keyword_set = make_set<std::string_view>({
     "import"sv
 });
 
-constexpr auto operator_symbols_set = make_set<std::string_view>({
+constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
 
-    "."sv
+    { "."sv, token_kind::Point }
 });
 
 
@@ -113,14 +114,14 @@ restart_get:
         ch = linebuf[col++];
 
         // break if we hit whitespace (or other control chars) or any other operator symbol char
-        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_set.contains(name.c_str()))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()))
         {
           col--;
           break;
         }
         name.push_back(ch);
       }
-      kind = token_kind::Identifier;
+      kind = (operator_symbols_map.contains(name.c_str()) ? operator_symbols_map[name.c_str()] : token_kind::Identifier);
       data = symbol(name);
     }
     else
@@ -143,7 +144,7 @@ restart_get:
         ch = linebuf[col++];
 
         // break if we hit whitespace (or other control chars) or any other token char
-        if(std::iscntrl(ch) || std::isspace(ch))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()))
         {
           col--;
           break;
@@ -181,7 +182,6 @@ std::vector<ast_type> reader::read(const char* module)
 {
   reader r(module);
 
-
   std::vector<ast_type> ast;
   token tok(token_kind::Undef, "", {});
   while(tok.kind != token_kind::EndOfFile)
@@ -207,6 +207,11 @@ std::vector<ast_type> reader::read(const char* module)
     case token_kind::LiteralNumber:
     {
       ast.push_back(literal(ast_tags::literal, tok));
+    } break;
+
+    case token_kind::Point:
+    {
+
     } break;
     }
   }
