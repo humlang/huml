@@ -4,16 +4,7 @@
 
 ### Step 1 to conquering the world
 
-- [ ] FOR (as in basic theoretical cs course) AST node     `for 5 { /*runs 5 times*/ }`
-- [ ] basic arithmetic expressions
-  - [ ] parsing of +, -, *     (Precedence Climbing)
-  - [ ] nodes for binary expressions
-  - [ ] node for assignment expression/statement
-- [ ] print AST node (-> intrinsic function)
-- [ ] read AST node (-> intrinsic function,    `getchar`)
-- [ ] AST visitor (similar to ast_print) which evaluates    aka "eval per node"
-- [ ] add block AST node
-- [ ] parse block AST node
+See our [kanboard](https://hx-kanb.dasnacl.de/).
 
 
 
