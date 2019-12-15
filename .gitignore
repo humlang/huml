@@ -31,3 +31,5 @@ build/
 
 # Temporaries
 *.swp
+
+catch_install/
