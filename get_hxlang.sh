@@ -14,6 +14,8 @@ make install
 
 cd ../../..
 
+rm -rfv lib/Catch2/build
+
 cmake -B./lib/fmt/build -H./lib/fmt -DFMT_TEST=OFF
 
 cd lib/fmt/build
