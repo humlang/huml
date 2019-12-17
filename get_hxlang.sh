@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-git clone git@github.com:hx-lang/hx-lang.git
-
-cd hx-lang
+# assume that you have cloned hx-lang and are in the respective directory
 
 git submodule update --init --recursive
 
@@ -24,7 +22,7 @@ make -j8
 
 cd ../../..
 
-cmake -B./build -H. -Dfmt_DIR=./lib/fmt/build -DCatch2_DIR=$(find catch_install/ -name "ParseAndAddCatchTests.cmake" | xargs dirname)[0]
+cmake -B./build -H. -Dfmt_DIR=./lib/fmt/build -DCatch2_DIR=$(find catch_install/ -name "ParseAndAddCatchTests.cmake" | xargs dirname | head -n 1)
 
 cd build
 
