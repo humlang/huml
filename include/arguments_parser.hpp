@@ -20,15 +20,16 @@ namespace detail
     std::vector<std::string_view> opt;
     std::string_view description;
     std::any default_value;
-    std::function<std::any(const std::vector<std::string>&)> parser;
+    std::function<std::any(const std::vector<std::string_view>&)> parser;
   };
   struct CmdOptions
   {
   private:
+    friend struct CmdParse;
     struct CmdOptionsAdder
     {
       CmdOptionsAdder& operator()(std::string_view opts, std::string_view description, std::any default_value,
-                                  const std::function<std::any(const std::vector<std::string>&)>& f);
+                                  const std::function<std::any(const std::vector<std::string_view>&)>& f);
 
       CmdOptions* ot;
     };
