@@ -28,7 +28,7 @@ constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
 });
 
 
-reader::reader(const char* module)
+reader::reader(std::string_view module)
   : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1)
 {  }
 
@@ -178,7 +178,7 @@ restart_get:
   return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
 }
 
-std::vector<ast_type> reader::read(const char* module)
+std::vector<ast_type> reader::read(std::string_view module)
 {
   reader r(module);
 

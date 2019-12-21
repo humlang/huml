@@ -5,7 +5,7 @@
 
 struct source_range
 {
-  const char* module;
+  std::string_view module;
 
   std::size_t column_beg;
   std::size_t row_beg;
@@ -15,7 +15,7 @@ struct source_range
 
   source_range() = default;
 
-  source_range(const char* module, std::size_t column_beg, std::size_t row_beg,
+  source_range(std::string_view module, std::size_t column_beg, std::size_t row_beg,
                                   std::size_t column_end, std::size_t row_end);
 
   void widen(const source_range& range);

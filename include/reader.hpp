@@ -14,16 +14,16 @@
 class reader
 {
 public:
-  static std::vector<ast_type> read(const char* module);
+  static std::vector<ast_type> read(std::string_view module);
 
   ~reader();
 private:
-  reader(const char* module);
+  reader(std::string_view module);
 
   template<typename T>
   T get() { static_assert(sizeof(T) != 0, "unimplemented"); }
 private:
-  const char* module;
+  std::string_view module;
   std::istream& is;
 
   std::string linebuf;

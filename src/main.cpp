@@ -25,15 +25,24 @@ int main(int argc, const char** argv)
 {
   arguments::parse(argc, argv, stdout);
 
+  std::vector<std::string_view> tasks;
   if(config.print_help)
     goto end;
 
+  if(config.files.empty())
+    tasks = { "STDIN" };
+  else
+    tasks = config.files;
+
+
+  // just do it sequentially now
+  for(auto& t : tasks)
   {
-  auto w = reader::read("STDIN");
-  for(auto& v : w)
-  {
-    std::visit(ast_printer<print>, v);
-  }
+    auto w = reader::read(t);
+    for(auto& v : w)
+    {
+      std::visit(ast_printer<print>, v);
+    }
   }
 
 end:

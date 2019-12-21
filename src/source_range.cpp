@@ -1,7 +1,7 @@
 #include "source_range.hpp"
 
-source_range::source_range(const char* module, std::size_t column_beg, std::size_t row_beg,
-                                             std::size_t column_end, std::size_t row_end)
+source_range::source_range(std::string_view module, std::size_t column_beg, std::size_t row_beg,
+                                                    std::size_t column_end, std::size_t row_end)
   : module(module), column_beg(column_beg), row_beg(row_beg), column_end(column_end), row_end(row_end)
 {  }
 

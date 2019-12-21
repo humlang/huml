@@ -29,10 +29,7 @@ void parse(int argc, const char** argv, std::FILE* out)
   }
   if(const auto& files = std::any_cast<std::vector<std::string_view>>(map["f"]); !files.empty())
   {
-    for(const auto& file : files)
-    {
-      fmt::print("FILE: {}\n", file);
-    }
+    config.files = files;
   }
 }
 
