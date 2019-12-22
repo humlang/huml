@@ -1,5 +1,6 @@
 #include <diagnostic.hpp>
 #include <diagnostic_db.hpp>
+#include <memory>
 #include <stream_lookup.hpp>
 
 #include <tmp/cxset.hpp>
@@ -13,13 +14,15 @@
 #include <cassert>
 #include <istream>
 #include <queue>
+#include <vector>
 
 using namespace std::literals::string_view_literals;
 
 constexpr auto keyword_set = make_set<std::string_view>({
 
     // modules
-    "import"sv
+    "import"sv,
+    "for"sv
 });
 
 constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
@@ -30,7 +33,10 @@ constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
 
 reader::reader(std::string_view module)
   : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1)
-{  }
+{
+  for(std::size_t i = 0; i < next_toks.size(); ++i)
+    consume();
+}
 
 reader::~reader()
 { stream_lookup.drop(module); }
@@ -88,6 +94,8 @@ char reader::get<char>()
 }
 
 
+///// Parsing
+
 template<>
 token reader::get<token>()
 {
@@ -122,6 +130,7 @@ restart_get:
         name.push_back(ch);
       }
       kind = (operator_symbols_map.contains(name.c_str()) ? operator_symbols_map[name.c_str()] : token_kind::Identifier);
+      kind = (keyword_set.contains(name.c_str()) ? token_kind::Keyword : kind);
       data = symbol(name);
     }
     else
@@ -178,42 +187,115 @@ restart_get:
   return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
 }
 
+void reader::consume()
+{
+  current = next_toks[0];
+
+  for(std::size_t i = 0, j = 1; j < next_toks.size(); ++i, ++j)
+    std::swap(next_toks[i], next_toks[j]);
+
+  next_toks.back() = get<token>();
+}
+
+template<typename F>
+void reader::expect(token_kind kind, F&& f)
+{
+  if(next_toks[0].kind != kind)
+    diagnostic <<= (f + next_toks[0].loc) | source_context(0);
+  consume();
+}
+
+template<typename F>
+void reader::expect(std::int8_t c, F&& f)
+{
+  expect(static_cast<token_kind>(c), std::forward<F>(f));
+}
+
+bool reader::accept(token_kind kind)
+{
+  if(next_toks[0].kind != kind)
+    return false;
+
+  consume();
+  return true;
+}
+
+bool reader::accept(std::int8_t c)
+{
+  return accept(static_cast<token_kind>(c));
+}
+
+rec_wrap_t<literal> reader::parse_literal()
+{
+  consume();
+  return std::make_unique<literal>(ast_tags::literal, old);
+}
+
+rec_wrap_t<block> reader::parse_block()
+{
+  auto tmp = current;
+  expect('{', diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
+
+  std::vector<stmt_type> v;
+  while(accept('}'))
+    v.emplace_back(parse_statement());
+
+  return std::make_unique<block>(ast_tags::block, tmp, std::move(v));
+}
+
+stmt_type reader::parse_keyword()
+{
+  assert(keyword_set.contains(current.data.get_string()));
+
+  consume();
+  if("for" == old.data.get_string())
+    return std::make_unique<loop>(ast_tags::loop, old, parse_literal(), parse_block());
+
+  return std::make_unique<error>(ast_tags::error, old);
+}
+
+stmt_type reader::parse_statement()
+{
+  switch(current.kind)
+  {
+  default:
+  {
+    diagnostic <<= (diagnostic_db::parser::unknown_token(current.data.get_string()) + current.loc)
+                  | source_context(0);
+    consume();
+    return std::make_unique<error>(ast_tags::error, old);
+  } break;
+
+  case token_kind::Keyword:
+  {
+    return std::move(parse_keyword());
+  }
+  }
+}
+
 std::vector<ast_type> reader::read(std::string_view module)
 {
   reader r(module);
 
   std::vector<ast_type> ast;
-  token tok(token_kind::Undef, "", {});
-  while(tok.kind != token_kind::EndOfFile)
+  while(r.current.kind != token_kind::EndOfFile)
   {
-    tok = r.get<token>();
+    r.consume();
 
-    switch(tok.kind)
+    switch(r.current.kind)
     {
     default:
     {
-      diagnostic <<= (diagnostic_db::parser::unknown_token(tok.data.get_string()) + tok.loc)
+      diagnostic <<= (diagnostic_db::parser::unknown_token(r.current.data.get_string()) + r.current.loc)
                     | source_context(0);
     } break;
 
     case token_kind::EndOfFile:
     break;
 
-    case token_kind::Identifier:
-    {
-      ast.push_back(identifier(ast_tags::identifier, tok));
-    } break;
-
-    case token_kind::LiteralNumber:
-    {
-      ast.push_back(literal(ast_tags::literal, tok));
-    } break;
-
-    case token_kind::Point:
-    {
-
-    } break;
     }
+    auto tmp = stmt_type_to_ast_type(r.parse_statement());
+    ast.emplace_back(std::move(tmp));
   }
   if(ast.empty())
   {

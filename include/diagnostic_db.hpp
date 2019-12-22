@@ -61,6 +61,21 @@ constexpr static const auto no_number = [](auto t) {
   return make_db_entry(diag_level::error, "PA-NN-000", err.get_string(), {});
 };
 
+constexpr static const auto unknown_keyword = [](auto t) {
+  symbol err(format(FMT_STRING("Can not tokenize \"{}\"."), t));
+  return make_db_entry(diag_level::error, "PA-UK-000", err.get_string(), {});
+};
+
+constexpr static const auto block_expects_lbrace = [](auto t) {
+  symbol err(format(FMT_STRING("\"{}\" expected before block."), t));
+  return make_db_entry(diag_level::error, "PA-BR-000", err.get_string(), {});
+};
+
+constexpr static const auto block_expects_rbrace = [](auto t) {
+  symbol err(format(FMT_STRING("\"{}\" expected after block."), t));
+  return make_db_entry(diag_level::error, "PA-BR-001", err.get_string(), {});
+};
+
   }
 }
 
