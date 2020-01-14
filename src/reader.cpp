@@ -237,7 +237,7 @@ rec_wrap_t<block> reader::parse_block()
   expect('{', diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
 
   std::vector<stmt_type> v;
-  while(accept('}'))
+  while(!accept('}'))
     v.emplace_back(parse_statement());
 
   return std::make_unique<block>(ast_tags::block, tmp, std::move(v));
