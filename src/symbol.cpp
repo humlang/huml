@@ -1,7 +1,11 @@
 #include <symbol.hpp>
 #include <tmp.hpp>
 
-thread_local std::unordered_map<std::uint_fast32_t, std::string> symbol::symbols = {};
+#include <mutex>
+
+static std::mutex symbol_table_mutex;
+
+std::unordered_map<std::uint_fast32_t, std::string> symbol::symbols = {};
 
 symbol::symbol(const std::string& str)
   : hash(hash_string(str))
@@ -64,6 +68,7 @@ std::string& symbol::lookup_or_emplace(std::uint_fast32_t hash, const char* str)
   if(it != symbols.end())
     return symbols[hash];
 
+  std::lock_guard<std::mutex> lock(symbol_table_mutex);
   symbols[hash] = str;
   return symbols[hash];
 }

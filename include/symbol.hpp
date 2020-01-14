@@ -28,7 +28,7 @@ struct symbol
 private:
   static std::string& lookup_or_emplace(std::uint_fast32_t hash, const char* str);
 private:
-  thread_local static std::unordered_map<std::uint_fast32_t, std::string> symbols;
+  static std::unordered_map<std::uint_fast32_t, std::string> symbols;
 
   std::uint_fast32_t hash;
 };
