@@ -102,6 +102,10 @@ struct loop : base<loop>
 {
 public:
   loop(tag, token tok, rec_wrap_t<literal> times, stmt_type body);
+
+  const rec_wrap_t<literal>& num_times() const { return times; }
+  const stmt_type& loop_body() const { return body; }
+
 private:
   rec_wrap_t<literal> times;
   stmt_type body;

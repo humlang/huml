@@ -8,34 +8,61 @@
 // The recursor allows us to recursively call ast_printer_helper
 template<typename PrinterFn>
 inline static constexpr auto ast_printer_helper = base_visitor {
-  [](auto recursor, auto& arg) { PrinterFn print;
+  [](auto&& rec, auto& arg) { PrinterFn print;
     print("unknown argument");
   },
 
-  [](auto recursor, rec_wrap_t<literal>& lit) { PrinterFn print;
+  [](auto&& rec, const stmt_type& typ) {
+    std::visit(rec, typ);
+  },
+
+  [](auto&& rec, const rec_wrap_t<literal>& lit) { PrinterFn print;
     print("literal token at " + lit->loc().to_string());
   },
 
-  [](auto recursor, rec_wrap_t<identifier>& id) { PrinterFn print;
+  [](auto&& rec, const rec_wrap_t<identifier>& id) { PrinterFn print;
     print("identifier token at " + id->loc().to_string());
   },
 
-  [](auto recursor, rec_wrap_t<loop>& l) { PrinterFn print;
-    print("loop at " + l->loc().to_string());
+  [](auto&& rec, const rec_wrap_t<loop>& l) { PrinterFn print;
+    auto loc = l->loc().to_string();
+    print("loop at " + loc);
+    print("[" + loc + "] data 1/2  -  ");
+    rec(l->num_times());
+
+    print("[" + loc + "] data 2/2  -  ");
+    std::visit(rec, l->loop_body());
   },
 
-  [](auto recursor, rec_wrap_t<block>& b) { PrinterFn print;
-    print("loop at " + b->loc().to_string());
-  }
+  [](auto&& rec, const rec_wrap_t<block>& b) { PrinterFn print;
+    print("block at " + b->loc().to_string());
+  },
+
+  [](auto&& rec, std::monostate& t) {}
 };
 
 std::mutex ast_printer_mutex;
 
+template<typename F>
+struct recursor
+{
+  recursor(F&& f) : f(f) {}
+
+  template<typename T>
+  void operator()(const T& arg)
+  { f(*this, arg); }
+private:
+  F f;
+};
+template<typename F> recursor(F&&) -> recursor<F>;
+
 // The actual ast_printer now just needs to plug everything accordingly
 template<typename PrinterFn>
 inline static constexpr auto ast_printer = 
-			[](auto& arg)
+			[](const auto& arg) -> void
       {
         const std::lock_guard<std::mutex> lock(ast_printer_mutex);
-        return ast_printer_helper<PrinterFn>(ast_printer_helper<PrinterFn>, arg);
+
+        ast_printer_helper<PrinterFn>(recursor(ast_printer_helper<PrinterFn>), arg);
       };
+

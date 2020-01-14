@@ -48,7 +48,7 @@ int main(int argc, const char** argv)
       auto& t = *tit;
       runners.emplace_back(std::async(std::launch::async, [t]()
       {
-        const auto& w = reader::read(t);
+        auto w = reader::read(t);
 
         for(auto& v : w)
         {

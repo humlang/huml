@@ -122,7 +122,7 @@ restart_get:
         ch = linebuf[col++];
 
         // break if we hit whitespace (or other control chars) or any other operator symbol char
-        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()) || keyword_set.contains(name.c_str()))
         {
           col--;
           break;
@@ -153,7 +153,7 @@ restart_get:
         ch = linebuf[col++];
 
         // break if we hit whitespace (or other control chars) or any other token char
-        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()) || keyword_set.contains(name.c_str()))
         {
           col--;
           break;
@@ -180,6 +180,17 @@ restart_get:
       data = symbol(name);
     } break;
 
+  case '{':
+    {
+      kind = token_kind::LBrace;
+      data = "{";
+    } break;
+  case '}':
+    {
+      kind = token_kind::RBrace;
+      data = "}";
+    } break;
+
   case EOF:
       kind = token_kind::EndOfFile;
     break;
@@ -189,6 +200,7 @@ restart_get:
 
 void reader::consume()
 {
+  old = current;
   current = next_toks[0];
 
   for(std::size_t i = 0, j = 1; j < next_toks.size(); ++i, ++j)
@@ -200,7 +212,7 @@ void reader::consume()
 template<typename F>
 void reader::expect(token_kind kind, F&& f)
 {
-  if(next_toks[0].kind != kind)
+  if(current.kind != kind)
     diagnostic <<= (f + next_toks[0].loc) | source_context(0);
   consume();
 }
@@ -213,7 +225,7 @@ void reader::expect(std::int8_t c, F&& f)
 
 bool reader::accept(token_kind kind)
 {
-  if(next_toks[0].kind != kind)
+  if(current.kind != kind)
     return false;
 
   consume();
@@ -249,7 +261,12 @@ stmt_type reader::parse_keyword()
 
   consume();
   if("for" == old.data.get_string())
-    return std::make_unique<loop>(ast_tags::loop, old, parse_literal(), parse_block());
+  {
+    auto very_old = old;
+    auto l = parse_literal();
+    auto b = parse_block();
+    return std::make_unique<loop>(ast_tags::loop, very_old, std::move(l), std::move(b));
+  }
 
   return std::make_unique<error>(ast_tags::error, old);
 }
@@ -281,7 +298,7 @@ std::vector<ast_type> reader::read(std::string_view module)
   while(r.current.kind != token_kind::EndOfFile)
   {
     r.consume();
-
+    /*
     switch(r.current.kind)
     {
     default:
@@ -293,7 +310,7 @@ std::vector<ast_type> reader::read(std::string_view module)
     case token_kind::EndOfFile:
     break;
 
-    }
+    }*/
     auto tmp = stmt_type_to_ast_type(r.parse_statement());
     ast.emplace_back(std::move(tmp));
   }
