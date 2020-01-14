@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <mutex>
 
 #include <ast.hpp>
 
@@ -28,7 +29,13 @@ inline static constexpr auto ast_printer_helper = base_visitor {
   }
 };
 
+std::mutex ast_printer_mutex;
+
 // The actual ast_printer now just needs to plug everything accordingly
 template<typename PrinterFn>
 inline static constexpr auto ast_printer = 
-			[](auto& arg) { return ast_printer_helper<PrinterFn>(ast_printer_helper<PrinterFn>, arg); };
+			[](auto& arg)
+      {
+        const std::lock_guard<std::mutex> lock(ast_printer_mutex);
+        return ast_printer_helper<PrinterFn>(ast_printer_helper<PrinterFn>, arg);
+      };

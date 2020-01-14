@@ -20,6 +20,7 @@ namespace detail
     std::vector<std::string_view> opt;
     std::string_view description;
     std::any default_value;
+    std::string_view default_value_str;
     std::function<std::any(const std::vector<std::string_view>&)> parser;
   };
   struct CmdOptions
@@ -29,6 +30,7 @@ namespace detail
     struct CmdOptionsAdder
     {
       CmdOptionsAdder& operator()(std::string_view opts, std::string_view description, std::any default_value,
+                                  std::string_view default_value_str,
                                   const std::function<std::any(const std::vector<std::string_view>&)>& f);
 
       CmdOptions* ot;

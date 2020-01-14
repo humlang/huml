@@ -39,6 +39,10 @@ constexpr static const auto source_information = [](auto loc) {
 
 static const auto unknown_arg = make_db_entry(diag_level::error, "AR-UN-000", "Unknown command line argument!", {});
 
+static const auto num_cores_too_small = make_db_entry(diag_level::error, "AR-NC-577", "Number of cores smaller than one.", {});
+static const auto num_cores_too_large = make_db_entry(diag_level::warn, "AR-NC-775", "Number of cores bigger than the number of concurrent threads supported by the implementation.", {});
+
+
   }
 
   namespace parser

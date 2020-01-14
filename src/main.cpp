@@ -9,6 +9,8 @@
 
 #include <iostream>
 #include <sstream>
+#include <future>
+#include <thread>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -25,6 +27,10 @@ int main(int argc, const char** argv)
 {
   arguments::parse(argc, argv, stdout);
 
+  if(diagnostic.error_code() != 0)
+    goto end;
+
+  { // <- needed for goto
   std::vector<std::string_view> tasks;
   if(config.print_help)
     goto end;
@@ -34,15 +40,31 @@ int main(int argc, const char** argv)
   else
     tasks = config.files;
 
-
-  // just do it sequentially now
-  for(auto& t : tasks)
+  std::vector<std::future<void>> runners;
+  for(auto tit = tasks.begin(); tit != tasks.end(); )
   {
-    auto w = reader::read(t);
-    for(auto& v : w)
+    for(std::size_t i = runners.size(); tit != tasks.end() && i < config.num_cores; ++i)
     {
-      std::visit(ast_printer<print>, v);
+      auto& t = *tit;
+      runners.emplace_back(std::async(std::launch::async, [t]()
+      {
+        const auto& w = reader::read(t);
+
+        for(auto& v : w)
+        {
+          std::visit(ast_printer<print>, v);
+        }
+      }));
+      ++tit;
     }
+    for(auto rit = runners.begin(); rit != runners.end(); )
+    {
+      if(rit->wait_for(std::chrono::nanoseconds(100)) == std::future_status::ready)
+        rit = runners.erase(rit);
+      else
+        ++rit;
+    }
+  }
   }
 
 end:

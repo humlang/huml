@@ -7,6 +7,7 @@
 #include <fmt/format.h>
 
 #include <cassert>
+#include <thread>
 
 namespace arguments
 {
@@ -15,9 +16,22 @@ void parse(int argc, const char** argv, std::FILE* out)
 {
   detail::CmdOptions options("h-lang", "The compiler for the h-language.");
   options.add_options()
-    ("h,?,-help", "Prints this text.", std::make_any<bool>(false), [](auto x){ return std::make_any<bool>(true); })
-    (",f,-files", "Accepts arbitrary list of files.", std::make_any<std::vector<std::string_view>>(),
+    ("h,?,-help", "Prints this text.", std::make_any<bool>(false), "false", [](auto x){ return std::make_any<bool>(true); })
+    (",f,-files", "Accepts arbitrary list of files.", std::make_any<std::vector<std::string_view>>(), "STDIN",
       [out](auto x){ std::vector<std::string_view> w; for(auto v : x) w.push_back(v); return w; })
+    ("j,-num-cores", "Number of cores to use for processing modules.", std::make_any<std::size_t>(1), "1",
+      [](auto x)
+      {
+        if(x.front() == "*")
+          return static_cast<std::size_t>(std::thread::hardware_concurrency());
+        auto v = static_cast<std::size_t>(std::stoull(std::string(x.front())));
+
+        if(v == 0)
+          diagnostic <<= (-diagnostic_db::args::num_cores_too_small);
+        else if(v > std::thread::hardware_concurrency())
+          diagnostic <<= (-diagnostic_db::args::num_cores_too_large);
+        return v;
+      })
     ;
 
   auto map = options.parse(argc, argv);
@@ -31,13 +45,14 @@ void parse(int argc, const char** argv, std::FILE* out)
   {
     config.files = files;
   }
+  config.num_cores = std::any_cast<std::size_t>(map["j"]);
 }
 
 namespace detail
 {
 
 CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string_view opt_list, std::string_view description,
-    std::any default_value, const std::function<std::any(const std::vector<std::string_view>&)>& f)
+    std::any default_value, std::string_view default_value_str, const std::function<std::any(const std::vector<std::string_view>&)>& f)
 {
   std::vector<std::string_view> opts;
   auto it = opt_list.find(',');
@@ -47,13 +62,14 @@ CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string
     opt.remove_suffix(opt.size() - it);
     opt_list.remove_prefix(it + 1); // + 1 to remove comma
 
+
     opts.emplace_back(opt);
     it = opt_list.find(',', it);
   }
   if(!opt_list.empty())
     opts.emplace_back(opt_list);
 
-  ot->data.push_back(CmdOption { opts, description, default_value, f });
+  ot->data.push_back(CmdOption { opts, description, default_value, default_value_str, f });
   return *this;
 }
 
@@ -156,45 +172,6 @@ std::map<std::string_view, std::any> CmdOptions::parse(int argc, const char** ar
     args[i - 1] = argv[i];
 
   return CmdParse(args, map, *this);
-
-
-  /*
-  for(int i = 1; i < argc; ++i)
-  {
-    std::vector<std::string> optargs;
-    std::optional<CmdOption> cur_opt;
-    bool matches = false;
-    while(!matches && i < argc)
-    {
-      const std::string str = argv[i];
-      for(auto v : data)
-      {
-        for(auto f : v.opt)
-        {
-          if(str.find(f) == 1) // first char of str is `-`, after that it should match
-          {
-            matches = true;
-            cur_opt = v;
-          }
-        }
-      }
-      if(!matches)
-      {
-        optargs.push_back(str);
-        ++i;
-      }
-    }
-    if(cur_opt.has_value())
-    {
-      std::any a = (*cur_opt).parser(optargs);
-      for(auto& o : cur_opt->opt)
-        map[o] = a;
-    }
-    else
-      diagnostic <<= (-diagnostic_db::args::unknown_arg);
-  }
-  */
-  return map;
 }
 
 void CmdOptions::print_help(std::FILE* f) const
@@ -209,7 +186,7 @@ void CmdOptions::print_help(std::FILE* f) const
       args += f;
       args += " or ";
     }
-    fmt::print(f, "{}    {}\n", args, v.description);
+    fmt::print(f, "{}    {} [default={}]\n", args, v.description, v.default_value_str);
   }
 }
 
