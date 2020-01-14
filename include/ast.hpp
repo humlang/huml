@@ -10,6 +10,21 @@
 template<class... Ts> struct base_visitor : Ts... { using Ts::operator()...; };
 template<class... Ts> base_visitor(Ts...) -> base_visitor<Ts...>;
 
+template<typename F>
+struct recursor
+{
+  recursor(F&& f) : f(f) {}
+
+  template<typename T>
+  void operator()(const T& arg)
+  { f(*this, arg); }
+private:
+  F f;
+};
+template<typename F> recursor(F&&) -> recursor<F>;
+// see sample for recursive visitor in ast_printer.hpp
+
+
 template<typename T>
 using rec_wrap_t = std::unique_ptr<T>;
 

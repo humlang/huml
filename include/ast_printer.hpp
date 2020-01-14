@@ -43,19 +43,6 @@ inline static constexpr auto ast_printer_helper = base_visitor {
 
 std::mutex ast_printer_mutex;
 
-template<typename F>
-struct recursor
-{
-  recursor(F&& f) : f(f) {}
-
-  template<typename T>
-  void operator()(const T& arg)
-  { f(*this, arg); }
-private:
-  F f;
-};
-template<typename F> recursor(F&&) -> recursor<F>;
-
 // The actual ast_printer now just needs to plug everything accordingly
 template<typename PrinterFn>
 inline static constexpr auto ast_printer = 
