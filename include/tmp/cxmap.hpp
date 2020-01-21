@@ -123,25 +123,25 @@ struct map
   }
 
   constexpr iterator begin() noexcept
-  { return { data }; }
+  { return { data, capacity, 0 }; }
 
   constexpr const_iterator begin() const noexcept
-  { return { data }; }
+  { return { data, capacity, 0 }; }
 
   constexpr const_iterator cbegin() const noexcept
-  { return { data }; }
+  { return { data, capacity, 0 }; }
 
   constexpr iterator end() noexcept
-  { return { data }; }
+  { return { data, capacity }; }
 
   constexpr const_iterator end() const noexcept
-  { return { data }; }
+  { return { data, capacity }; }
 
   constexpr const_iterator cend() const noexcept
-  { return { data }; }
+  { return { data, capacity }; }
 
   [[nodiscard]] constexpr bool empty() const noexcept
-  { return capacity; }
+  { return capacity == 0; }
 
   constexpr size_type size() const noexcept
   { return capacity; }
@@ -162,7 +162,7 @@ struct map
   constexpr iterator find(const Key& key)
   {
     for(auto it = begin(); it != end(); ++it)
-      if(!cmp(*it, key) && !cmp(key, *it))
+      if(!cmp(it->first, key) && !cmp(key, it->first))
         return it;
     return end();
   }
@@ -170,7 +170,7 @@ struct map
   constexpr const_iterator find(const Key& key) const
   {
     for(auto it = begin(); it != end(); ++it)
-      if(!cmp(*it, key) && !cmp(key, *it))
+      if(!cmp(it->first, key) && !cmp(key, it->first))
         return it;
     return end();
   }
@@ -195,7 +195,7 @@ struct map
       it = first;
       step = count / 2;
       std::advance(it, step);
-      if(comp(*it, key))
+      if(comp(it->first, key))
       {
         first = ++it;
         count -= step + 1;
@@ -217,7 +217,7 @@ struct map
       it = first;
       step = count / 2;
       std::advance(it, step);
-      if(comp(*it, key))
+      if(comp(it->first, key))
       {
         first = ++it;
         count -= step + 1;
@@ -239,7 +239,7 @@ struct map
       it = first;
       step = count / 2;
       std::advance(it, step);
-      if(!comp(key, *it))
+      if(!comp(key, it->first))
       {
         first = ++it;
         count -= step + 1;
@@ -261,7 +261,7 @@ struct map
       it = first;
       step = count / 2;
       std::advance(it, step);
-      if(!comp(key, *it))
+      if(!comp(key, it->first))
       {
         first = ++it;
         count -= step + 1;

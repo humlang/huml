@@ -34,6 +34,24 @@ struct cxpair
   constexpr cxpair& operator=(const cxpair<T0, T1>& other)
   { first = other.first; second = other.second; return *this; }
 
+  constexpr cxpair& operator==(const cxpair<T0, T1>& other)
+  { return first == other.first && second == other.second; }
+
+  constexpr cxpair& operator!=(const cxpair<T0, T1>& other)
+  { return first != other.first || second != other.second; }
+
+  constexpr cxpair& operator<=(const cxpair<T0, T1>& other)
+  { return first <= other.first && second <= other.second; }
+
+  constexpr cxpair& operator<(const cxpair<T0, T1>& other)
+  { return first < other.first && second < other.second; }
+
+  constexpr cxpair& operator>(const cxpair<T0, T1>& other)
+  { return first > other.first && second > other.second; }
+
+  constexpr cxpair& operator>=(const cxpair<T0, T1>& other)
+  { return first >= other.first && second >= other.second; }
+
   T0 first;
   T1 second;
 };

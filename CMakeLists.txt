@@ -27,6 +27,12 @@ target_compile_definitions(hx-lang_parsing_tests PUBLIC -DH_LANG_TESTING)
 target_link_libraries(hx-lang_parsing_tests Catch2::Catch2 fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT})
 set_property(TARGET hx-lang_parsing_tests PROPERTY CXX_STANDARD 17)
 
+add_executable(hx-lang_cx_tests test/cx_things.cpp
+  "${hx-lang_files}")
+target_compile_definitions(hx-lang_cx_tests PUBLIC -DH_LANG_TESTING)
+target_link_libraries(hx-lang_cx_tests Catch2::Catch2 fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT})
+set_property(TARGET hx-lang_cx_tests PROPERTY CXX_STANDARD 17)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/lib/Catch2/contrib/")
 
 include(CTest)
