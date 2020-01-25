@@ -24,6 +24,11 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     print("identifier token at " + id->loc().to_string());
   },
 
+  [](auto&& rec, const rec_wrap_t<assign>& ass) { PrinterFn print;
+      print("Assign token at " + ass->loc().to_string());
+      std::visit(rec, ass->exp());
+  },
+
   [](auto&& rec, const rec_wrap_t<loop>& l) { PrinterFn print;
     auto loc = l->loc().to_string();
     print("loop at " + loc);
@@ -38,6 +43,16 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     print("block at " + b->loc().to_string());
   },
 
+  [](auto&& rec, const rec_wrap_t<binary_exp>& bin) { PrinterFn print;
+      print("binary expresion at " + bin->loc().to_string());
+      auto loc = bin->loc().to_string();
+      print("Left Expression: [" + loc + "] data 1/2");
+      auto symbol = bin->symb();
+      print(symbol.get_string());
+      std::visit(rec, bin->get_left_exp());
+      print("Right Expression: [" + loc + "] data 2/2");
+      std::visit(rec, bin->get_right_exp());
+  },
   [](auto&& rec, std::monostate& t) {}
 };
 
