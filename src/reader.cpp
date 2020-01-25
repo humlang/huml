@@ -31,7 +31,7 @@ constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
         {"+"sv,  token_kind::Plus},
         {"-"sv,  token_kind::Minus},
         {"*"sv,  token_kind::Asterisk},
-        {"="sv,  token_kind::Assign}
+        {"="sv,  token_kind::Equal}
 });
 // ordered in increasing preference
 constexpr auto token_precedence_map = make_map<token_kind, int>( {
@@ -202,7 +202,22 @@ restart_get:
       kind = token_kind::RBrace;
       data = "}";
     } break;
-
+    case ':': // used for assign in :=
+    {
+      assert(col < linebuf.size());
+        ch = linebuf[col++];
+        if (ch == '=')
+        {
+          kind = token_kind::Assign;
+          data = ":=";
+        }
+        else
+        {
+          kind = token_kind::Colon;
+          data = ":";
+          col--; // revert look ahead try
+        }
+    } break;
   case EOF:
       kind = token_kind::EndOfFile;
     break;
@@ -294,7 +309,7 @@ stmt_type reader::parse_assign()
   // we know we have an identifier here
   auto id = parse_identifier();
   // check if next sign is an = for
-  expect('=', diagnostic_db::parser::block_expects_lbrace(current.data.get_string())); // this has to be changed expect consumes
+  expect(4, diagnostic_db::parser::block_expects_lbrace(current.data.get_string())); // TODO this has to be changed expect consumes
   token assign_tok = old;    // get the assign
   // the next part is an expression
   exp_type right = parse_expression(0);
