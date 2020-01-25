@@ -8,16 +8,18 @@
 
 enum class token_kind : std::int8_t
 {
-  Identifier = 1,
-  LiteralNumber = 2,
-  Keyword = 3,
-  Point = '.',
-
-  LBrace = '{',
-  RBrace = '}',
-
-  Undef = 0,
-  EndOfFile = EOF
+    Identifier = 1,
+    LiteralNumber = 2,
+    Keyword = 3,
+    Point = '.',
+    LBrace = '{',
+    RBrace = '}',
+    Plus = '+',
+    Minus = '-',
+    Asterisk = '*',
+    Assign = '=',
+    Undef = 0,
+    EndOfFile = EOF
 };
 
 class token
