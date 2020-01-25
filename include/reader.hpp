@@ -37,8 +37,16 @@ private:
 
   stmt_type parse_keyword();
   rec_wrap_t<literal> parse_literal();
+  rec_wrap_t<identifier> parse_identifier();
   rec_wrap_t<block> parse_block();
+  stmt_type parse_assign();
   stmt_type parse_statement();
+
+  exp_type parse_prefix(); // prefix operators like ! - etc. Further this is also used for variables e.g x
+  exp_type parse_binary(exp_type left);
+  exp_type parse_expression(int precedence); // TODO we need precedence table for Right now only add a (+ -) b
+  int getPrecedence(); // this will get the Precedence of the next token ( look ahead token)
+
 private:
   std::string_view module;
   std::istream& is;
