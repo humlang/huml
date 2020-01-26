@@ -80,6 +80,11 @@ constexpr static const auto block_expects_rbrace = [](auto t) {
   return make_db_entry(diag_level::error, "PA-BR-001", err.get_string(), {});
 };
 
+constexpr static const auto assign_expects_colon_equal = [](auto t) {
+    symbol err(format(FMT_STRING("\"{}\" expected after identifier."), t));
+    return make_db_entry(diag_level::error, "PA-BR-002", err.get_string(), {});
+};
+
   }
 }
 

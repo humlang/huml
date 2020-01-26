@@ -25,7 +25,8 @@ inline static constexpr auto ast_printer_helper = base_visitor {
   },
 
   [](auto&& rec, const rec_wrap_t<assign>& ass) { PrinterFn print;
-      print("Assign token at " + ass->loc().to_string());
+      rec(ass->var());
+      print("assign token at " + ass->loc().to_string());
       std::visit(rec, ass->exp());
   },
 
