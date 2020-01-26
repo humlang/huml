@@ -41,7 +41,7 @@ constexpr auto token_precedence_map = make_map<token_kind, int>( {
         {token_kind::Minus, 1},
         {token_kind::Asterisk, 2},
         {token_kind::LiteralNumber, 6},
-
+        {token_kind::Identifier, 6},
         });
 
 
@@ -384,6 +384,10 @@ exp_type reader::parse_prefix() // operator
     {
       return std::move(parse_literal());
     }
+    case token_kind::Identifier:
+    {
+      return std::move(parse_identifier());
+    }
   }
 }
 
@@ -442,7 +446,7 @@ std::vector<ast_type> reader::read(std::string_view module)
   std::vector<ast_type> ast;
   while(r.current.kind != token_kind::EndOfFile)
   {
-    r.consume();
+    r.consume(); // This should always be a ; since this after every statement
     /*
     switch(r.current.kind)
     {
