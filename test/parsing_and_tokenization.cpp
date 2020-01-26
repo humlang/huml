@@ -135,3 +135,37 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
 
     }
 }
+
+TEST_CASE( "Expression test parsing", "[Expressions]" ) {
+
+  SECTION( "expression-with-whitespace" ) {
+    diagnostic.reset();
+    stream_lookup.write_test("x := 6*7");
+    auto w = reader::read("TESTSTREAM");
+    
+    REQUIRE(w.size() == 1);
+    REQUIRE(std::holds_alternative<rec_wrap_t<assign>>(w[0]));
+    
+    auto& ass = std::get<rec_wrap_t<assign>>(w[0]);
+    auto& exp = ass->exp();
+    REQUIRE(std::holds_alternative<rec_wrap_t<binary_exp>>(exp));
+    
+    auto& bin_exp = std::get<rec_wrap_t<binary_exp>>(exp);
+    REQUIRE( bin_exp->tok.kind == token_kind::Asterisk);
+    REQUIRE( bin_exp->tok.data.get_string() == "*" );
+    
+    auto& left = bin_exp->get_left_exp();
+    REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(left));
+    
+    auto& left2 = std::get<rec_wrap_t<literal>>(left);
+    REQUIRE( left2->tok.kind == token_kind::LiteralNumber);
+    REQUIRE( left2->tok.data.get_string() == "6" );
+
+    auto& right = bin_exp->get_right_exp();
+    REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(right));
+    
+    auto& right2 = std::get<rec_wrap_t<literal>>(right);
+    REQUIRE( right2->tok.kind == token_kind::LiteralNumber);
+    REQUIRE( right2->tok.data.get_string() == "7" );
+  }
+}

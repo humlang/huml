@@ -201,7 +201,21 @@ restart_get:
       kind = token_kind::LiteralNumber;
       data = symbol(name);
     } break;
-
+  case '*':
+  {
+    kind = token_kind::Asterisk;
+    data = "*";
+  } break;
+  case '+':
+  {
+    kind = token_kind::Plus;
+    data = "+";
+  } break;
+  case '-':
+  {
+    kind = token_kind::Minus;
+    data = "-";
+  } break;
   case '{':
     {
       kind = token_kind::LBrace;
