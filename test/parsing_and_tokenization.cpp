@@ -86,3 +86,52 @@ TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
 }
 */
 
+TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
+
+    SECTION( "assignment_with_whitespace" ) {
+      diagnostic.reset();
+      stream_lookup.write_test("x := 2");
+      auto w = reader::read("TESTSTREAM");
+
+      REQUIRE(w.size() == 1);
+      REQUIRE(std::holds_alternative<rec_wrap_t<assign>>(w[0]));
+      auto& ass = std::get<rec_wrap_t<assign>>(w[0]);
+
+      REQUIRE( ass->tok.kind == token_kind::Assign);
+      REQUIRE( ass->tok.data.get_string() == ":=" );
+
+      auto& id = ass->var();
+      REQUIRE( id->tok.kind == token_kind::Identifier );
+      REQUIRE( id->tok.data.get_string() == "x" );
+
+      auto& exp = ass->exp();
+      REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(exp));
+      auto& lit = std::get<rec_wrap_t<literal>>(exp);
+      REQUIRE( lit->tok.kind == token_kind::LiteralNumber );
+      REQUIRE( lit->tok.data.get_string() == "2" );
+    }
+
+    SECTION( "assignment-without-whitespace" ) {
+      diagnostic.reset();
+      stream_lookup.write_test("x:=2");
+      auto w = reader::read("TESTSTREAM");
+
+      REQUIRE(w.size() == 1);
+      REQUIRE(std::holds_alternative<rec_wrap_t<assign>>(w[0]));
+      auto& ass = std::get<rec_wrap_t<assign>>(w[0]);
+
+      REQUIRE( ass->tok.kind == token_kind::Assign);
+      REQUIRE( ass->tok.data.get_string() == ":=" );
+
+      auto& id = ass->var();
+      REQUIRE( id->tok.kind == token_kind::Identifier );
+      REQUIRE( id->tok.data.get_string() == "x" );
+
+      auto& exp = ass->exp();
+      REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(exp));
+      auto& lit = std::get<rec_wrap_t<literal>>(exp);
+      REQUIRE( lit->tok.kind == token_kind::LiteralNumber );
+      REQUIRE( lit->tok.data.get_string() == "2" );
+
+    }
+}

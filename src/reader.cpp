@@ -28,6 +28,8 @@ constexpr auto keyword_set = make_set<std::string_view>({
 constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
 
         { "."sv, token_kind::Point },
+        {":"sv, token_kind::Colon},
+        {";"sv, token_kind::Semi},
         {"+"sv,  token_kind::Plus},
         {"-"sv,  token_kind::Minus},
         {"*"sv,  token_kind::Asterisk},
@@ -133,8 +135,12 @@ restart_get:
         // don't use get<char>() here, identifiers are not connected with a '\n'
         ch = linebuf[col++];
 
+        // we look up in the operator map only for the single char. otherwise we wont parse y:= not correctly for example
+        // TODO I dont know how unperfomant this is and if there is a better way to convert a char to a string view
+        std::string ch_s;
+        ch_s.push_back(ch);
         // break if we hit whitespace (or other control chars) or any other operator symbol char
-        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()) || keyword_set.contains(name.c_str()))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(ch_s.c_str()) || keyword_set.contains(name.c_str()))
         {
           col--;
           break;
@@ -164,8 +170,12 @@ restart_get:
         // don't use get<char>() here, numbers are not connected with a '\n'
         ch = linebuf[col++];
 
+        // we look up in the operator map only for the single char. otherwise we wont parse 2; not correctly for example
+        // This could give problems with floaing point numbers since 2.3 will now be parsed as "2" "." "3" so to literals and a point
+        std::string ch_s;
+        ch_s.push_back(ch);
         // break if we hit whitespace (or other control chars) or any other token char
-        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(name.c_str()) || keyword_set.contains(name.c_str()))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(ch_s.c_str()) || keyword_set.contains(name.c_str()))
         {
           col--;
           break;
@@ -202,22 +212,27 @@ restart_get:
       kind = token_kind::RBrace;
       data = "}";
     } break;
-    case ':': // used for assign in :=
-    {
-      assert(col < linebuf.size());
-        ch = linebuf[col++];
-        if (ch == '=')
-        {
-          kind = token_kind::Assign;
-          data = ":=";
-        }
-        else
-        {
-          kind = token_kind::Colon;
-          data = ":";
-          col--; // revert look ahead try
-        }
-    } break;
+  case ';':
+  {
+    kind = token_kind::Semi;
+    data = ";";
+  } break;
+  case ':': // used for assign in :=
+  {
+    assert(col < linebuf.size());
+      ch = linebuf[col++];
+      if (ch == '=')
+      {
+        kind = token_kind::Assign;
+        data = ":=";
+      }
+      else
+      {
+        kind = token_kind::Colon;
+        data = ":";
+        col--; // revert look ahead try
+      }
+  } break;
   case EOF:
       kind = token_kind::EndOfFile;
     break;
@@ -309,7 +324,7 @@ stmt_type reader::parse_assign()
   // we know we have an identifier here
   auto id = parse_identifier();
   // check if next sign is an = for
-  expect(4, diagnostic_db::parser::block_expects_lbrace(current.data.get_string())); // TODO this has to be changed expect consumes
+  expect(4, diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
   token assign_tok = old;    // get the assign
   // the next part is an expression
   exp_type right = parse_expression(0);
@@ -441,7 +456,7 @@ std::vector<ast_type> reader::read(std::string_view module)
 // returns precedence of the lookahead token! uses a map
 int reader::getPrecedence() {
   token_kind prec = current.kind; // I think it should be current
-  if (prec == token_kind::Undef || prec == token_kind::EndOfFile)
+  if (prec == token_kind::Undef || prec == token_kind::EndOfFile || prec == token_kind::Semi)
     return 0;
   return token_precedence_map[prec];
 }
