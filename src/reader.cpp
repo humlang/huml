@@ -232,11 +232,11 @@ restart_get:
   } break;
   case ':': // also used for assign in :=
   {
-    assert(col < linebuf.size());
-    if(accept('='))
+    if(col < linebuf.size() && linebuf[col] == '=')
     {
       kind = token_kind::Assign;
       data = ":=";
+      ch = linebuf[col++];
     }
     else
     {
