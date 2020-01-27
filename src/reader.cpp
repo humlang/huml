@@ -136,7 +136,6 @@ restart_get:
         ch = linebuf[col++];
 
         // we look up in the operator map only for the single char. otherwise we wont parse y:= not correctly for example
-        // TODO I dont know how unperfomant this is and if there is a better way to convert a char to a string view
         std::string ch_s;
         ch_s.push_back(ch);
         // break if we hit whitespace (or other control chars) or any other operator symbol char
@@ -231,21 +230,19 @@ restart_get:
     kind = token_kind::Semi;
     data = ";";
   } break;
-  case ':': // used for assign in :=
+  case ':': // also used for assign in :=
   {
     assert(col < linebuf.size());
-      ch = linebuf[col++];
-      if (ch == '=')
-      {
-        kind = token_kind::Assign;
-        data = ":=";
-      }
-      else
-      {
-        kind = token_kind::Colon;
-        data = ":";
-        col--; // revert look ahead try
-      }
+    if(accept('='))
+    {
+      kind = token_kind::Assign;
+      data = ":=";
+    }
+    else
+    {
+      kind = token_kind::Colon;
+      data = ":";
+    }
   } break;
   case EOF:
       kind = token_kind::EndOfFile;
@@ -418,7 +415,7 @@ exp_type reader::parse_expression(int precedence)
   // Will we add funcitons to the ast attributes and do we need to add them to all or is something else planned?
 
   // we cant make this into function parse_infix since we need to move prefix then..
-  while(precedence < getPrecedence()) { // that way we would handle left associativity think about 2 * 3 + 5 => would be 2* (3 + 5) which is wrong
+  while(precedence < this->precedence()) { // that way we would handle left associativity think about 2 * 3 + 5 => would be 2* (3 + 5) which is wrong
     switch(current.kind)
     {
       default:
@@ -471,9 +468,8 @@ std::vector<ast_type> reader::read(std::string_view module)
   return ast;
 }
 
-// returns precedence of the lookahead token! uses a map
-int reader::getPrecedence() {
-  token_kind prec = current.kind; // I think it should be current
+int reader::precedence() {
+  token_kind prec = current.kind;
   if (prec == token_kind::Undef || prec == token_kind::EndOfFile || prec == token_kind::Semi)
     return 0;
   return token_precedence_map[prec];

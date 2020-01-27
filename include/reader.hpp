@@ -16,6 +16,8 @@ class reader
 public:
   static std::vector<ast_type> read(std::string_view module);
 
+  static constexpr std::size_t lookahead_size = 1;
+
   ~reader();
 private:
   reader(std::string_view module);
@@ -45,7 +47,7 @@ private:
   exp_type parse_prefix(); // prefix operators like ! - etc. Further this is also used for variables e.g x
   exp_type parse_binary(exp_type left);
   exp_type parse_expression(int precedence); // TODO we need precedence table for Right now only add a (+ -) b
-  int getPrecedence(); // this will get the Precedence of the next token ( look ahead token)
+  int precedence(); // this will get the Precedence of the next token ( look ahead token)
 
 private:
   std::string_view module;
@@ -56,9 +58,8 @@ private:
   std::size_t col;
   std::size_t row;
 
-
   token old {token_kind::Undef, "", {}};
   token current {token_kind::Undef, "", {}};
-  std::array<token, 1> next_toks { {{token_kind::Undef, "", {}}} };
+  std::array<token, lookahead_size> next_toks { {{token_kind::Undef, "", {}}} };
 };
 

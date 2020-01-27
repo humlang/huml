@@ -170,8 +170,8 @@ struct assign : base<assign>
 public:
     assign(tag, rec_wrap_t<identifier> variable, token op, exp_type right);
 
-    const rec_wrap_t<identifier>& var() const {return variable;}
-    const exp_type& exp() const {return right;}
+    const rec_wrap_t<identifier>& var() const { return variable; }
+    const exp_type& exp() const { return right; }
 private:
     rec_wrap_t<identifier> variable;
     exp_type right;
