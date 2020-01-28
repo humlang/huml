@@ -28,14 +28,16 @@ private:
   void consume();
 
   // "hard error"   -> always consumes
-  template<typename F>
-  void expect(token_kind kind, F&& f);
-  template<typename F>
-  void expect(std::int8_t kind, F&& f);
+  template<token_kind, typename F>
+  void expect(F&& f);
+  template<std::uint8_t, typename F>
+  void expect(F&& f);
 
   // "soft error"    -> only consumes if ==
-  bool accept(token_kind kind);
-  bool accept(std::int8_t kind);
+  template<token_kind>
+  bool accept();
+  template<std::uint8_t>
+  bool accept();
 
   maybe_stmt parse_keyword();
   literal parse_literal();

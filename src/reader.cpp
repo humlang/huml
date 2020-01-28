@@ -44,6 +44,12 @@ constexpr auto token_precedence_map = make_map<token_kind, int>( {
         {token_kind::Identifier, 6},
         });
 
+constexpr static bool isprint(unsigned char c)
+{
+  return (' ' <= c && c <= '~');
+
+}
+
 
 reader::reader(std::string_view module)
   : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1)
@@ -262,21 +268,24 @@ void reader::consume()
   next_toks.back() = get<token>();
 }
 
-template<typename F>
-void reader::expect(token_kind kind, F&& f)
+template<token_kind kind, typename F>
+void reader::expect(F&& f)
 {
   if(current.kind != kind)
     diagnostic <<= (f + next_toks[0].loc) | source_context(0);
   consume();
 }
 
-template<typename F>
-void reader::expect(std::int8_t c, F&& f)
+template<std::uint8_t c, typename F>
+void reader::expect(F&& f)
 {
-  expect(static_cast<token_kind>(c), std::forward<F>(f));
+  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
+
+  expect<static_cast<token_kind>(c)>(std::forward<F>(f));
 }
 
-bool reader::accept(token_kind kind)
+template<token_kind kind>
+bool reader::accept()
 {
   if(current.kind != kind)
     return false;
@@ -285,9 +294,12 @@ bool reader::accept(token_kind kind)
   return true;
 }
 
-bool reader::accept(std::int8_t c)
+template<std::uint8_t c>
+bool reader::accept()
 {
-  return accept(static_cast<token_kind>(c));
+  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
+
+  return accept<static_cast<token_kind>(c)>();
 }
 
 literal reader::parse_literal()
@@ -305,10 +317,10 @@ identifier reader::parse_identifier()
 block reader::parse_block()
 {
   auto tmp = current;
-  expect('{', diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
+  expect<'{'>(diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
 
   std::vector<maybe_stmt> v;
-  while(!accept('}'))
+  while(!accept<'}'>())
   {
     // just propagate error nodes
     auto stmt = parse_statement();
@@ -344,7 +356,7 @@ stmt_type reader::parse_assign()
   // we know we have an identifier here
   auto id = parse_identifier();
   // check if next sign is an = for
-  expect(token_kind::Assign, diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
+  expect<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
   token assign_tok = old;    // get the assign
   // the next part is an expression
   auto right = parse_expression(0);
