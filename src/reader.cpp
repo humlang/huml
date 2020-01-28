@@ -268,20 +268,23 @@ void reader::consume()
   next_toks.back() = get<token>();
 }
 
-template<token_kind kind, typename F>
-void reader::expect(F&& f)
+template<token_kind kind, typename FailF, typename F>
+void reader::expect(FailF&& fail, F&& f)
 {
   if(current.kind != kind)
+  {
     diagnostic <<= (f + next_toks[0].loc) | source_context(0);
+    fail();
+  }
   consume();
 }
 
-template<std::uint8_t c, typename F>
-void reader::expect(F&& f)
+template<std::uint8_t c, typename FailF, typename F>
+void reader::expect(FailF&& fail, F&& f)
 {
   static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
 
-  expect<static_cast<token_kind>(c)>(std::forward<F>(f));
+  expect<static_cast<token_kind>(c)>(std::forward<FailF>(fail), std::forward<F>(f));
 }
 
 template<token_kind kind>
@@ -302,6 +305,11 @@ bool reader::accept()
   return accept<static_cast<token_kind>(c)>();
 }
 
+error reader::mk_error()
+{
+  return ast_tags::error.make_node(old);
+}
+
 literal reader::parse_literal()
 {
   consume();
@@ -317,7 +325,7 @@ identifier reader::parse_identifier()
 block reader::parse_block()
 {
   auto tmp = current;
-  expect<'{'>(diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
+  expect<'{'>([this]{ find_next_valid_stmt(); }, diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
 
   std::vector<maybe_stmt> v;
   while(!accept<'}'>())
@@ -348,7 +356,7 @@ maybe_stmt reader::parse_keyword()
     return ast_tags::loop.make_node(very_old, std::move(l), std::move(b));
   }
 
-  return ast_tags::error.make_node(old);
+  return mk_error();
 }
 
 stmt_type reader::parse_assign()
@@ -356,7 +364,7 @@ stmt_type reader::parse_assign()
   // we know we have an identifier here
   auto id = parse_identifier();
   // check if next sign is an = for
-  expect<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
+  expect<token_kind::Assign>([this]{ find_next_valid_stmt(); }, diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
   token assign_tok = old;    // get the assign
   // the next part is an expression
   auto right = parse_expression(0);
@@ -374,7 +382,7 @@ maybe_stmt reader::parse_statement()
                   | source_context(0);
     consume();
 
-    return ast_tags::error.make_node(old);
+    return mk_error();
   } break;
 
   case token_kind::Keyword:
@@ -398,7 +406,7 @@ maybe_expr reader::parse_prefix() // operator
                      | source_context(0);
       consume();
 
-      return ast_tags::error.make_node(old);
+      return mk_error();
     }
 
     case token_kind::LiteralNumber:
@@ -441,7 +449,7 @@ maybe_expr reader::parse_expression(int precedence)
       default:
       { // TODO this should never happen anymore
         return prefix; // Important if there is no infix we return the prefix
-        //infix = ast_tags::error.make_node(old); // return error when we did not find a fitting token
+        //infix = mk_error(); // return error when we did not find a fitting token
       }
 
       case token_kind::Plus: case token_kind::Minus: case token_kind::Asterisk:
@@ -485,4 +493,15 @@ int reader::precedence() {
     return 0;
   return token_precedence_map[prec];
 }
+
+void reader::find_next_valid_stmt()
+{
+
+}
+
+void reader::find_next_valid_expr()
+{
+
+}
+
 

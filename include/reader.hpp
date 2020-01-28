@@ -28,16 +28,19 @@ private:
   void consume();
 
   // "hard error"   -> always consumes
-  template<token_kind, typename F>
-  void expect(F&& f);
-  template<std::uint8_t, typename F>
-  void expect(F&& f);
+  template<token_kind, typename FailF, typename F>
+  void expect(FailF&& fail, F&& f);
+  template<std::uint8_t, typename FailF, typename F>
+  void expect(FailF&& fail, F&& f);
 
   // "soft error"    -> only consumes if ==
   template<token_kind>
   bool accept();
   template<std::uint8_t>
   bool accept();
+
+  // always uses old for the error
+  error mk_error();
 
   maybe_stmt parse_keyword();
   literal parse_literal();
@@ -50,6 +53,12 @@ private:
   exp_type parse_binary(maybe_expr left);
   maybe_expr parse_expression(int precedence); // TODO we need precedence table for Right now only add a (+ -) b
   int precedence(); // this will get the Precedence of the next token ( look ahead token)
+
+
+  // Ignores tokens until it finds the next start for a valid statement
+  void find_next_valid_stmt();
+  // Ignores tokens until it finds the next start for a valid expression
+  void find_next_valid_expr();
 
 private:
   std::string_view module;
