@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <token.hpp>
 
 #include <variant>
@@ -32,36 +33,51 @@ using rec_wrap_t = std::unique_ptr<T>;
 namespace ast_tags
 {
   template<typename T>
-  struct tag {};
+  struct tag
+  {
+    // can be convenient.
+    template<typename... Args>
+    static rec_wrap_t<T> make_node(Args&&... args)
+    { return std::make_unique<T>(tag<T>(), std::forward<Args>(args)...); }
+  };
 }
 
-struct literal;
-struct identifier;
-struct loop;
-struct error;
-struct block;
-struct assign;
+struct literal_;    using literal = rec_wrap_t<literal_>;
+struct identifier_; using identifier = rec_wrap_t<identifier_>;
+struct loop_;       using loop = rec_wrap_t<loop_>;
+struct error_;      using error = rec_wrap_t<error_>;
+struct block_;      using block = rec_wrap_t<block_>;
+struct assign_;     using assign = rec_wrap_t<assign_>;
 
 // expressions
-struct binary_exp;
+struct binary_exp_; using binary_exp = rec_wrap_t<binary_exp_>;
 
 using stmt_type = std::variant<std::monostate,
-        rec_wrap_t<loop>,
-        rec_wrap_t<block>,
-        rec_wrap_t<assign>
+        loop,
+        block,
+        assign
 >;
 
 using exp_type = std::variant<std::monostate,
-        rec_wrap_t<literal>,
-        rec_wrap_t<identifier>,
-        rec_wrap_t<binary_exp>
+        literal,
+        identifier,
+        binary_exp
 >;
 
 using ast_type = std::variant<std::monostate,
       stmt_type,
       exp_type,
-      rec_wrap_t<error>
+      error
 >;
+// The error node is special, as it can also be an expression or a statement.
+// To implement this in a somewhat clean way (visitors will do fine with this)
+// we introduce "optional" types, where the content is either a exp/stmt or an error
+//  -> This forces us to really handle errors somewhat correctly in the parser
+using maybe_expr = std::variant<std::monostate, exp_type, rec_wrap_t<error_>>;
+using maybe_stmt = std::variant<std::monostate, stmt_type, rec_wrap_t<error_>>;
+
+// POLICY: Every getter must return one of the previously declared variants.
+//          Otherwise, have fun parsing the error messages coming from our visitors
 
 // This aggregate type is used to add basic information to AST nodes
 template<typename T>
@@ -70,7 +86,7 @@ struct base
 public:
   using tag = ast_tags::tag<T>;
 public:
-  static std::uint64_t counter;
+  static std::atomic_uint_fast64_t counter;
   std::uint64_t _id { counter++ };
   token tok;
 protected:
@@ -87,82 +103,81 @@ private:
   const T& self() const { return static_cast<const T&>(*this); }
 };
 template<typename T>
-std::uint64_t base<T>::counter = 0;
+std::atomic_uint_fast64_t base<T>::counter = 0;
 
 // Nodes
-struct literal : base<literal>
+struct literal_ : base<literal_>
 {
 public:
-  literal(tag, token tok);
+  literal_(tag, token tok);
 };
 
-struct identifier : base<identifier>
+struct identifier_ : base<identifier_>
 {
 public:
-  identifier(tag, token tok);
+  identifier_(tag, token tok);
 };
 
-struct error : base<error>
+struct error_ : base<error_>
 {
 public:
-  error(tag, token tok);
+  error_(tag, token tok);
 };
 
-struct loop : base<loop>
+struct loop_ : base<loop_>
 {
 public:
-  loop(tag, token tok, rec_wrap_t<literal> times, stmt_type body);
+  loop_(tag, token tok, literal times, maybe_stmt body);
 
   const exp_type& num_times() const { return times; }
-  const stmt_type& loop_body() const { return body; }
+  const maybe_stmt& loop_body() const { return body; }
 
 private:
   exp_type times;
-  stmt_type body;
+  maybe_stmt body;
 };
 
-struct block : base<block>
+struct block_ : base<block_>
 {
 public:
-  block(tag, token tok, std::vector<std::variant<std::monostate, stmt_type, rec_wrap_t<error>>> stmts);
+  block_(tag, token tok, std::vector<maybe_stmt> stmts);
 private:
-  std::vector<std::variant<std::monostate, stmt_type, rec_wrap_t<error>>> stmts;
+  std::vector<maybe_stmt> stmts;
 };
 
-struct assign : base<assign>
+struct assign_ : base<assign_>
 {
 public:
-  assign(tag, rec_wrap_t<identifier> variable, token op, std::variant<std::monostate, exp_type, rec_wrap_t<error>> right);
+  assign_(tag, identifier variable, token op, maybe_expr right);
 
   const exp_type& var() const { return variable; }
-  const std::variant<std::monostate, exp_type, rec_wrap_t<error>>& exp() const { return right; }
+  const maybe_expr& exp() const { return right; }
 private:
   exp_type variable;
-  std::variant<std::monostate, exp_type, rec_wrap_t<error>> right;
+  maybe_expr right;
 };
 
-struct binary_exp : base<binary_exp>
+struct binary_exp_ : base<binary_exp_>
 {
 public:
-  binary_exp(tag, std::variant<std::monostate, exp_type, rec_wrap_t<error>> left,
-                  token op,
-                  std::variant<std::monostate, exp_type, rec_wrap_t<error>> right);
-  const std::variant<std::monostate, exp_type, rec_wrap_t<error>>& get_right_exp() const { return right;}
-  const std::variant<std::monostate, exp_type, rec_wrap_t<error>>& get_left_exp() const { return left;}
+  binary_exp_(tag, maybe_expr left, token op, maybe_expr right);
+
+  const maybe_expr& get_right_exp() const { return right;}
+  const maybe_expr& get_left_exp() const { return left;}
 private:
-  std::variant<std::monostate, exp_type, rec_wrap_t<error>> left;
-  std::variant<std::monostate, exp_type, rec_wrap_t<error>> right;
+  maybe_expr left;
+  maybe_expr right;
 };
 
 // Tag definitions
 namespace ast_tags
 {
-    static constexpr inline tag<literal> literal = {};
-    static constexpr inline tag<identifier> identifier = {};
-    static constexpr inline tag<loop> loop = {};
-    static constexpr inline tag<error> error = {};
-    static constexpr inline tag<block> block = {};
-    static constexpr inline tag<assign> assign = {};
-    static constexpr inline tag<binary_exp> binary_exp = {};
+  static constexpr inline tag<literal_> literal = {};
+  static constexpr inline tag<identifier_> identifier = {};
+  static constexpr inline tag<loop_> loop = {};
+  static constexpr inline tag<error_> error = {};
+  static constexpr inline tag<block_> block = {};
+  static constexpr inline tag<assign_> assign = {};
+  static constexpr inline tag<binary_exp_> binary_exp = {};
 }
 

@@ -1,34 +1,31 @@
 #include <ast.hpp>
 
 // ast
-literal::literal(literal::tag, token tok)
+literal_::literal_(literal_::tag, token tok)
   : base({}, tok)
 {  }
 
-identifier::identifier(identifier::tag, token tok)
+identifier_::identifier_(identifier_::tag, token tok)
   : base({}, tok)
 {  }
 
-error::error(error::tag, token tok)
+error_::error_(error_::tag, token tok)
   : base({}, tok)
 {  }
 
-loop::loop(loop::tag, token tok, rec_wrap_t<literal> times, stmt_type body)
+loop_::loop_(loop_::tag, token tok, literal times, maybe_stmt body)
   : base({}, tok), times(std::move(times)), body(std::move(body))
 {  }
 
-block::block(block::tag, token tok, std::vector<std::variant<std::monostate, stmt_type, rec_wrap_t<error>>> v)
+block_::block_(block_::tag, token tok, std::vector<maybe_stmt> v)
   : base({}, tok), stmts(std::move(v))
 {  }
 
-binary_exp::binary_exp(binary_exp::tag, std::variant<std::monostate, exp_type, rec_wrap_t<error>> left,
-                                        token op,
-                                        std::variant<std::monostate, exp_type, rec_wrap_t<error>> right)
+binary_exp_::binary_exp_(binary_exp_::tag, maybe_expr left, token op, maybe_expr right)
   : base({}, op), left(std::move(left)), right(std::move(right))
 {  }
 
-assign::assign(base::tag, rec_wrap_t<identifier> variable, token op,
-                          std::variant<std::monostate, exp_type, rec_wrap_t<error>> right)
+assign_::assign_(assign_::tag, identifier variable, token op, maybe_expr right)
   : base({}, op), variable(std::move(variable)), right(std::move(right))
 {  }
 

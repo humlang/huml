@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <cassert>
 #include <mutex>
 
 #include <ast.hpp>
@@ -20,21 +21,21 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     std::visit(rec, typ);
   },
 
-  [](auto&& rec, const rec_wrap_t<literal>& lit) -> void { PrinterFn print;
+  [](auto&& rec, const literal& lit) -> void { PrinterFn print;
     print("literal token at " + lit->loc().to_string());
   },
 
-  [](auto&& rec, const rec_wrap_t<identifier>& id) -> void { PrinterFn print;
+  [](auto&& rec, const identifier& id) -> void { PrinterFn print;
     print("identifier token at " + id->loc().to_string());
   },
 
-  [](auto&& rec, const rec_wrap_t<assign>& ass) -> void { PrinterFn print;
+  [](auto&& rec, const assign& ass) -> void { PrinterFn print;
     std::visit(rec, ass->var());
     print("assign token at " + ass->loc().to_string());
     std::visit(rec, ass->exp());
   },
 
-  [](auto&& rec, const rec_wrap_t<loop>& l) -> void { PrinterFn print;
+  [](auto&& rec, const loop& l) -> void { PrinterFn print;
     auto loc = l->loc().to_string();
     print("loop at " + loc);
     print("[" + loc + "] data 1/2  -  ");
@@ -44,11 +45,11 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     std::visit(rec, l->loop_body());
   },
 
-  [](auto&& rec, const rec_wrap_t<block>& b) -> void { PrinterFn print;
+  [](auto&& rec, const block& b) -> void { PrinterFn print;
     print("block at " + b->loc().to_string());
   },
 
-  [](auto&& rec, const rec_wrap_t<binary_exp>& bin) -> void { PrinterFn print;
+  [](auto&& rec, const binary_exp& bin) -> void { PrinterFn print;
     print("binary expresion at " + bin->loc().to_string());
     auto loc = bin->loc().to_string();
     print("left expression: [" + loc + "] data 1/2");
@@ -58,7 +59,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     print("right expression: [" + loc + "] data 2/2");
     std::visit(rec, bin->get_right_exp());
   },
-  [](auto&& rec, const std::monostate& t) -> void {  }
+  [](auto&& rec, const std::monostate& t) -> void { assert(false && "Should never be called."); }
 };
 
 std::mutex ast_printer_mutex;
