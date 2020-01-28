@@ -7,85 +7,6 @@
 
 #include <sstream>
 
-/*
-TEST_CASE( "Numbers are parsed correctly", "[Numbers]" ) {
-  
-  SECTION( "single-digit" ) {
-    diagnostic.reset();
-    stream_lookup.write_test("0 1 2 3 4 5 6 7 8 9");
-    auto w = reader::read("TESTSTREAM");
-
-    std::size_t i = 0;
-    std::size_t col = 1;
-    for(auto& v : w)
-    {
-      REQUIRE( std::holds_alternative<rec_wrap_t<literal>>(v) );
-
-      if(std::holds_alternative<rec_wrap_t<literal>>(v))
-      {
-        auto& lit = std::get<rec_wrap_t<literal>>(v);
-
-        REQUIRE( lit->tok.kind == token_kind::LiteralNumber );
-        REQUIRE( lit->tok.data.get_string() == std::to_string(i) );
-
-        REQUIRE( lit->tok.loc.module == "TESTSTREAM" );
-        REQUIRE( lit->tok.loc.row_beg == 1 );
-        REQUIRE( lit->tok.loc.row_end == 2 );
-        REQUIRE( lit->tok.loc.column_beg == col );
-        REQUIRE( lit->tok.loc.column_end == (col + 1) );
-      }
-      ++i;
-      col += 2;
-    }
-
-  }
-
-  SECTION( "no trailing zero" ) {
-    diagnostic.reset();
-    stream_lookup.write_test("000123 2");
-    auto w = reader::read("TESTSTREAM");
-
-    REQUIRE( w.size() == 1 );
-    for(auto& v : w)
-    {
-      REQUIRE( std::holds_alternative<rec_wrap_t<literal>>(v) );
-
-      if(std::holds_alternative<rec_wrap_t<literal>>(v))
-      {
-        auto& lit = std::get<rec_wrap_t<literal>>(v);
-
-        REQUIRE( lit->tok.kind == token_kind::LiteralNumber );
-        REQUIRE( lit->tok.data.get_string() == std::to_string(2) );
-
-        REQUIRE( lit->tok.loc.module == "TESTSTREAM" );
-        REQUIRE( lit->tok.loc.row_beg == 1 );
-        REQUIRE( lit->tok.loc.row_end == 2 );
-        REQUIRE( lit->tok.loc.column_beg == 8 );
-        REQUIRE( lit->tok.loc.column_end == 9 );
-      }
-    }
-    const auto& diag = diagnostic.get_all();
-
-    REQUIRE( diag.size() == 1);
-    REQUIRE( diag[0].data.level == diag_level::error );
-    REQUIRE( diag[0].data.human_referrable_code == "PA-LZ-000" );
-  }
-
-  SECTION( "literal around number" ) {
-    diagnostic.reset();
-    stream_lookup.write_test("0a a0");
-    auto w = reader::read("TESTSTREAM");
-
-    REQUIRE( w.size() == 1 );
-    const auto& diag = diagnostic.get_all();
-
-    REQUIRE( diag.size() == 1);
-    REQUIRE( diag[0].data.level == diag_level::error );
-    REQUIRE( diag[0].data.human_referrable_code == "PA-NN-000" );
-  }
-}
-*/
-
 TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
 
     SECTION( "assignment_with_whitespace" ) {
@@ -94,21 +15,37 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
       auto w = reader::read("TESTSTREAM");
 
       REQUIRE(w.size() == 1);
-      REQUIRE(std::holds_alternative<rec_wrap_t<assign>>(w[0]));
-      auto& ass = std::get<rec_wrap_t<assign>>(w[0]);
+      const bool is_assignstmt = std::holds_alternative<stmt_type>(w[0]);
+      REQUIRE(is_assignstmt);
+      if(!is_assignstmt)
+        return; // bail out, we cannot go on!
+      auto& assstmt = std::get<stmt_type>(w[0]);
+      const bool is_assign = std::holds_alternative<assign>(assstmt);
+      REQUIRE(is_assign);
+      if(!is_assign)
+        return; // bail out, we cannot go on!
+      auto& ass = std::get<assign>(assstmt);
 
-      REQUIRE( ass->tok.kind == token_kind::Assign);
-      REQUIRE( ass->tok.data.get_string() == ":=" );
+      REQUIRE(ass->tok.kind == token_kind::Assign);
+      REQUIRE(ass->tok.data.get_string() == ":=" );
 
-      auto& id = ass->var();
-      REQUIRE( id->tok.kind == token_kind::Identifier );
-      REQUIRE( id->tok.data.get_string() == "x" );
+      auto& id = std::get<identifier>(ass->var());
+      REQUIRE(id->tok.kind == token_kind::Identifier );
+      REQUIRE(id->tok.data.get_string() == "x" );
 
       auto& exp = ass->exp();
-      REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(exp));
-      auto& lit = std::get<rec_wrap_t<literal>>(exp);
-      REQUIRE( lit->tok.kind == token_kind::LiteralNumber );
-      REQUIRE( lit->tok.data.get_string() == "2" );
+      const bool is_litexpr = std::holds_alternative<exp_type>(exp);
+      REQUIRE(is_litexpr);
+      if(!is_litexpr)
+        return; // bail out, we cannot go on!
+      auto& litexpr = std::get<exp_type>(exp);
+      const bool is_lit = std::holds_alternative<literal>(litexpr);
+      REQUIRE(is_lit);
+      if(!is_lit)
+        return; // bail out, we cannot go on!
+      auto& lit = std::get<literal>(litexpr);
+      REQUIRE(lit->tok.kind == token_kind::LiteralNumber );
+      REQUIRE(lit->tok.data.get_string() == "2" );
     }
 
     SECTION( "assignment-without-whitespace" ) {
@@ -117,22 +54,37 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
       auto w = reader::read("TESTSTREAM");
 
       REQUIRE(w.size() == 1);
-      REQUIRE(std::holds_alternative<rec_wrap_t<assign>>(w[0]));
-      auto& ass = std::get<rec_wrap_t<assign>>(w[0]);
+      const bool is_assignstmt = std::holds_alternative<stmt_type>(w[0]);
+      REQUIRE(is_assignstmt);
+      if(!is_assignstmt)
+        return; // bail out, we cannot go on!
+      auto& assstmt = std::get<stmt_type>(w[0]);
+      const bool is_assign = std::holds_alternative<assign>(assstmt);
+      REQUIRE(is_assign);
+      if(!is_assign)
+        return; // bail out, we cannot go on!
+      auto& ass = std::get<assign>(assstmt);
 
-      REQUIRE( ass->tok.kind == token_kind::Assign);
-      REQUIRE( ass->tok.data.get_string() == ":=" );
+      REQUIRE(ass->tok.kind == token_kind::Assign);
+      REQUIRE(ass->tok.data.get_string() == ":=" );
 
-      auto& id = ass->var();
-      REQUIRE( id->tok.kind == token_kind::Identifier );
-      REQUIRE( id->tok.data.get_string() == "x" );
+      auto& id = std::get<identifier>(ass->var());
+      REQUIRE(id->tok.kind == token_kind::Identifier );
+      REQUIRE(id->tok.data.get_string() == "x" );
 
       auto& exp = ass->exp();
-      REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(exp));
-      auto& lit = std::get<rec_wrap_t<literal>>(exp);
-      REQUIRE( lit->tok.kind == token_kind::LiteralNumber );
-      REQUIRE( lit->tok.data.get_string() == "2" );
-
+      const bool is_litexpr = std::holds_alternative<exp_type>(exp);
+      REQUIRE(is_litexpr);
+      if(!is_litexpr)
+        return; // bail out, we cannot go on!
+      auto& litexpr = std::get<exp_type>(exp);
+      const bool is_lit = std::holds_alternative<literal>(litexpr);
+      REQUIRE(is_lit);
+      if(!is_lit)
+        return; // bail out, we cannot go on!
+      auto& lit = std::get<literal>(litexpr);
+      REQUIRE(lit->tok.kind == token_kind::LiteralNumber );
+      REQUIRE(lit->tok.data.get_string() == "2" );
     }
 }
 
@@ -144,28 +96,61 @@ TEST_CASE( "Expression test parsing", "[Expressions]" ) {
     auto w = reader::read("TESTSTREAM");
     
     REQUIRE(w.size() == 1);
-    REQUIRE(std::holds_alternative<rec_wrap_t<assign>>(w[0]));
+    const bool is_assign_stmt = std::holds_alternative<stmt_type>(w[0]);
+    if(!is_assign_stmt)
+      return; 
+    auto& assstmt = std::get<stmt_type>(w[0]);
+    const bool is_assign = std::holds_alternative<assign>(assstmt);
+    if(!is_assign)
+      return; 
     
-    auto& ass = std::get<rec_wrap_t<assign>>(w[0]);
+    auto& ass = std::get<assign>(assstmt);
     auto& exp = ass->exp();
-    REQUIRE(std::holds_alternative<rec_wrap_t<binary_exp>>(exp));
+    const bool is_binexpex = std::holds_alternative<exp_type>(exp);
+    if(!is_binexpex)
+      return;
+    auto& bin_expex = std::get<exp_type>(exp);
+    const bool is_binexp = std::holds_alternative<binary_exp>(bin_expex);
+    if(!is_binexp)
+      return;
+    auto& bin_exp = std::get<binary_exp>(bin_expex);
     
-    auto& bin_exp = std::get<rec_wrap_t<binary_exp>>(exp);
-    REQUIRE( bin_exp->tok.kind == token_kind::Asterisk);
-    REQUIRE( bin_exp->tok.data.get_string() == "*" );
+    REQUIRE(bin_exp->tok.kind == token_kind::Asterisk);
+    REQUIRE(bin_exp->tok.data.get_string() == "*" );
     
-    auto& left = bin_exp->get_left_exp();
-    REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(left));
+    auto& left_exp = bin_exp->get_left_exp();
+    bool left_is_idex = std::holds_alternative<exp_type>(left_exp);
+    REQUIRE(left_is_idex);
+    if(!left_is_idex)
+      return;
     
-    auto& left2 = std::get<rec_wrap_t<literal>>(left);
-    REQUIRE( left2->tok.kind == token_kind::LiteralNumber);
-    REQUIRE( left2->tok.data.get_string() == "6" );
+    auto& leftex = std::get<exp_type>(left_exp);
+    bool left_is_id = std::holds_alternative<literal>(leftex);
+    REQUIRE(left_is_id);
+    if(!left_is_id)
+      return;
+    
+    auto& left = std::get<literal>(leftex);
+    REQUIRE(left->tok.kind == token_kind::LiteralNumber);
+    REQUIRE(left->tok.data.get_string() == "6" );
 
-    auto& right = bin_exp->get_right_exp();
-    REQUIRE(std::holds_alternative<rec_wrap_t<literal>>(right));
+
+
+    auto& right_exp = bin_exp->get_right_exp();
+    bool right_is_idex = std::holds_alternative<exp_type>(right_exp);
+    REQUIRE(right_is_idex);
+    if(!right_is_idex)
+      return;
     
-    auto& right2 = std::get<rec_wrap_t<literal>>(right);
-    REQUIRE( right2->tok.kind == token_kind::LiteralNumber);
-    REQUIRE( right2->tok.data.get_string() == "7" );
+    auto& rightex = std::get<exp_type>(right_exp);
+    bool right_is_id = std::holds_alternative<literal>(rightex);
+    REQUIRE(right_is_id);
+    if(!right_is_id)
+      return;
+    
+    auto& right = std::get<literal>(rightex);
+    REQUIRE(right->tok.kind == token_kind::LiteralNumber);
+    REQUIRE(right->tok.data.get_string() == "7" );
   }
 }
+
