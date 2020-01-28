@@ -14,6 +14,8 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
       stream_lookup.write_test("x := 2");
       auto w = reader::read("TESTSTREAM");
 
+      std::vector<std::uint_fast64_t> ids;
+
       REQUIRE(w.size() == 1);
       const bool is_assignstmt = std::holds_alternative<stmt_type>(w[0]);
       REQUIRE(is_assignstmt);
@@ -25,6 +27,7 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
       if(!is_assign)
         return; // bail out, we cannot go on!
       auto& ass = std::get<assign>(assstmt);
+      ids.push_back(ass->id());
 
       REQUIRE(ass->tok.kind == token_kind::Assign);
       REQUIRE(ass->tok.data.get_string() == ":=" );
@@ -32,6 +35,7 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
       auto& id = std::get<identifier>(ass->var());
       REQUIRE(id->tok.kind == token_kind::Identifier );
       REQUIRE(id->tok.data.get_string() == "x" );
+      ids.push_back(id->id());
 
       auto& exp = ass->exp();
       const bool is_litexpr = std::holds_alternative<exp_type>(exp);
@@ -46,6 +50,11 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
       auto& lit = std::get<literal>(litexpr);
       REQUIRE(lit->tok.kind == token_kind::LiteralNumber );
       REQUIRE(lit->tok.data.get_string() == "2" );
+      ids.push_back(lit->id());
+
+      // we want that each node has a unique id
+      std::sort(ids.begin(), ids.end());
+      REQUIRE((std::adjacent_find(ids.begin(), ids.end()) == ids.end()));
     }
 
     SECTION( "assignment-without-whitespace" ) {
@@ -99,18 +108,22 @@ TEST_CASE( "Expression test parsing", "[Expressions]" ) {
     const bool is_assign_stmt = std::holds_alternative<stmt_type>(w[0]);
     if(!is_assign_stmt)
       return; 
+    REQUIRE(is_assign_stmt);
     auto& assstmt = std::get<stmt_type>(w[0]);
     const bool is_assign = std::holds_alternative<assign>(assstmt);
+    REQUIRE(is_assign);
     if(!is_assign)
       return; 
     
     auto& ass = std::get<assign>(assstmt);
     auto& exp = ass->exp();
     const bool is_binexpex = std::holds_alternative<exp_type>(exp);
+    REQUIRE(is_binexpex);
     if(!is_binexpex)
       return;
     auto& bin_expex = std::get<exp_type>(exp);
     const bool is_binexp = std::holds_alternative<binary_exp>(bin_expex);
+    REQUIRE(is_binexp);
     if(!is_binexp)
       return;
     auto& bin_exp = std::get<binary_exp>(bin_expex);
@@ -133,7 +146,6 @@ TEST_CASE( "Expression test parsing", "[Expressions]" ) {
     auto& left = std::get<literal>(leftex);
     REQUIRE(left->tok.kind == token_kind::LiteralNumber);
     REQUIRE(left->tok.data.get_string() == "6" );
-
 
 
     auto& right_exp = bin_exp->get_right_exp();
