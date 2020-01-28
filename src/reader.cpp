@@ -298,7 +298,7 @@ rec_wrap_t<literal> reader::parse_literal()
 
 rec_wrap_t<identifier> reader::parse_identifier()
 {
-  consume();
+  consume(); // TODO: expect(token_kind::Identifier)
   return std::make_unique<identifier>(ast_tags::identifier, old);
 }
 
@@ -307,14 +307,21 @@ rec_wrap_t<block> reader::parse_block()
   auto tmp = current;
   expect('{', diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
 
-  std::vector<stmt_type> v;
+  std::vector<std::variant<std::monostate, stmt_type, rec_wrap_t<error>>> v;
   while(!accept('}'))
-    v.emplace_back(parse_statement());
+  {
+    // just propagate error nodes
+    auto stmt = parse_statement();
+    if(std::holds_alternative<stmt_type>(stmt))
+      v.emplace_back(std::move(std::get<stmt_type>(stmt)));
+    else 
+      v.emplace_back(std::move(std::get<rec_wrap_t<error>>(stmt)));
+  }
 
   return std::make_unique<block>(ast_tags::block, tmp, std::move(v));
 }
 
-stmt_type reader::parse_keyword()
+std::variant<std::monostate, stmt_type, rec_wrap_t<error>> reader::parse_keyword()
 {
   assert(keyword_set.contains(current.data.get_string()));
 
@@ -335,14 +342,15 @@ stmt_type reader::parse_assign()
   // we know we have an identifier here
   auto id = parse_identifier();
   // check if next sign is an = for
-  expect(4, diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
+  expect(token_kind::Assign, diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
   token assign_tok = old;    // get the assign
   // the next part is an expression
-  exp_type right = parse_expression(0);
+  auto right = parse_expression(0);
+
   return std::make_unique<assign>(ast_tags::assign, std::move(id), assign_tok, std::move(right));
 }
 
-stmt_type reader::parse_statement()
+std::variant<std::monostate, stmt_type, rec_wrap_t<error>> reader::parse_statement()
 {
   switch(current.kind)
   {
@@ -365,7 +373,7 @@ stmt_type reader::parse_statement()
   }
 }
 
-exp_type reader::parse_prefix() // operator
+std::variant<std::monostate, exp_type, rec_wrap_t<error>> reader::parse_prefix() // operator
 {
   switch(current.kind)
   {
@@ -388,24 +396,19 @@ exp_type reader::parse_prefix() // operator
   }
 }
 
-
-exp_type reader::parse_binary(exp_type left)
+exp_type reader::parse_binary(std::variant<std::monostate, exp_type, rec_wrap_t<error>> left)
 {
   token op = current; // safe operator
   consume(); // get to next token
   int precedence = token_precedence_map[op.kind]; // this is for *
-  exp_type right = parse_expression(precedence);
+  auto right = parse_expression(precedence);
   return std::make_unique<binary_exp>(ast_tags::binary_exp, std::move(left), op, std::move(right)); // I hope this calls the constructor
 }
 
-exp_type reader::parse_expression(int precedence)
+std::variant<std::monostate, exp_type, rec_wrap_t<error>> reader::parse_expression(int precedence)
 {
-
-  exp_type prefix = parse_prefix(); // this consumes one right now by creating a literal e.g 3 x was called prefix
-
-  if(std::holds_alternative<rec_wrap_t<error>>(prefix)) { // if we have an error in left
-    // error state that should not happen
-  }
+  auto prefix = parse_prefix(); // this consumes one right now by creating a literal e.g 3 x was called prefix
+  // prefix might be error, this is fine. Just pretend it is an expression
 
   // Infix part because of move semantics we cant write it inside a function since we would need to move prefix that we wpuld maybe return
   exp_type infix;  // e.g + - = etc since i move my prefix here i lose it if i want to return it in my if condition
@@ -458,8 +461,13 @@ std::vector<ast_type> reader::read(std::string_view module)
 
     }*/
     //auto tmp2 = exp_type_to_ast_type(r.parse_expression(0));
-    auto tmp = stmt_type_to_ast_type(r.parse_statement());
-    ast.emplace_back(std::move(tmp));
+
+    auto tmp = r.parse_statement();
+
+    if(std::holds_alternative<stmt_type>(tmp))
+      ast.emplace_back(std::move(std::get<stmt_type>(tmp)));
+    else
+      ast.emplace_back(std::move(std::get<rec_wrap_t<error>>(tmp)));
   }
   if(ast.empty())
   {
