@@ -80,30 +80,37 @@ using maybe_stmt = std::variant<std::monostate, stmt_type, rec_wrap_t<error_>>;
 //          Otherwise, have fun parsing the error messages coming from our visitors
 
 // This aggregate type is used to add basic information to AST nodes
+
+// we need this, otherwise the counter will only be unique per ast-node-type
+//   i.e. 1 + 2 yields ids "0, 0, 1", where the last two are for the literals
+struct unique_base
+{
+public:
+  std::uint64_t id() const { return _id; }
+private:
+  static std::atomic_uint_fast64_t counter;
+  std::uint64_t _id { counter++ };
+};
+
 template<typename T>
-struct base
+struct base : unique_base
 {
 public:
   using tag = ast_tags::tag<T>;
 public:
-  static std::atomic_uint_fast64_t counter;
-  std::uint64_t _id { counter++ };
   token tok;
 protected:
   base(tag, token tok)
-    : tok(tok)
+    : unique_base(), tok(tok)
   { }
 
-  std::uint64_t id() const { return _id; }
 public:
-    symbol symb() const { return tok.data; }
-    source_range loc() { return tok.loc; }
+  symbol symb() const { return tok.data; }
+  source_range loc() { return tok.loc; }
 private:
         T& self()       { return static_cast<T&>(*this); }
   const T& self() const { return static_cast<const T&>(*this); }
 };
-template<typename T>
-std::atomic_uint_fast64_t base<T>::counter = 0;
 
 // Nodes
 struct literal_ : base<literal_>

@@ -1,5 +1,7 @@
 #include <ast.hpp>
 
+std::atomic_uint_fast64_t unique_base::counter = 0;
+
 // ast
 literal_::literal_(literal_::tag, token tok)
   : base({}, tok)
