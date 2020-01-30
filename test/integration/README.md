@@ -12,8 +12,10 @@ sudo ./install.sh /usr/local
 HOWTO
 =====
 
-In integration expects the path to the hx-lang binary as environment variable.
-Also, it expects the path the tests.
+The simplest way to run the integration tests is by executing the `run_all.sh` script in this directory.
+
+For more fine grained control, the tests expect the path to the hx-lang binary as environment variable.
+Also, they expect the path the tests.
 An example execution (if hx-lang is installed in home dir and the binary in a `build` directory) is:
 
 ```sh
