@@ -23,6 +23,24 @@ struct print
   }
 };
 
+static const std::map<emit_classes, std::function<void(std::string_view)>> emitter =
+{
+  { emit_classes::help, [](auto){ assert(false); } },
+  { emit_classes::ast, [](std::string_view t)
+    {
+      auto w = reader::read(t);
+
+      for(auto& v : w)
+      {
+        std::visit(ast_printer<print>, v);
+      }
+    } },
+  { emit_classes::tokens, [](std::string_view t)
+    {
+      assert(false && "TODO");
+    } },
+};
+
 int main(int argc, const char** argv)
 {
   arguments::parse(argc, argv, stdout);
@@ -46,15 +64,9 @@ int main(int argc, const char** argv)
     for(std::size_t i = runners.size(); tit != tasks.end() && i < config.num_cores; ++i)
     {
       auto& t = *tit;
-      runners.emplace_back(std::async(std::launch::async, [t]()
-      {
-        auto w = reader::read(t);
 
-        for(auto& v : w)
-        {
-          std::visit(ast_printer<print>, v);
-        }
-      }));
+      runners.emplace_back(std::async(std::launch::async, [t]() { emitter.at(config.emit_class)(t); }));
+
       ++tit;
     }
     for(auto rit = runners.begin(); rit != runners.end(); )
