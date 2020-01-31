@@ -3,10 +3,8 @@
 export HX_LANG_PATH=$(cd "$PWD"/../../build ; echo $PWD)
 export HX_LANG_TEST=$(cd "$PWD"/../../test ; echo $PWD)
 
-## PARSING
-
 success=0
-for i in parsing/*.bats; do
+for i in cmdargs/*.bats parsing/*.bats; do
   echo "Start $i."
   bats $i
 

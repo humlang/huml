@@ -106,7 +106,7 @@ constexpr auto source_context = [](std::size_t prev_rows)
 
 struct diagnostic_message
 {
-  bool print(std::FILE* file, std::size_t indent_depth = 0) const;
+  void print(std::FILE* file, std::size_t indent_depth = 0) const;
 
   source_range location;
   diagnostic_db::diag_db_entry data;

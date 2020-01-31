@@ -66,7 +66,7 @@ void parse(int argc, const char** argv, std::FILE* out)
     config.files = files;
   }
   config.num_cores = std::any_cast<std::size_t>(map["j"]);
-  if((config.emit_class = std::any_cast<emit_classes>(map["-emit="])) == emit_classes::help)
+  if((config.emit_class = std::any_cast<emit_classes>(map["-emit"])) == emit_classes::help)
   {
     print_emit_classes(out);
     config.print_help = true;
@@ -170,7 +170,7 @@ private:
     {
       for(auto f : v.opt)
       {
-        if(str.find(f) == 1) // first char of str is `-`, after that it should match
+        if(str.find(f) == 1 && str.size() - 1 == f.size()) // first char of str is `-`, after that it should match
           cur_opt = v;
       }
     }
@@ -209,7 +209,7 @@ std::map<std::string, std::any> CmdOptions::parse(int argc, const char** argv)
   {
     // We want to split at equals
     std::string_view v = argv[i];
-    if(auto it = v.find('='); it != std::string_view::npos && it + 1 != std::string_view::npos)
+    if(auto it = v.rfind('='); it != std::string_view::npos && it + 1 != std::string_view::npos)
     {
       // grab the option
       auto w = v;

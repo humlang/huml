@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cassert>
 
-bool diagnostic_message::print(std::FILE* file, std::size_t indent_depth) const
+void diagnostic_message::print(std::FILE* file, std::size_t indent_depth) const
 {
   const std::string indentation(indent_depth * 4, ' ');
   fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}{}:{}:{}: ",
@@ -35,12 +35,10 @@ bool diagnostic_message::print(std::FILE* file, std::size_t indent_depth) const
     data.fn(file); 
   fmt::print(file, fg(fmt::color::white), "\n");
 
-  const bool to_return = data.level == diag_level::error ? false : true;
   for(auto& v : sub_messages)
   {
     v.print(file, indent_depth + 1);
   }
-  return to_return;
 }
 
 diagnostic_message operator+(diagnostic_db::diag_db_entry data, source_range range)
@@ -71,6 +69,9 @@ diagnostics_manager& diagnostics_manager::operator<<=(diagnostic_message msg)
 
   data.push_back(msg);
 
+  if(msg.data.level == diag_level::error)
+    err = 1;
+
   std::sort(data.begin(), data.end(), [](const diagnostic_message& a, const diagnostic_message& b)
                                       { return std::string_view(a.location.module) < std::string_view(b.location.module); });
 
@@ -98,8 +99,7 @@ void diagnostics_manager::print(std::FILE* file)
   {
     if(!ign.has(v.data.level))
     {
-      if(!(v.print(file)))
-        err = 1;
+      v.print(file);
       ign = v.data.ign;
     }
   }
