@@ -9,6 +9,14 @@
 #include <cassert>
 #include <thread>
 
+using namespace std::string_view_literals;
+
+void print_emit_classes(std::FILE* f)
+{
+  fmt::print(f, "emit classes: ");
+  fmt::print(f, "help, tokens, ast\n");
+}
+
 namespace arguments
 {
 
@@ -19,7 +27,19 @@ void parse(int argc, const char** argv, std::FILE* out)
     ("h,?,-help", "Prints this text.", std::make_any<bool>(false), "false", [](auto x){ return std::make_any<bool>(true); })
     (",f,-files", "Accepts arbitrary list of files.", std::make_any<std::vector<std::string_view>>(), "STDIN",
       [out](auto x){ std::vector<std::string_view> w; for(auto v : x) w.push_back(v); return w; })
-    ("j,-num-cores", "Number of cores to use for processing modules.", std::make_any<std::size_t>(1), "1",
+    ("-emit=", "Choose what to emit. Set to \"help\" to get a list.", std::make_any<emit_classes>(emit_classes::ast), "ast",
+      [](auto x)
+      {
+        assert(x.size() == 1);
+        auto& v = x.front();
+        if(v == "tokens") return emit_classes::tokens;
+        else if(v == "ast") return emit_classes::ast;
+        else if(v == "help") return emit_classes::help;
+
+        diagnostic <<= (-diagnostic_db::args::emit_not_present); 
+        return emit_classes::help;
+      })
+    ("j,-num-cores", "Number of cores to use for processing modules. \"*\" to determine automatically.", std::make_any<std::size_t>(1), "1",
       [](auto x)
       {
         if(x.front() == "*")
@@ -46,6 +66,11 @@ void parse(int argc, const char** argv, std::FILE* out)
     config.files = files;
   }
   config.num_cores = std::any_cast<std::size_t>(map["j"]);
+  if((config.emit_class = std::any_cast<emit_classes>(map["-emit="])) == emit_classes::help)
+  {
+    print_emit_classes(out);
+    config.print_help = true;
+  }
 }
 
 namespace detail
@@ -54,6 +79,7 @@ namespace detail
 CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string_view opt_list, std::string_view description,
     std::any default_value, std::string_view default_value_str, const std::function<std::any(const std::vector<std::string_view>&)>& f)
 {
+  bool has_equals = false;
   std::vector<std::string_view> opts;
   auto it = opt_list.find(',');
   while(it != std::string::npos)
@@ -62,14 +88,25 @@ CmdOptions::CmdOptionsAdder& CmdOptions::CmdOptionsAdder::operator()(std::string
     opt.remove_suffix(opt.size() - it);
     opt_list.remove_prefix(it + 1); // + 1 to remove comma
 
-
+    if(!opt.empty() && opt.back() == '=')
+    {
+      opt.remove_suffix(1); // <- get rid of equals
+      has_equals = true;
+    }
     opts.emplace_back(opt);
     it = opt_list.find(',', it);
   }
   if(!opt_list.empty())
+  {
+    if(!opt_list.empty() && opt_list.back() == '=')
+    {
+      opt_list.remove_suffix(1); // <- get rid of equals
+      has_equals = true;
+    }
     opts.emplace_back(opt_list);
+  }
 
-  ot->data.push_back(CmdOption { opts, description, default_value, default_value_str, f });
+  ot->data.push_back(CmdOption { opts, description, default_value, default_value_str, f, has_equals });
   return *this;
 }
 
@@ -79,7 +116,7 @@ CmdOptions::CmdOptionsAdder CmdOptions::add_options()
 
 struct CmdParse
 {
-  CmdParse(const std::vector<std::string_view>& args, std::map<std::string_view, std::any>& map, CmdOptions& cmdopts)
+  CmdParse(const std::vector<std::string_view>& args, std::map<std::string, std::any>& map, CmdOptions& cmdopts)
     : args(&args), map(&map), cmdopts(&cmdopts)
   {
     for(auto v : this->cmdopts->data)
@@ -87,17 +124,15 @@ struct CmdParse
       for(auto f : v.opt)
       {
         if(f == "") // if we have an implicit argument, make this the initial current option
-	{
           cur_opt = v;
-	}
       }
     }
   }
 
-  operator std::map<std::string_view, std::any>&()
+  operator std::map<std::string, std::any>&()
   { return parse(); }
 private:
-  std::map<std::string_view, std::any>& parse()
+  std::map<std::string, std::any>& parse()
   {
     using namespace std::literals;
     for(auto it = args->begin(); it != args->end(); ++it)
@@ -118,11 +153,12 @@ private:
     opt_args.push_back(str);
 
     // parse option arguments only if we hit the end or another option
-    if((next == "" || next[0] == '-') && cur_opt.has_value())
+    //    .... or if we have an equals option currently, since it only supports one arg
+    if(((next == "" || next[0] == '-') && cur_opt.has_value()) || cur_opt->has_equals)
     {
       std::any a = (*cur_opt).parser(opt_args);
       for(auto& o : cur_opt->opt)
-        (*map)[o] = a;
+        (*map)[static_cast<std::string>(o) + (cur_opt->has_equals ? "=" : "")] = a;
     }
     // TODO: add destructor that collects all superfluous args and emits error
   }
@@ -145,7 +181,7 @@ private:
 
 private:
   const std::vector<std::string_view>* args;
-  std::map<std::string_view, std::any>* map;
+  std::map<std::string, std::any>* map; // <- not a string_view, since we need to append '=' sometimes
 
   CmdOptions* cmdopts;
 
@@ -153,23 +189,40 @@ private:
   std::optional<CmdOption> cur_opt;
 };
 
-std::map<std::string_view, std::any> CmdOptions::parse(int argc, const char** argv)
+std::map<std::string, std::any> CmdOptions::parse(int argc, const char** argv)
 {
-  std::map<std::string_view, std::any> map;
+  std::map<std::string, std::any> map;
   for(auto v : data)
   {
     for(auto f : v.opt)
     {
-      map[f] = v.default_value;
+      map[static_cast<std::string>(f)] = v.default_value;
     }
   }
   if(argc - 1 == 0)
     return map;
  
-  std::vector<std::string_view> args(argc - 1);
+  std::vector<std::string_view> args;
+  args.reserve(argc - 1);
 
   for(int i = 1; i < argc; ++i)
-    args[i - 1] = argv[i];
+  {
+    // We want to split at equals
+    std::string_view v = argv[i];
+    if(auto it = v.find('='); it != std::string_view::npos && it + 1 != std::string_view::npos)
+    {
+      // grab the option
+      auto w = v;
+      w.remove_suffix(w.size() - it);
+      args.push_back(w);
+
+      // grab its argument
+      v.remove_prefix(it + 1); // + 1 to remove equals
+      args.push_back(v);
+    }
+    else
+      args.push_back(argv[i]);
+  }
 
   return CmdParse(args, map, *this);
 }

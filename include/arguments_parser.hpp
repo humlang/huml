@@ -22,6 +22,8 @@ namespace detail
     std::any default_value;
     std::string_view default_value_str;
     std::function<std::any(const std::vector<std::string_view>&)> parser;
+
+    bool has_equals { false };
   };
   struct CmdOptions
   {
@@ -42,7 +44,7 @@ namespace detail
 
     CmdOptionsAdder add_options();
 
-    std::map<std::string_view, std::any> parse(int argc, const char** argv);
+    std::map<std::string, std::any> parse(int argc, const char** argv);
 
     void print_help(std::FILE* f) const;
   private:
