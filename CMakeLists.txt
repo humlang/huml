@@ -9,7 +9,6 @@ set(hx-lang_files src/reader.cpp
   src/source_range.cpp
   src/diagnostic.cpp
   src/stream_lookup.cpp
-  src/argument_parser.cpp
   )
 
 find_package(fmt REQUIRED)
@@ -41,7 +40,7 @@ ParseAndAddCatchTests(hx-lang_parsing_tests)
 
 # main program
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
-add_executable(hx-lang src/main.cpp "${hx-lang_files}")
+add_executable(hx-lang src/main.cpp src/argument_parser.cpp "${hx-lang_files}")
 target_link_libraries(hx-lang PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT})
 set_property(TARGET hx-lang PROPERTY CXX_STANDARD 17)
 
