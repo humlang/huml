@@ -23,6 +23,25 @@ private:
   F f;
 };
 template<typename F> recursor(F&&) -> recursor<F>;
+
+template<typename S, typename F>
+struct stateful_recursor
+{
+  stateful_recursor(S&& s, F&& f) : state(s), f(f) {}
+
+  template<typename T>
+  auto operator()(const T& arg) -> std::invoke_result_t<F, stateful_recursor<S, F>&&, const T&>
+  { return f(*this, arg); }
+
+  S state;
+private:
+  F f;
+};
+template<typename S, typename F>
+F& stateful_recursor_friend_hack(stateful_recursor<S, F>& r)
+{ return r.f; }
+
+template<typename S, typename F> stateful_recursor(S&&, F&&) -> stateful_recursor<S, F>;
 // see sample for recursive visitor in ast_printer.hpp
 
 
