@@ -35,7 +35,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
   { emit_classes::help, [](auto){ assert(false); } },
   { emit_classes::ast, [](std::string_view t)
     {
-      auto w = reader::read(t);
+      auto w = reader::read<ast_type>(t);
 
       for(auto& v : w)
       {
@@ -44,7 +44,13 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
     } },
   { emit_classes::tokens, [](std::string_view t)
     {
-      assert(false && "TODO");
+      auto w = reader::read<token>(t);
+
+      for(auto& tok : w)
+      {
+        std::cout << "Token \'" << kind_to_str(tok.kind) << "\' at " << tok.loc.to_string()
+                  << " with data \"" << tok.data.get_string() << "\".\n";
+      }
     } },
 };
 

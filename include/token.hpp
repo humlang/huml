@@ -25,6 +25,8 @@ enum class token_kind : std::int8_t
     EndOfFile = EOF
 };
 
+std::string_view kind_to_str(token_kind kind);
+
 class token
 {
 public:

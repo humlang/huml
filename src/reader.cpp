@@ -45,10 +45,7 @@ constexpr auto token_precedence_map = make_map<token_kind, int>( {
         });
 
 constexpr static bool isprint(unsigned char c)
-{
-  return (' ' <= c && c <= '~');
-
-}
+{ return (' ' <= c && c <= '~'); }
 
 
 reader::reader(std::string_view module)
@@ -463,7 +460,7 @@ maybe_expr reader::parse_expression(int precedence)
   return prefix;
 }
 
-
+template<>
 std::vector<ast_type> reader::read(std::string_view module)
 {
   reader r(module);
@@ -487,6 +484,23 @@ std::vector<ast_type> reader::read(std::string_view module)
   return ast;
 }
 
+template<>
+std::vector<token> reader::read(std::string_view module)
+{
+  reader r(module);
+
+  std::vector<token> toks;
+  while(r.current.kind != token_kind::EndOfFile)
+  {
+    // First is undefined
+    r.consume();
+    toks.push_back(r.current);
+  }
+  if(toks.empty())
+    diagnostic <<= (-diagnostic_db::parser::empty_module);
+  return toks;
+}
+
 int reader::precedence() {
   token_kind prec = current.kind;
   if (prec == token_kind::Undef || prec == token_kind::EndOfFile || prec == token_kind::Semi)
@@ -496,12 +510,12 @@ int reader::precedence() {
 
 void reader::find_next_valid_stmt()
 {
-
+  // TODO
 }
 
 void reader::find_next_valid_expr()
 {
-
+  // TODO
 }
 
 

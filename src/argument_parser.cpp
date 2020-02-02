@@ -66,7 +66,8 @@ void parse(int argc, const char** argv, std::FILE* out)
     config.files = files;
   }
   config.num_cores = std::any_cast<std::size_t>(map["j"]);
-  if((config.emit_class = std::any_cast<emit_classes>(map["-emit"])) == emit_classes::help)
+  config.emit_class = std::any_cast<emit_classes>(map["-emit="]);
+  if(config.emit_class == emit_classes::help)
   {
     print_emit_classes(out);
     config.print_help = true;
@@ -196,7 +197,7 @@ std::map<std::string, std::any> CmdOptions::parse(int argc, const char** argv)
   {
     for(auto f : v.opt)
     {
-      map[static_cast<std::string>(f)] = v.default_value;
+      map[static_cast<std::string>(f) + (v.has_equals ? "=" : "")] = v.default_value;
     }
   }
   if(argc - 1 == 0)

@@ -14,7 +14,9 @@
 class reader
 {
 public:
-  static std::vector<ast_type> read(std::string_view module);
+
+  template<typename T>
+  static std::vector<T> read(std::string_view module) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
 
   static constexpr std::size_t lookahead_size = 1;
 
