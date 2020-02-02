@@ -17,9 +17,16 @@
 
 struct print
 {
-  void operator()(std::string str)
+  void operator()(std::string str, std::size_t indent_depth = 0)
   {
+    indent(indent_depth);
     std::cout << str << "\n";
+  }
+
+  void indent(std::size_t depth)
+  {
+    while(depth-- > 0)
+      std::cout << "  ";
   }
 };
 

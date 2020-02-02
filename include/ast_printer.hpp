@@ -14,7 +14,7 @@
 template<typename PrinterFn>
 inline static constexpr auto ast_printer_helper = base_visitor {
   [](auto&& rec, auto& arg) -> void { PrinterFn print;
-    print("unknown argument");
+    print("unknown argument", rec.state.depth);
   },
 
   [](auto&& rec, const stmt_type& typ) -> void {
@@ -22,42 +22,41 @@ inline static constexpr auto ast_printer_helper = base_visitor {
   },
 
   [](auto&& rec, const literal& lit) -> void { PrinterFn print;
-    print("literal token at " + lit->loc().to_string());
+    print("literal token at " + lit->loc().to_string(), rec.state.depth);
   },
 
   [](auto&& rec, const identifier& id) -> void { PrinterFn print;
-    print("identifier token at " + id->loc().to_string());
+    print("identifier token at " + id->loc().to_string(), rec.state.depth);
   },
 
   [](auto&& rec, const assign& ass) -> void { PrinterFn print;
+    print("assign token at " + ass->loc().to_string(), rec.state.depth);
+    rec.state.depth++;
     std::visit(rec, ass->var());
-    print("assign token at " + ass->loc().to_string());
     std::visit(rec, ass->exp());
+    rec.state.depth--;
   },
 
   [](auto&& rec, const loop& l) -> void { PrinterFn print;
     auto loc = l->loc().to_string();
-    print("loop at " + loc);
-    print("[" + loc + "] data 1/2  -  ");
+    print("loop at " + loc, rec.state.depth);
+    rec.state.depth++;
     std::visit(rec, l->num_times());
-
-    print("[" + loc + "] data 2/2  -  ");
     std::visit(rec, l->loop_body());
+    rec.state.depth--;
   },
 
   [](auto&& rec, const block& b) -> void { PrinterFn print;
-    print("block at " + b->loc().to_string());
+    print("block at " + b->loc().to_string(), rec.state.depth);
   },
 
   [](auto&& rec, const binary_exp& bin) -> void { PrinterFn print;
-    print("binary expresion at " + bin->loc().to_string());
-    auto loc = bin->loc().to_string();
-    print("left expression: [" + loc + "] data 1/2");
-    auto symbol = bin->symb();
-    print(symbol.get_string());
+    print("binary expresion at " + bin->loc().to_string(), rec.state.depth);
+
+    rec.state.depth++;
     std::visit(rec, bin->get_left_exp());
-    print("right expression: [" + loc + "] data 2/2");
     std::visit(rec, bin->get_right_exp());
+    rec.state.depth--;
   },
   [](auto&& rec, const std::monostate& t) -> void { assert(false && "Should never be called."); }
 };
@@ -69,8 +68,10 @@ template<typename PrinterFn>
 inline static constexpr auto ast_printer = 
 			[](const auto& arg) -> void
       {
-        const std::lock_guard<std::mutex> lock(ast_printer_mutex);
+        struct state
+        { std::size_t depth; };
 
-        return ast_printer_helper<PrinterFn>(recursor(ast_printer_helper<PrinterFn>), arg);
+        const std::lock_guard<std::mutex> lock(ast_printer_mutex);
+        return ast_printer_helper<PrinterFn>(stateful_recursor(state{0}, ast_printer_helper<PrinterFn>), arg);
       };
 
