@@ -22,41 +22,80 @@ inline static constexpr auto ast_printer_helper = base_visitor {
   },
 
   [](auto&& rec, const literal& lit) -> void { PrinterFn print;
-    print("literal token at " + lit->loc().to_string(), rec.state.depth);
+    print("< literal, id=\"" + std::to_string(lit->id()) + "\""
+        + ", location=\"" + lit->loc().to_string() + "\""
+        + ", symbol=\"" + lit->symb().get_string() + "\""
+        + ">", rec.state.depth);
   },
 
   [](auto&& rec, const identifier& id) -> void { PrinterFn print;
-    print("identifier token at " + id->loc().to_string(), rec.state.depth);
+    print("< identifier, id=\"" + std::to_string(id->id()) + "\""
+        + ", location=\"" + id->loc().to_string() + "\""
+        + ", symbol=\"" + id->symb().get_string() + "\""
+        + ">", rec.state.depth);
+  },
+
+  [](auto&& rec, const error& err) -> void { PrinterFn print;
+    print("< error, id=\"" + std::to_string(err->id()) + "\""
+        + ", location=\"" + err->loc().to_string() + "\""
+        + ", symbol=\"" + err->symb().get_string() + "\""
+        + ">", rec.state.depth);
   },
 
   [](auto&& rec, const assign& ass) -> void { PrinterFn print;
-    print("assign token at " + ass->loc().to_string(), rec.state.depth);
+    print("<|assign, id=\"" + std::to_string(ass->id()) + "\""
+        + ", location=\"" + ass->loc().to_string() + "\""
+        + ", symbol=\"" + ass->symb().get_string() + "\""
+        + ", ", rec.state.depth);
+
     rec.state.depth++;
     std::visit(rec, ass->var());
     std::visit(rec, ass->exp());
     rec.state.depth--;
+
+    print("|assign>", rec.state.depth);
   },
 
   [](auto&& rec, const loop& l) -> void { PrinterFn print;
-    auto loc = l->loc().to_string();
-    print("loop at " + loc, rec.state.depth);
+    print("<|loop, id=\"" + std::to_string(l->id()) + "\""
+        + ", location=\"" + l->loc().to_string() + "\""
+        + ", symbol=\"" + l->symb().get_string() + "\""
+        + ", ", rec.state.depth);
+
     rec.state.depth++;
     std::visit(rec, l->num_times());
     std::visit(rec, l->loop_body());
     rec.state.depth--;
+
+    print("|loop>", rec.state.depth);
   },
 
   [](auto&& rec, const block& b) -> void { PrinterFn print;
-    print("block at " + b->loc().to_string(), rec.state.depth);
+    print("<|block, id=\"" + std::to_string(b->id()) + "\""
+        + ", location=\"" + b->loc().to_string() + "\""
+        + ", symbol=\"" + b->symb().get_string() + "\""
+        + ", ", rec.state.depth);
+
+    rec.state.depth++;
+    for(auto& v : b->statements())
+      std::visit(rec, v);
+    rec.state.depth--;
+
+    print("|block>", rec.state.depth);
   },
 
   [](auto&& rec, const binary_exp& bin) -> void { PrinterFn print;
-    print("binary expresion at " + bin->loc().to_string(), rec.state.depth);
+    print("<|binary expression, id=\"" + std::to_string(bin->id()) + "\""
+        + ", location=\"" + bin->loc().to_string() + "\""
+        + ", symbol=\"" + bin->symb().get_string() + "\""
+        + ", ", rec.state.depth);
 
     rec.state.depth++;
     std::visit(rec, bin->get_left_exp());
     std::visit(rec, bin->get_right_exp());
     rec.state.depth--;
+
+    print("|binary expression>", rec.state.depth);
   },
   [](auto&& rec, const std::monostate& t) -> void { assert(false && "Should never be called."); }
 };

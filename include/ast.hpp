@@ -167,6 +167,8 @@ struct block_ : base<block_>
 {
 public:
   block_(tag, token tok, std::vector<maybe_stmt> stmts);
+
+  const std::vector<maybe_stmt>& statements() const { return stmts; }
 private:
   std::vector<maybe_stmt> stmts;
 };
