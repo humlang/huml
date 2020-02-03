@@ -53,6 +53,9 @@ reader::reader(std::string_view module)
 {
   for(std::size_t i = 0; i < next_toks.size(); ++i)
     consume();
+
+  // need one additional consume to initialize `current`
+  consume(); 
 }
 
 reader::~reader()
@@ -401,6 +404,8 @@ maybe_stmt reader::parse_assign()
   // the next part is an expression
   auto right = parse_expression(0);
 
+  if(!expect_stmt<token_kind::Semi>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
+    return mk_error();
   return ast_tags::assign.make_node(std::move(id), assign_tok, std::move(right));
 }
 
@@ -503,14 +508,16 @@ std::vector<ast_type> reader::read(std::string_view module)
   std::vector<ast_type> ast;
   while(r.current.kind != token_kind::EndOfFile)
   {
-    r.consume();
-
     auto tmp = r.parse_statement();
 
     if(std::holds_alternative<stmt_type>(tmp))
       ast.emplace_back(std::move(std::get<stmt_type>(tmp)));
     else
       ast.emplace_back(std::move(std::get<error>(tmp)));
+
+    // accept any tailing semicolons, we allow stuff like `x := y;;;;;;;;;;`
+    while(r.accept<token_kind::Semi>())
+      ;
   }
   if(ast.empty())
   {
