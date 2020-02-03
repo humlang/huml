@@ -265,24 +265,49 @@ void reader::consume()
   next_toks.back() = get<token>();
 }
 
-template<token_kind kind, typename FailF, typename F>
-void reader::expect(FailF&& fail, F&& f)
+template<token_kind kind, reader::FailType type, typename F>
+bool reader::expect(F&& f)
 {
   if(current.kind != kind)
   {
-    diagnostic <<= (f + next_toks[0].loc) | source_context(0);
-    fail();
+    diagnostic <<= (f + current.loc) | source_context(0);
+
+    switch(type)
+    {
+      default:
+      case FailType::Statement:  find_next_valid_stmt(); break;
+      case FailType::Expression: find_next_valid_expr(); break;
+    }
+    return false;
   }
   consume();
+  return true;
 }
 
-template<std::uint8_t c, typename FailF, typename F>
-void reader::expect(FailF&& fail, F&& f)
+template<std::uint8_t c, reader::FailType type, typename F>
+bool reader::expect(F&& f)
 {
   static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
 
-  expect<static_cast<token_kind>(c)>(std::forward<FailF>(fail), std::forward<F>(f));
+  return expect<static_cast<token_kind>(c), type>(std::forward<F>(f));
 }
+
+template<token_kind kind, typename F>
+bool reader::expect_stmt(F&& f)
+{ return expect<kind, FailType::Statement>(std::forward<F>(f)); }
+
+template<std::uint8_t kind, typename F>
+bool reader::expect_stmt(F&& f)
+{ return expect<kind, FailType::Statement>(std::forward<F>(f)); }
+
+template<token_kind kind, typename F>
+bool reader::expect_expr(F&& f)
+{ return expect<kind, FailType::Expression>(std::forward<F>(f)); }
+
+template<std::uint8_t kind, typename F>
+bool reader::expect_expr(F&& f)
+{ return expect<kind, FailType::Expression>(std::forward<F>(f)); }
+
 
 template<token_kind kind>
 bool reader::accept()
@@ -309,23 +334,27 @@ error reader::mk_error()
 
 literal reader::parse_literal()
 {
-  consume();
+  // Only have numbers as literals for now
+  expect_expr<token_kind::LiteralNumber>(diagnostic_db::parser::literal_expected(current.data.get_string()));
   return ast_tags::literal.make_node(old);
 }
 
 identifier reader::parse_identifier()
 {
-  consume(); // TODO: expect(token_kind::Identifier)
+  expect_expr<token_kind::Identifier>(diagnostic_db::parser::identifier_expected(current.data.get_string()));
   return ast_tags::identifier.make_node(old);
 }
 
-block reader::parse_block()
+maybe_stmt reader::parse_block()
 {
   auto tmp = current;
-  expect<'{'>([this]{ find_next_valid_stmt(); }, diagnostic_db::parser::block_expects_lbrace(current.data.get_string()));
+
+  // ensure we see an opening brace
+  if(!expect_stmt<'{'>(diagnostic_db::parser::block_expects_lbrace(current.data.get_string())))
+    return mk_error();
 
   std::vector<maybe_stmt> v;
-  while(!accept<'}'>())
+  while(current.kind != token_kind::RBrace && current.kind != token_kind::EndOfFile)
   {
     // just propagate error nodes
     auto stmt = parse_statement();
@@ -334,8 +363,10 @@ block reader::parse_block()
     else 
       v.emplace_back(std::move(std::get<error>(stmt)));
   }
+  // ensure that we see a closing brace
+  if(!expect_stmt<'{'>(diagnostic_db::parser::block_expects_rbrace(current.data.get_string())))
+    return mk_error();
 
-  // TODO: return error node if accept has never seen '{' or if expect did not see '}'
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
 }
 
@@ -356,13 +387,17 @@ maybe_stmt reader::parse_keyword()
   return mk_error();
 }
 
-stmt_type reader::parse_assign()
+maybe_stmt reader::parse_assign()
 {
   // we know we have an identifier here
   auto id = parse_identifier();
+
   // check if next sign is an = for
-  expect<token_kind::Assign>([this]{ find_next_valid_stmt(); }, diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())); // TODO this has to be changed expect consumes
-  token assign_tok = old;    // get the assign
+  if(!expect_stmt<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())))
+    return mk_error();
+
+  token assign_tok = old;
+
   // the next part is an expression
   auto right = parse_expression(0);
 
@@ -510,12 +545,44 @@ int reader::precedence() {
 
 void reader::find_next_valid_stmt()
 {
-  // TODO
+  bool run = true;
+  while(run)
+  {
+    switch(current.kind)
+    {
+    default: consume(); break;
+
+    // Edge cases
+    case token_kind::Undef:
+    case token_kind::EndOfFile:
+
+    // Beginning tokens of statements
+    case token_kind::Keyword:
+    case token_kind::Identifier:
+       run = false;
+    }
+  }
 }
 
 void reader::find_next_valid_expr()
 {
-  // TODO
+  bool run = true;
+  while(run)
+  {
+    switch(current.kind)
+    {
+    default: consume(); break;
+
+    // Edge cases
+    case token_kind::Undef:
+    case token_kind::EndOfFile:
+    
+    // Beginning tokens of expressions
+    case token_kind::Identifier:
+    case token_kind::LiteralNumber:
+       run = false;
+    }
+  }
 }
 
 

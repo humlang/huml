@@ -29,11 +29,29 @@ private:
 
   void consume();
 
+
+  enum class FailType
+  {
+    Statement,
+    Expression
+  };
+
   // "hard error"   -> always consumes
-  template<token_kind, typename FailF, typename F>
-  void expect(FailF&& fail, F&& f);
-  template<std::uint8_t, typename FailF, typename F>
-  void expect(FailF&& fail, F&& f);
+  template<token_kind, FailType type, typename F>
+  bool expect(F&& f);
+  template<std::uint8_t, FailType type, typename F>
+  bool expect(F&& f);
+
+
+  template<token_kind, typename F>
+  bool expect_stmt(F&& f);
+  template<std::uint8_t, typename F>
+  bool expect_stmt(F&& f);
+
+  template<token_kind, typename F>
+  bool expect_expr(F&& f);
+  template<std::uint8_t, typename F>
+  bool expect_expr(F&& f);
 
   // "soft error"    -> only consumes if ==
   template<token_kind>
@@ -47,14 +65,14 @@ private:
   maybe_stmt parse_keyword();
   literal parse_literal();
   identifier parse_identifier();
-  block parse_block();
-  stmt_type parse_assign();
+  maybe_stmt parse_block();
+  maybe_stmt parse_assign();
   maybe_stmt parse_statement();
 
   maybe_expr parse_prefix(); // prefix operators like ! - etc. Further this is also used for variables e.g x
   exp_type parse_binary(maybe_expr left);
   maybe_expr parse_expression(int precedence); // TODO we need precedence table for Right now only add a (+ -) b
-  int precedence(); // this will get the Precedence of the next token ( look ahead token)
+  int precedence();
 
 
   // Ignores tokens until it finds the next start for a valid statement

@@ -73,18 +73,28 @@ constexpr static const auto unknown_keyword = [](auto t) {
 };
 
 constexpr static const auto block_expects_lbrace = [](auto t) {
-  symbol err(format(FMT_STRING("\"{}\" expected before block."), t));
+  symbol err(format(FMT_STRING("\"{}\" expected before block, instead got \"{}\"."), "{{", t));
   return make_db_entry(diag_level::error, "PA-BR-000", err.get_string(), {});
 };
 
 constexpr static const auto block_expects_rbrace = [](auto t) {
-  symbol err(format(FMT_STRING("\"{}\" expected after block."), t));
+  symbol err(format(FMT_STRING("\"{}\" expected after block, instead got \"{}\"."), "}}", t));
   return make_db_entry(diag_level::error, "PA-BR-001", err.get_string(), {});
 };
 
 constexpr static const auto assign_expects_colon_equal = [](auto t) {
-    symbol err(format(FMT_STRING("\"{}\" expected after identifier."), t));
+    symbol err(format(FMT_STRING("\":=\" expected after identifier, instead got \"{}\"."), t));
     return make_db_entry(diag_level::error, "PA-BR-002", err.get_string(), {});
+};
+
+constexpr static const auto identifier_expected = [](auto t) {
+    symbol err(format(FMT_STRING("Expected identifier, instead got \"{}\"."), t));
+    return make_db_entry(diag_level::error, "PA-ID-402", err.get_string(), {});
+};
+
+constexpr static const auto literal_expected = [](auto t) {
+    symbol err(format(FMT_STRING("Expected literal, instead got \"{}\"."), t));
+    return make_db_entry(diag_level::error, "PA-ID-402", err.get_string(), {});
 };
 
   }
