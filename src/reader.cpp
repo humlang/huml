@@ -426,6 +426,10 @@ maybe_stmt reader::parse_statement()
   {
     return std::move(parse_keyword());
   }
+  case token_kind::LBrace:
+  {
+    return std::move(parse_block());
+  }
   case token_kind::Identifier:
   {
     return std::move(parse_assign());
@@ -550,6 +554,7 @@ int reader::precedence() {
   return token_precedence_map[prec];
 }
 
+
 void reader::find_next_valid_stmt()
 {
   bool run = true;
@@ -564,6 +569,7 @@ void reader::find_next_valid_stmt()
     case token_kind::EndOfFile:
 
     // Beginning tokens of statements
+    case token_kind::LBrace:
     case token_kind::Keyword:
     case token_kind::Identifier:
        run = false;
