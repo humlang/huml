@@ -13,11 +13,15 @@
 //   Also note that we need to state the return type explicitly, otherwise you'll have nasty errors
 template<typename PrinterFn>
 inline static constexpr auto ast_printer_helper = base_visitor {
+  // always add the following four edge cases
+  [](auto&& rec, const std::monostate& t) -> void { assert(false && "Should never be called."); },
   [](auto&& rec, auto& arg) -> void { PrinterFn print;
     print("unknown argument", rec.state.depth);
   },
-
   [](auto&& rec, const stmt_type& typ) -> void {
+    std::visit(rec, typ);
+  },
+  [](auto&& rec, const exp_type& typ) -> void {
     std::visit(rec, typ);
   },
 
@@ -96,8 +100,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     rec.state.depth--;
 
     print("|binary expression>", rec.state.depth);
-  },
-  [](auto&& rec, const std::monostate& t) -> void { assert(false && "Should never be called."); }
+  }
 };
 
 std::mutex ast_printer_mutex;
