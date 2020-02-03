@@ -364,7 +364,7 @@ maybe_stmt reader::parse_block()
       v.emplace_back(std::move(std::get<error>(stmt)));
   }
   // ensure that we see a closing brace
-  if(!expect_stmt<'{'>(diagnostic_db::parser::block_expects_rbrace(current.data.get_string())))
+  if(!expect_stmt<'}'>(diagnostic_db::parser::block_expects_rbrace(current.data.get_string())))
     return mk_error();
 
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
