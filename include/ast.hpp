@@ -153,13 +153,13 @@ public:
 struct loop_ : base<loop_>
 {
 public:
-  loop_(tag, token tok, literal times, maybe_stmt body);
+  loop_(tag, token tok, maybe_expr times, maybe_stmt body);
 
-  const exp_type& num_times() const { return times; }
+  const maybe_expr& num_times() const { return times; }
   const maybe_stmt& loop_body() const { return body; }
 
 private:
-  exp_type times;
+  maybe_expr times;
   maybe_stmt body;
 };
 

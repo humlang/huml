@@ -15,7 +15,7 @@ error_::error_(error_::tag, token tok)
   : base({}, tok)
 {  }
 
-loop_::loop_(loop_::tag, token tok, literal times, maybe_stmt body)
+loop_::loop_(loop_::tag, token tok, maybe_expr times, maybe_stmt body)
   : base({}, tok), times(std::move(times)), body(std::move(body))
 {  }
 
