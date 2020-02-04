@@ -11,7 +11,7 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
 
     SECTION( "assignment_with_whitespace" ) {
       diagnostic.reset();
-      stream_lookup.write_test("x := 2");
+      stream_lookup.write_test("x := 2;");
       auto w = reader::read<ast_type>("TESTSTREAM");
 
       std::vector<std::uint_fast64_t> ids;
@@ -21,12 +21,12 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
       REQUIRE(is_assignstmt);
       if(!is_assignstmt)
         return; // bail out, we cannot go on!
-      auto& assstmt = std::get<stmt_type>(w[0]);
-      const bool is_assign = std::holds_alternative<assign>(assstmt);
+      auto& assstmtmaybe = std::get<stmt_type>(w[0]);
+      const bool is_assign = std::holds_alternative<assign>(assstmtmaybe);
       REQUIRE(is_assign);
       if(!is_assign)
         return; // bail out, we cannot go on!
-      auto& ass = std::get<assign>(assstmt);
+      auto& ass = std::get<assign>(assstmtmaybe);
       ids.push_back(ass->id());
 
       REQUIRE(ass->tok.kind == token_kind::Assign);
@@ -59,7 +59,7 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
 
     SECTION( "assignment-without-whitespace" ) {
       diagnostic.reset();
-      stream_lookup.write_test("x:=2");
+      stream_lookup.write_test("x:=2;");
       auto w = reader::read<ast_type>("TESTSTREAM");
 
       REQUIRE(w.size() == 1);
@@ -101,7 +101,7 @@ TEST_CASE( "Expression test parsing", "[Expressions]" ) {
 
   SECTION( "expression-with-whitespace" ) {
     diagnostic.reset();
-    stream_lookup.write_test("x := 6*7");
+    stream_lookup.write_test("x := 6*7;");
     auto w = reader::read<ast_type>("TESTSTREAM");
     
     REQUIRE(w.size() == 1);
