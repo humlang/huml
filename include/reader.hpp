@@ -63,8 +63,8 @@ private:
   error mk_error();
 
   maybe_stmt parse_keyword();
-  literal parse_literal();
-  identifier parse_identifier();
+  maybe_expr parse_literal();
+  maybe_expr parse_identifier();
   maybe_stmt parse_block();
   maybe_stmt parse_assign();
   maybe_stmt parse_statement();

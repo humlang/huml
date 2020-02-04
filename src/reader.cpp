@@ -274,13 +274,7 @@ bool reader::expect(F&& f)
   if(current.kind != kind)
   {
     diagnostic <<= (f + current.loc) | source_context(0);
-
-    switch(type)
-    {
-      default:
-      case FailType::Statement:  find_next_valid_stmt(); break;
-      case FailType::Expression: find_next_valid_expr(); break;
-    }
+    find_next_valid_stmt();
     return false;
   }
   consume();
@@ -335,16 +329,18 @@ error reader::mk_error()
   return ast_tags::error.make_node(old);
 }
 
-literal reader::parse_literal()
+maybe_expr reader::parse_literal()
 {
   // Only have numbers as literals for now
-  expect_expr<token_kind::LiteralNumber>(diagnostic_db::parser::literal_expected(current.data.get_string()));
+  if(!expect_expr<token_kind::LiteralNumber>(diagnostic_db::parser::literal_expected(current.data.get_string())))
+    return mk_error();
   return ast_tags::literal.make_node(old);
 }
 
-identifier reader::parse_identifier()
+maybe_expr reader::parse_identifier()
 {
-  expect_expr<token_kind::Identifier>(diagnostic_db::parser::identifier_expected(current.data.get_string()));
+  if(!expect_expr<token_kind::Identifier>(diagnostic_db::parser::identifier_expected(current.data.get_string())))
+    return mk_error();
   return ast_tags::identifier.make_node(old);
 }
 
@@ -394,6 +390,8 @@ maybe_stmt reader::parse_assign()
 {
   // we know we have an identifier here
   auto id = parse_identifier();
+
+  assert(std::holds_alternative<identifier>(id));
 
   // check if next sign is an = for
   if(!expect_stmt<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())))
@@ -475,6 +473,11 @@ maybe_expr reader::parse_expression(int precedence)
 {
   auto prefix = parse_prefix(); // this consumes one right now by creating a literal e.g 3 x was called prefix
   // prefix might be error, this is fine. Just pretend it is an expression
+  
+  if(std::holds_alternative<error>(prefix))
+  {
+    return prefix;
+  }
 
   // Infix part because of move semantics we cant write it inside a function since we would need to move prefix that we wpuld maybe return
   exp_type infix;  // e.g + - = etc since i move my prefix here i lose it if i want to return it in my if condition
@@ -496,6 +499,10 @@ maybe_expr reader::parse_expression(int precedence)
       case token_kind::Plus: case token_kind::Minus: case token_kind::Asterisk:
       {
         prefix = parse_binary(std::move(prefix));
+        if(std::holds_alternative<error>(prefix))
+        {
+          return prefix;
+        }
       }
     }
   }
@@ -571,8 +578,11 @@ void reader::find_next_valid_stmt()
     // Beginning tokens of statements
     case token_kind::LBrace:
     case token_kind::Keyword:
-    case token_kind::Identifier:
        run = false;
+
+    case token_kind::Identifier:
+       if(next_toks[0].kind == token_kind::Assign)
+         run = false;
     }
   }
 }
