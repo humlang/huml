@@ -1,7 +1,9 @@
 #pragma once
 
 #include <type_traits>
+#include <variant>
 #include <cstdint>
+#include <cassert>
 #include <array>
 
 struct nonesuch {
@@ -56,4 +58,149 @@ constexpr H hash_string(T str)
     hash ^= (hash * 31) + (*p);
   return hash;
 }
+
+//// MAGICY GET
+// allows to compress std::get<T0>(std::get<T1>(...(std::get<Tn>(variant))...)) calls into just one get call
+
+namespace one
+{
+namespace detail
+{
+
+template<typename T, typename... Args>
+constexpr bool is_in_there(const std::variant<Args...>& v)
+{ return (std::is_same_v<T, Args> || ...); }
+
+template<typename T, typename... Args>
+constexpr bool is_in_there(std::variant<Args...>&& v)
+{ return (std::is_same_v<T, Args> || ...); }
+
+template<typename T>
+constexpr inline static bool is_variant = false;
+template<typename... Args>
+constexpr inline static bool is_variant<std::variant<Args...>> = true;
+
+
+template<std::size_t N>
+struct num { static const constexpr auto value = N; };
+
+template <class F, std::size_t... Is>
+constexpr void for_(F&& func, std::index_sequence<Is...>)
+{ (func(num<Is>{}), ...); }
+
+template <std::size_t N, typename F>
+constexpr void for_(F&& func)
+{ for_(std::forward<F>(func), std::make_index_sequence<N>()); }
+
+template<typename T, typename D>
+constexpr std::variant<std::monostate, T> magical_get(D&&)
+{ return std::monostate{}; }
+
+template<typename T, int n = 0, typename... Args>
+constexpr std::variant<std::monostate, T> magical_get(std::variant<Args...>&& w)
+{
+  if constexpr(is_in_there<T>(w) && n == 0)
+    return std::get<T>(w);
+  else
+  {
+    std::variant<std::monostate, T*> v;
+    for_<sizeof...(Args)>([&w, &v](auto i)
+    {
+      if(auto x = std::get_if<i.value>(&w))
+      {
+        auto res = magical_get<T>(*x);
+
+        if(std::holds_alternative<T>(res))
+          v = res;
+      }
+    });
+    return v;
+  }
+}
+
+template<typename T, typename D>
+constexpr std::variant<std::monostate, const T*> magical_get(const D&)
+{ return std::monostate{}; }
+
+template<typename T, typename... Args>
+constexpr std::variant<std::monostate, const T*> magical_get(const std::variant<Args...>& w)
+{
+  if constexpr(is_in_there<T>(w))
+    return &std::get<T>(w);
+  else
+  {
+    std::variant<std::monostate, const T*> v;
+    for_<sizeof...(Args)>([&w, &v](auto i)
+    {
+      if(auto x = std::get_if<i.value>(&w))
+      {
+        auto res = magical_get<T>(*x);
+
+        if(std::holds_alternative<const T*>(res))
+          v = res;
+      }
+    });
+    return v;
+  }
+}
+
+template<typename T, typename D>
+constexpr std::variant<std::monostate, T*> magical_get(D&)
+{ return std::monostate{}; }
+
+template<typename T, typename... Args>
+constexpr std::variant<std::monostate, T*> magical_get(std::variant<Args...>& w)
+{
+  if constexpr(is_in_there<T>(w))
+    return &std::get<T>(w);
+  else
+  {
+    std::variant<std::monostate, T*> v;
+    for_<sizeof...(Args)>([&w, &v](auto i)
+    {
+      if(auto x = std::get_if<i.value>(&w))
+      {
+        auto res = magical_get<T>(*x);
+
+        if(std::holds_alternative<T*>(res))
+          v = res;
+      }
+    });
+    return v;
+  }
+}
+}
+
+template<typename T, typename... Args>
+constexpr T get(std::variant<Args...>&& w)
+{
+  auto x = detail::magical_get<T>(w);
+
+  assert(std::holds_alternative<T*>(x));
+  
+  return std::get<T>(x);
+}
+
+template<typename T, typename... Args>
+constexpr T& get(std::variant<Args...>& w)
+{
+  auto x = detail::magical_get<T>(w);
+
+  assert(std::holds_alternative<T*>(x));
+  
+  return *(std::get<T*>(x));
+}
+
+template<typename T, typename... Args>
+constexpr const T& get(const std::variant<Args...>& w)
+{
+  auto x = detail::magical_get<T>(w);
+
+  assert(std::holds_alternative<T*>(x));
+  
+  return *(std::get<T*>(x));
+}
+
+}
+
 

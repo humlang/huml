@@ -392,7 +392,7 @@ maybe_stmt reader::parse_assign()
   auto id = parse_identifier();
 
   // parse_statement should ensure that we have seen a token identifier
-  assert(std::holds_alternative<exp_type>(id));
+  assert(std::holds_alternative<exp_type>(id)); // TODO: sharpen this to identifer, although one::get already asserts this
 
   // check if next sign is an = for
   if(!expect_stmt<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())))
@@ -405,7 +405,7 @@ maybe_stmt reader::parse_assign()
 
   if(!expect_stmt<token_kind::Semi>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
     return mk_error();
-  return ast_tags::assign.make_node(std::move(std::get<identifier>(std::get<exp_type>(id))), assign_tok, std::move(right));
+  return ast_tags::assign.make_node(std::move(one::get<identifier>(id)), assign_tok, std::move(right));
 }
 
 maybe_stmt reader::parse_statement()
