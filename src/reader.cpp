@@ -579,11 +579,15 @@ void reader::find_next_valid_stmt()
     // Beginning tokens of statements
     case token_kind::LBrace:
     case token_kind::Keyword:
-       run = false;
+       run = false; break;
 
     case token_kind::Identifier:
-       if(next_toks[0].kind == token_kind::Assign)
-         run = false;
+       {
+         if(next_toks[0].kind == token_kind::Assign)
+           run = false;
+         else
+           consume();
+       } break;
     }
   }
 }
