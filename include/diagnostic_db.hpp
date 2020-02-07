@@ -10,6 +10,8 @@ namespace diagnostic_db
 {
 
 constexpr static const auto source_information = [](auto loc) {
+  if(loc.column_beg == loc.column_end)
+    return make_db_entry(diag_level::info, "SC-IN-770", [](auto x) { fmt::print("end of file reached"); }, {});
   return make_db_entry(diag_level::info, "SC-IN-769", 
     [loc](std::FILE* file) {
       auto& is = stream_lookup[loc.module];
@@ -78,12 +80,12 @@ constexpr static const auto unknown_keyword = [](auto t) {
 };
 
 constexpr static const auto block_expects_lbrace = [](auto t) {
-  symbol err(format(FMT_STRING("\"{}\" expected before block, instead got \"{}\"."), "{{", t));
+  symbol err(format(FMT_STRING("\'{{\' expected before block, instead got \"{}\"."), t));
   return make_db_entry(diag_level::error, "PA-BR-000", err.get_string(), {});
 };
 
 constexpr static const auto block_expects_rbrace = [](auto t) {
-  symbol err(format(FMT_STRING("\"{}\" expected after block, instead got \"{}\"."), "}}", t));
+  symbol err(format(FMT_STRING("\'}}\' expected after block, instead got \"{}\"."), t));
   return make_db_entry(diag_level::error, "PA-BR-001", err.get_string(), {});
 };
 
@@ -99,8 +101,11 @@ constexpr static const auto identifier_expected = [](auto t) {
 
 constexpr static const auto literal_expected = [](auto t) {
     symbol err(format(FMT_STRING("Expected literal, instead got \"{}\"."), t));
-    return make_db_entry(diag_level::error, "PA-ID-402", err.get_string(), {});
+    return make_db_entry(diag_level::error, "PA-LT-402", err.get_string(), {});
 };
+
+static const auto for_expects_literal_or_id = make_db_entry(diag_level::info, "PA-FO-422",
+                            "\"for\" expects literal or idenfier in loop head.", {});
 
   }
 }

@@ -12,5 +12,5 @@ for n
   fib1 := old + fib1;
 }
 
-print(fib1);
+print() := fib1;
 

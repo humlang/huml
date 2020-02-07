@@ -53,8 +53,10 @@ namespace diagnostic_db
 
   namespace detail
   {
+    // sneaky hack. We don't want to actually format the msg message, this is already done
+    // in the diagnostic_db entrie's lambdas
 static constexpr auto normal_print_fn_g = [](std::string_view msg)
-        { return [msg](std::FILE* f) { return fmt::print(f, msg); }; };
+        { return [msg](std::FILE* f) { return fmt::print(f, "{}", msg); }; };
   }
 
   struct diag_db_entry
@@ -111,6 +113,8 @@ struct diagnostic_message
   source_range location;
   diagnostic_db::diag_db_entry data;
 
+  diagnostic_message& operator|=(diagnostic_message&& other);
+
   std::vector<diagnostic_message> sub_messages;
 private:
   diagnostic_message(source_range loc, diagnostic_db::diag_db_entry entry, std::vector<diagnostic_message> v)
@@ -132,7 +136,7 @@ diagnostic_message&& operator|(diagnostic_message&& msg, diagnostic_source_info_
 
 inline diagnostic_message diagnostic_db::diag_db_entry::operator-() const
 {
-  return diagnostic_message({"unknown",0,0,0,0}, *this, {});    
+  return diagnostic_message({"__unknown",0,0,0,0}, *this, {});    
 }
 
 struct diagnostics_manager
@@ -155,6 +159,9 @@ public:
 
   const std::vector<diagnostic_message>& get_all() const
   { /*no need to lock*/ return data; }
+
+  diagnostic_message& get_last()
+  { return data.back(); }
 
   inline void reset() { err = 0; _print_codes = true; data.clear(); }
 private:

@@ -252,6 +252,7 @@ restart_get:
   } break;
   case EOF:
       kind = token_kind::EndOfFile;
+      data = "EOF";
     break;
   }
   return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
@@ -273,7 +274,10 @@ bool reader::expect(F&& f)
 {
   if(current.kind != kind)
   {
-    diagnostic <<= (f + current.loc) | source_context(0);
+    if(current.kind != token_kind::EndOfFile)
+      diagnostic <<= (f + current.loc) | source_context(0);
+    else
+      diagnostic <<= (f + current.loc);
     find_next_valid_stmt();
     return false;
   }
@@ -360,7 +364,10 @@ maybe_stmt reader::parse_keyword()
   if("for" == old.data.get_string())
   {
     auto very_old = old;
-    auto l = parse_literal();
+    auto l = (current.kind == token_kind::Identifier ? parse_identifier() : parse_literal());
+    // If we neither have an identifier nor a literal, emit a useful error
+    if(std::holds_alternative<error>(l))
+      diagnostic.get_last() |= -(diagnostic_db::parser::for_expects_literal_or_id);
     auto b = parse_block();
 
     return ast_tags::loop.make_node(very_old, std::move(l), std::move(b));

@@ -9,10 +9,13 @@
 void diagnostic_message::print(std::FILE* file, std::size_t indent_depth) const
 {
   const std::string indentation(indent_depth * 4, ' ');
-  fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}{}:{}:{}: ",
-      indentation,
-      location.module,
-      location.row_beg, location.column_beg);
+  if(location.module != "__unknown")
+  {
+    fmt::print(file, fmt::emphasis::bold | fg(fmt::color::white), "{}{}:{}:{}: ",
+        indentation,
+        location.module,
+        location.row_beg, location.column_beg);
+  }
 
   if(diagnostic.print_codes())
   {
@@ -46,6 +49,12 @@ diagnostic_message operator+(diagnostic_db::diag_db_entry data, source_range ran
 
 diagnostic_message operator+(source_range range, diagnostic_db::diag_db_entry data)
 { return diagnostic_message(range, data, {}); }
+
+diagnostic_message& diagnostic_message::operator|=(diagnostic_message&& msg)
+{
+  sub_messages.emplace_back(std::forward<diagnostic_message>(msg));
+  return *this;
+}
 
 diagnostic_message&& operator|(diagnostic_message&& msg0, diagnostic_message&& msg1)
 {
