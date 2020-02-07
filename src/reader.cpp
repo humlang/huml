@@ -268,7 +268,7 @@ void reader::consume()
   next_toks.back() = get<token>();
 }
 
-template<token_kind kind, reader::FailType type, typename F>
+template<token_kind kind, typename F>
 bool reader::expect(F&& f)
 {
   if(current.kind != kind)
@@ -281,30 +281,13 @@ bool reader::expect(F&& f)
   return true;
 }
 
-template<std::uint8_t c, reader::FailType type, typename F>
+template<std::uint8_t c, typename F>
 bool reader::expect(F&& f)
 {
   static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
 
-  return expect<static_cast<token_kind>(c), type>(std::forward<F>(f));
+  return expect<static_cast<token_kind>(c)>(std::forward<F>(f));
 }
-
-template<token_kind kind, typename F>
-bool reader::expect_stmt(F&& f)
-{ return expect<kind, FailType::Statement>(std::forward<F>(f)); }
-
-template<std::uint8_t kind, typename F>
-bool reader::expect_stmt(F&& f)
-{ return expect<kind, FailType::Statement>(std::forward<F>(f)); }
-
-template<token_kind kind, typename F>
-bool reader::expect_expr(F&& f)
-{ return expect<kind, FailType::Expression>(std::forward<F>(f)); }
-
-template<std::uint8_t kind, typename F>
-bool reader::expect_expr(F&& f)
-{ return expect<kind, FailType::Expression>(std::forward<F>(f)); }
-
 
 template<token_kind kind>
 bool reader::accept()
@@ -332,14 +315,14 @@ error reader::mk_error()
 maybe_expr reader::parse_literal()
 {
   // Only have numbers as literals for now
-  if(!expect_expr<token_kind::LiteralNumber>(diagnostic_db::parser::literal_expected(current.data.get_string())))
+  if(!expect<token_kind::LiteralNumber>(diagnostic_db::parser::literal_expected(current.data.get_string())))
     return mk_error();
   return ast_tags::literal.make_node(old);
 }
 
 maybe_expr reader::parse_identifier()
 {
-  if(!expect_expr<token_kind::Identifier>(diagnostic_db::parser::identifier_expected(current.data.get_string())))
+  if(!expect<token_kind::Identifier>(diagnostic_db::parser::identifier_expected(current.data.get_string())))
     return mk_error();
   return ast_tags::identifier.make_node(old);
 }
@@ -349,7 +332,7 @@ maybe_stmt reader::parse_block()
   auto tmp = current;
 
   // ensure we see an opening brace
-  if(!expect_stmt<'{'>(diagnostic_db::parser::block_expects_lbrace(current.data.get_string())))
+  if(!expect<'{'>(diagnostic_db::parser::block_expects_lbrace(current.data.get_string())))
     return mk_error();
 
   std::vector<maybe_stmt> v;
@@ -363,7 +346,7 @@ maybe_stmt reader::parse_block()
       v.emplace_back(std::move(std::get<error>(stmt)));
   }
   // ensure that we see a closing brace
-  if(!expect_stmt<'}'>(diagnostic_db::parser::block_expects_rbrace(current.data.get_string())))
+  if(!expect<'}'>(diagnostic_db::parser::block_expects_rbrace(current.data.get_string())))
     return mk_error();
 
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
@@ -395,7 +378,7 @@ maybe_stmt reader::parse_assign()
   assert(std::holds_alternative<exp_type>(id)); // TODO: sharpen this to identifer, although one::get already asserts this
 
   // check if next sign is an = for
-  if(!expect_stmt<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())))
+  if(!expect<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())))
     return mk_error();
 
   token assign_tok = old;
@@ -403,7 +386,7 @@ maybe_stmt reader::parse_assign()
   // the next part is an expression
   auto right = parse_expression(0);
 
-  if(!expect_stmt<token_kind::Semi>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
+  if(!expect<token_kind::Semi>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
     return mk_error();
   return ast_tags::assign.make_node(std::move(one::get<identifier>(id)), assign_tok, std::move(right));
 }
@@ -588,27 +571,6 @@ void reader::find_next_valid_stmt()
          else
            consume();
        } break;
-    }
-  }
-}
-
-void reader::find_next_valid_expr()
-{
-  bool run = true;
-  while(run)
-  {
-    switch(current.kind)
-    {
-    default: consume(); break;
-
-    // Edge cases
-    case token_kind::Undef:
-    case token_kind::EndOfFile:
-    
-    // Beginning tokens of expressions
-    case token_kind::Identifier:
-    case token_kind::LiteralNumber:
-       run = false;
     }
   }
 }

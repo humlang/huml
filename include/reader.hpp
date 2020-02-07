@@ -29,29 +29,11 @@ private:
 
   void consume();
 
-
-  enum class FailType
-  {
-    Statement,
-    Expression
-  };
-
   // "hard error"   -> always consumes
-  template<token_kind, FailType type, typename F>
-  bool expect(F&& f);
-  template<std::uint8_t, FailType type, typename F>
-  bool expect(F&& f);
-
-
   template<token_kind, typename F>
-  bool expect_stmt(F&& f);
+  bool expect(F&& f);
   template<std::uint8_t, typename F>
-  bool expect_stmt(F&& f);
-
-  template<token_kind, typename F>
-  bool expect_expr(F&& f);
-  template<std::uint8_t, typename F>
-  bool expect_expr(F&& f);
+  bool expect(F&& f);
 
   // "soft error"    -> only consumes if ==
   template<token_kind>
@@ -77,8 +59,6 @@ private:
 
   // Ignores tokens until it finds the next start for a valid statement
   void find_next_valid_stmt();
-  // Ignores tokens until it finds the next start for a valid expression
-  void find_next_valid_expr();
 
 private:
   std::string_view module;
