@@ -20,6 +20,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
 # tests
 find_package(Catch2 REQUIRED)
 
+## unit tests
 add_executable(hx-lang_parsing_tests test/parsing_and_tokenization.cpp
   "${hx-lang_files}")
 target_compile_definitions(hx-lang_parsing_tests PUBLIC -DH_LANG_TESTING)
@@ -37,6 +38,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/lib/Catc
 include(CTest)
 include(ParseAndAddCatchTests)
 ParseAndAddCatchTests(hx-lang_parsing_tests)
+
+## integration tests
+add_test(NAME hx-lang_run_integration_test
+  COMMAND bash -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/test/integration/ ; ./run_all.sh"
+)
 
 # main program
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
