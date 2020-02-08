@@ -21,13 +21,11 @@ using namespace std::literals::string_view_literals;
 constexpr auto keyword_set = make_set<std::string_view>({
 
     // modules
-    "import"sv,
     "for"sv
 });
 
 constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
 
-        { "."sv, token_kind::Point },
         {":"sv, token_kind::Colon},
         {";"sv, token_kind::Semi},
         {"+"sv,  token_kind::Plus},

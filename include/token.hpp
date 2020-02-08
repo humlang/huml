@@ -12,7 +12,6 @@ enum class token_kind : std::int8_t
     LiteralNumber = 2,
     Keyword = 3,
     Assign = 4, // will be :=
-    Point = '.',
     Colon = ':',
     Semi = ';',
     LBrace = '{',

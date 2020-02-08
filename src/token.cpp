@@ -14,7 +14,6 @@ std::string_view kind_to_str(token_kind kind)
   case token_kind::LiteralNumber: return "LiteralNumber";
   case token_kind::Keyword: return "Keyword";
   case token_kind::Assign: return "Assign";
-  case token_kind::Point: return "Point";
   case token_kind::Colon: return "Colon";
   case token_kind::Semi: return "Semicolon";
   case token_kind::LBrace: return "LBrace";
