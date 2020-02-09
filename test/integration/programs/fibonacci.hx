@@ -3,7 +3,7 @@
 fib0 := 0;
 fib1 := 1;
 
-n := read();
+readin n;
 
 for n
 {
@@ -12,5 +12,5 @@ for n
   fib1 := old + fib1;
 }
 
-print() := fib1;
+print fib1;
 

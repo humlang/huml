@@ -31,3 +31,11 @@ assign_::assign_(assign_::tag, identifier variable, token op, maybe_expr right)
   : base({}, op), variable(std::move(variable)), right(std::move(right))
 {  }
 
+readin_::readin_(readin_::tag, token tok, maybe_expr arg)
+  : base({}, tok), argument(std::move(arg))
+{  }
+
+print_::print_(print_::tag, token tok, maybe_expr arg)
+  : base({}, tok), argument(std::move(arg))
+{  }
+

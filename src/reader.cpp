@@ -21,7 +21,9 @@ using namespace std::literals::string_view_literals;
 constexpr auto keyword_set = make_set<std::string_view>({
 
     // modules
-    "for"sv
+    "for"sv,
+    "print"sv,
+    "readin"sv
 });
 
 constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
@@ -163,7 +165,7 @@ restart_get:
   case '0': starts_with_zero = true; case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
     {
-      // read until there is no number anymore. Disallow 000840
+      // readin until there is no number anymore. Disallow 000840
       std::string name;
       name.push_back(ch);
       bool emit_not_a_number_error = false;
@@ -370,6 +372,22 @@ maybe_stmt reader::parse_keyword()
 
     return ast_tags::loop.make_node(very_old, std::move(l), std::move(b));
   }
+  else if("readin" == old.data.get_string())
+  {
+    auto very_old = old;
+    auto arg = parse_expression(0);
+    if(!expect<';'>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
+      return mk_error();
+    return ast_tags::readin.make_node(very_old, std::move(arg));
+  }
+  else if("print" == old.data.get_string())
+  {
+    auto very_old = old;
+    auto arg = parse_expression(0);
+    if(!expect<';'>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
+      return mk_error();
+    return ast_tags::print.make_node(very_old, std::move(arg));
+  }
 
   return mk_error();
 }
@@ -378,9 +396,6 @@ maybe_stmt reader::parse_assign()
 {
   // we know we have an identifier here
   auto id = parse_identifier();
-
-  // parse_statement should ensure that we have seen a token identifier
-  assert(std::holds_alternative<exp_type>(id)); // TODO: sharpen this to identifer, although one::get already asserts this
 
   // check if next sign is an = for
   if(!expect<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())))
@@ -472,7 +487,7 @@ maybe_expr reader::parse_expression(int precedence)
   exp_type infix;  // e.g + - = etc since i move my prefix here i lose it if i want to return it in my if condition
   // TODO we have to be careful on how we set these precedences in the functions. sometimes map is enough but sometimes we need the context e-g unary - or binary -?
   // TODO For printing I want to print the actual AST values in the nodes
-  // TODO should parse_read() be under parse_keyword()? or own function?
+  // TODO should parse_readin() be under parse_keyword()? or own function?
   // Will we add funcitons to the ast attributes and do we need to add them to all or is something else planned?
 
   // we cant make this into function parse_infix since we need to move prefix then..

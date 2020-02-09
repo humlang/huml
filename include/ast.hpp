@@ -61,20 +61,24 @@ namespace ast_tags
   };
 }
 
-struct literal_;    using literal = rec_wrap_t<literal_>;
-struct identifier_; using identifier = rec_wrap_t<identifier_>;
 struct loop_;       using loop = rec_wrap_t<loop_>;
 struct error_;      using error = rec_wrap_t<error_>;
 struct block_;      using block = rec_wrap_t<block_>;
+struct readin_;     using readin = rec_wrap_t<readin_>;
+struct print_;      using print = rec_wrap_t<print_>;
 struct assign_;     using assign = rec_wrap_t<assign_>;
 
 // expressions
 struct binary_exp_; using binary_exp = rec_wrap_t<binary_exp_>;
+struct identifier_; using identifier = rec_wrap_t<identifier_>;
+struct literal_;    using literal = rec_wrap_t<literal_>;
 
 using stmt_type = std::variant<std::monostate,
         loop,
         block,
-        assign
+        assign,
+        print,
+        readin
 >;
 
 using exp_type = std::variant<std::monostate,
@@ -185,6 +189,27 @@ private:
   maybe_expr right;
 };
 
+struct print_ : base<print_>
+{
+public:
+  print_(tag, token tok, maybe_expr arg);
+
+  const maybe_expr& arg() const { return argument; }
+private:
+  maybe_expr argument;
+};
+
+
+struct readin_ : base<readin_>
+{
+public:
+  readin_(tag, token tok, maybe_expr arg);
+
+  const maybe_expr& arg() const { return argument; }
+private:
+  maybe_expr argument;
+};
+
 struct binary_exp_ : base<binary_exp_>
 {
 public:
@@ -206,6 +231,8 @@ namespace ast_tags
   static constexpr inline tag<error_> error = {};
   static constexpr inline tag<block_> block = {};
   static constexpr inline tag<assign_> assign = {};
+  static constexpr inline tag<print_> print = {};
+  static constexpr inline tag<readin_> readin = {};
   static constexpr inline tag<binary_exp_> binary_exp = {};
 }
 

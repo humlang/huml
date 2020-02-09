@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-struct print
+struct printer
 {
   void operator()(std::string str, std::size_t indent_depth = 0)
   {
@@ -39,7 +39,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
 
       for(auto& v : w)
       {
-        std::visit(ast_printer<print>, v);
+        std::visit(ast_printer<printer>, v);
       }
     } },
   { emit_classes::tokens, [](std::string_view t)
