@@ -549,9 +549,8 @@ std::vector<token> reader::read(std::string_view module)
   std::vector<token> toks;
   while(r.current.kind != token_kind::EndOfFile)
   {
-    // First is undefined
-    r.consume();
     toks.push_back(r.current);
+    r.consume();
   }
   if(toks.empty())
     diagnostic <<= (-diagnostic_db::parser::empty_module);
