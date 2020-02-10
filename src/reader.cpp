@@ -534,10 +534,8 @@ std::vector<ast_type> reader::read(std::string_view module)
     while(r.accept<token_kind::Semi>())
       ;
   }
-  if(ast.empty())
-  {
+  if(ast.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= (-diagnostic_db::parser::empty_module);
-  }
   return ast;
 }
 
@@ -552,7 +550,7 @@ std::vector<token> reader::read(std::string_view module)
     toks.push_back(r.current);
     r.consume();
   }
-  if(toks.empty())
+  if(toks.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= (-diagnostic_db::parser::empty_module);
   return toks;
 }
