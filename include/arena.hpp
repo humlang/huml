@@ -4,27 +4,22 @@
 #include <vector>
 
 template<typename T>
-struct monotonic
+struct monotonic_buffer
 {
 public:
   union monotonic_item
   {
   public:
-    monotonic_item *get_next_item() const { return next; }
-    void set_next_item(monotonic_item *n) { next = n; }
+    monotonic_item* get_next_item() const { return next; }
+    void set_next_item(monotonic_item* n) { next = n; }
  
-    T *get_storage() { return reinterpret_cast<T *>(datum); }
+    T* get_storage() { return reinterpret_cast<T*>(object); }
  
-    static monotonic_item *storage_to_item(T *t)
-    {
-      monotonic_item *current_item = reinterpret_cast<monotonic_item *>(t);
-      return current_item;
-    }
+    static monotonic_item* storage_to_item(T* t)
+    { return reinterpret_cast<monotonic_item*>(t); }
   private:
-    using StorageType = alignas(alignof(T)) char[sizeof(T)];
- 
-    monotonic_item *next;
-    StorageType datum;
+    monotonic_item* next;
+    alignas(alignof(T)) char object[sizeof(T)];
   };
 
   struct monotonic_arena
@@ -41,9 +36,9 @@ public:
       storage[arena_size - 1].set_next_item(nullptr);
     }
 
-    monotonic_item *get_storage() const { return storage.get(); }
+    monotonic_item* get_storage() const { return storage.get(); }
 
-    void set_next_arena(std::unique_ptr<monotonic_arena> &&n)
+    void set_next_arena(std::unique_ptr<monotonic_arena>&& n)
     {
       assert(!next);
  
@@ -52,13 +47,13 @@ public:
   };
 
 public:
-  monotonic(std::size_t arena_size)
+  monotonic_buffer(std::size_t arena_size)
       : arena_size(arena_size), arena(new monotonic_arena(arena_size)),
         free_list(arena->get_storage())
   {  }
 
   template<typename... Args>
-  T *alloc(Args &&... args)
+  T* alloc(Args&&... args)
   {
     if(free_list == nullptr)
     {
@@ -68,20 +63,20 @@ public:
       free_list = arena->get_storage();
     }
  
-    monotonic_item *current_item = free_list;
+    monotonic_item* current_item = free_list;
     free_list = current_item->get_next_item();
  
-    T *result = current_item->get_storage();
+    T* result = current_item->get_storage();
     new (result) T(std::forward<Args>(args)...);
  
     return result;
   }
 
-  void free(T *t)
+  void free(T* t)
   {
     t->T::~T();
  
-    monotonic_item *current_item = monotonic_item::storage_to_item(t);
+    monotonic_item* current_item = monotonic_item::storage_to_item(t);
  
     current_item->set_next_item(free_list);
     free_list = current_item;
