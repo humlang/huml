@@ -465,9 +465,9 @@ maybe_expr reader::parse_prefix() // operator
 
 exp_type reader::parse_binary(maybe_expr left)
 {
-  token op = current; // safe operator
-  consume(); // get to next token
-  int precedence = token_precedence_map[op.kind]; // this is for *
+  token op = current;
+  consume();
+  int precedence = token_precedence_map[op.kind];
   auto right = parse_expression(precedence);
 
   return ast_tags::binary_exp.make_node(std::move(left), op, std::move(right));
@@ -475,32 +475,21 @@ exp_type reader::parse_binary(maybe_expr left)
 
 maybe_expr reader::parse_expression(int precedence)
 {
-  auto prefix = parse_prefix(); // this consumes one right now by creating a literal e.g 3 x was called prefix
-  // prefix might be error, this is fine. Just pretend it is an expression
+  auto prefix = parse_prefix();
   
   if(std::holds_alternative<error>(prefix))
-  {
     return prefix;
-  }
 
-  // Infix part because of move semantics we cant write it inside a function since we would need to move prefix that we wpuld maybe return
-  exp_type infix;  // e.g + - = etc since i move my prefix here i lose it if i want to return it in my if condition
-  // TODO we have to be careful on how we set these precedences in the functions. sometimes map is enough but sometimes we need the context e-g unary - or binary -?
-  // TODO For printing I want to print the actual AST values in the nodes
-  // TODO should parse_readin() be under parse_keyword()? or own function?
-  // Will we add funcitons to the ast attributes and do we need to add them to all or is something else planned?
-
-  // we cant make this into function parse_infix since we need to move prefix then..
-  while(precedence < this->precedence()) { // that way we would handle left associativity think about 2 * 3 + 5 => would be 2* (3 + 5) which is wrong
+  exp_type infix;
+  while(precedence < this->precedence())
+  {
     switch(current.kind)
     {
-      default:
-      { // TODO this should never happen anymore
-        return prefix; // Important if there is no infix we return the prefix
-        //infix = mk_error(); // return error when we did not find a fitting token
-      }
+      default: return prefix;
 
-      case token_kind::Plus: case token_kind::Minus: case token_kind::Asterisk:
+      case token_kind::Plus:
+      case token_kind::Minus:
+      case token_kind::Asterisk:
       {
         prefix = parse_binary(std::move(prefix));
         if(std::holds_alternative<error>(prefix))
@@ -510,7 +499,6 @@ maybe_expr reader::parse_expression(int precedence)
       }
     }
   }
-
 
   return prefix;
 }
