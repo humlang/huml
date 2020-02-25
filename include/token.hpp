@@ -32,8 +32,14 @@ template<typename Kind>
 class generic_token
 {
 public:
+  using token_kind = Kind;
+public:
   generic_token(Kind kind, symbol data, source_range range)
     : kind(kind), data(data), loc(range)
+  {  }
+
+  generic_token()
+    : kind(Kind::Undef), data(""), loc()
   {  }
 
   Kind kind;
@@ -45,8 +51,14 @@ template<>
 class generic_token<ass::token_kind>
 {
 public:
+  using token_kind = ass::token_kind;
+public:
   generic_token(ass::token_kind kind, op_code opc, symbol data, source_range range)
     : kind(kind), opc(opc), data(data), loc(range)
+  {  }
+
+  generic_token()
+    : kind(ass::token_kind::Undef), opc(op_code::UNKNOWN), data(""), loc()
   {  }
 
   ass::token_kind kind;

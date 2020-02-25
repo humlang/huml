@@ -12,7 +12,7 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
     SECTION( "assignment_with_whitespace" ) {
       diagnostic.reset();
       stream_lookup.write_test("x := 2;");
-      auto w = reader::read<ast_type>("TESTSTREAM");
+      auto w = hx_reader::read<ast_type>("TESTSTREAM");
 
       std::vector<std::uint_fast64_t> ids;
 
@@ -60,7 +60,7 @@ TEST_CASE( "Assignments are parsed correctly", "[Assignments]" ) {
     SECTION( "assignment-without-whitespace" ) {
       diagnostic.reset();
       stream_lookup.write_test("x:=2;");
-      auto w = reader::read<ast_type>("TESTSTREAM");
+      auto w = hx_reader::read<ast_type>("TESTSTREAM");
 
       REQUIRE(w.size() == 1);
       const bool is_assignstmt = std::holds_alternative<stmt_type>(w[0]);
@@ -102,7 +102,7 @@ TEST_CASE( "Expression test parsing", "[Expressions]" ) {
   SECTION( "expression-with-whitespace" ) {
     diagnostic.reset();
     stream_lookup.write_test("x := 6*7;");
-    auto w = reader::read<ast_type>("TESTSTREAM");
+    auto w = hx_reader::read<ast_type>("TESTSTREAM");
     
     REQUIRE(w.size() == 1);
     const bool is_assign_stmt = std::holds_alternative<stmt_type>(w[0]);

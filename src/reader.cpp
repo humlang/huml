@@ -66,21 +66,14 @@ constexpr static bool isprint(unsigned char c)
 { return (' ' <= c && c <= '~'); }
 
 
-reader::reader(std::string_view module)
+base_reader::base_reader(std::string_view module)
   : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1)
-{
-  for(std::size_t i = 0; i < next_toks.size(); ++i)
-    consume();
+{  }
 
-  // need one additional consume to initialize `current`
-  consume(); 
-}
-
-reader::~reader()
+base_reader::~base_reader()
 { stream_lookup.drop(module); }
 
-template<>
-char reader::get<char>()
+char base_reader::getc()
 {
   // yields the next char that is not a basic whitespace character i.e. NOT stuff like zero width space
   char ch = 0;
@@ -132,16 +125,15 @@ char reader::get<char>()
 }
 
 
-///// Parsing
+///// Tokenization
 
-template<>
-token reader::get<token>()
+token hx_reader::gett()
 {
 restart_get:
   symbol data("");
   token_kind kind = token_kind::Undef;
 
-  char ch = get<char>();
+  char ch = getc();
   std::size_t beg_row = row;
   std::size_t beg_col = col - 1;
 
@@ -276,17 +268,14 @@ restart_get:
   return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
 }
 
-///////////// ASSEMBLER
-
-template<>
-ass::token reader::get<ass::token>()
+ass::token asm_reader::gett()
 {
 restart_get:
   symbol data("");
   ass::token_kind kind = ass::token_kind::Undef;
   op_code opc = op_code::UNKNOWN;
 
-  char ch = get<char>();
+  char ch = getc();
   std::size_t beg_row = row;
   std::size_t beg_col = col - 1;
 
@@ -400,7 +389,7 @@ restart_get:
   return ass::token(kind, opc, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
 }
 
-void reader::consume()
+void hx_reader::consume()
 {
   old = current;
   current = next_toks[0];
@@ -408,11 +397,11 @@ void reader::consume()
   for(std::size_t i = 0, j = 1; j < next_toks.size(); ++i, ++j)
     std::swap(next_toks[i], next_toks[j]);
 
-  next_toks.back() = get<token>();
+  next_toks.back() = gett();
 }
 
 template<token_kind kind, typename F>
-bool reader::expect(F&& f)
+bool hx_reader::expect(F&& f)
 {
   if(current.kind != kind)
   {
@@ -428,7 +417,7 @@ bool reader::expect(F&& f)
 }
 
 template<std::uint8_t c, typename F>
-bool reader::expect(F&& f)
+bool hx_reader::expect(F&& f)
 {
   static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
 
@@ -436,7 +425,7 @@ bool reader::expect(F&& f)
 }
 
 template<token_kind kind>
-bool reader::accept()
+bool hx_reader::accept()
 {
   if(current.kind != kind)
     return false;
@@ -446,19 +435,19 @@ bool reader::accept()
 }
 
 template<std::uint8_t c>
-bool reader::accept()
+bool hx_reader::accept()
 {
   static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
 
   return accept<static_cast<token_kind>(c)>();
 }
 
-error reader::mk_error()
+error hx_reader::mk_error()
 {
   return ast_tags::error.make_node(old);
 }
 
-maybe_expr reader::parse_literal()
+maybe_expr hx_reader::parse_literal()
 {
   // Only have numbers as literals for now
   if(!expect<token_kind::LiteralNumber>(diagnostic_db::parser::literal_expected(current.data.get_string())))
@@ -466,14 +455,14 @@ maybe_expr reader::parse_literal()
   return ast_tags::literal.make_node(old);
 }
 
-maybe_expr reader::parse_identifier()
+maybe_expr hx_reader::parse_identifier()
 {
   if(!expect<token_kind::Identifier>(diagnostic_db::parser::identifier_expected(current.data.get_string())))
     return mk_error();
   return ast_tags::identifier.make_node(old);
 }
 
-maybe_stmt reader::parse_block()
+maybe_stmt hx_reader::parse_block()
 {
   auto tmp = current;
 
@@ -498,7 +487,7 @@ maybe_stmt reader::parse_block()
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
 }
 
-maybe_stmt reader::parse_keyword()
+maybe_stmt hx_reader::parse_keyword()
 {
   assert(keyword_set.count(current.data.get_string()));
 
@@ -534,7 +523,7 @@ maybe_stmt reader::parse_keyword()
   return mk_error();
 }
 
-maybe_stmt reader::parse_assign()
+maybe_stmt hx_reader::parse_assign()
 {
   // we know we have an identifier here
   auto id = parse_identifier();
@@ -553,7 +542,7 @@ maybe_stmt reader::parse_assign()
   return ast_tags::assign.make_node(std::move(one::get<identifier>(id)), assign_tok, std::move(right));
 }
 
-maybe_stmt reader::parse_statement()
+maybe_stmt hx_reader::parse_statement()
 {
   switch(current.kind)
   {
@@ -581,7 +570,7 @@ maybe_stmt reader::parse_statement()
   }
 }
 
-maybe_expr reader::parse_prefix() // operator
+maybe_expr hx_reader::parse_prefix() // operator
 {
   switch(current.kind)
   {
@@ -605,7 +594,7 @@ maybe_expr reader::parse_prefix() // operator
   }
 }
 
-exp_type reader::parse_binary(maybe_expr left)
+exp_type hx_reader::parse_binary(maybe_expr left)
 {
   token op = current;
   consume();
@@ -615,7 +604,7 @@ exp_type reader::parse_binary(maybe_expr left)
   return ast_tags::binary_exp.make_node(std::move(left), op, std::move(right));
 }
 
-maybe_expr reader::parse_expression(int precedence)
+maybe_expr hx_reader::parse_expression(int precedence)
 {
   auto prefix = parse_prefix();
   
@@ -645,55 +634,7 @@ maybe_expr reader::parse_expression(int precedence)
   return prefix;
 }
 
-template<>
-std::vector<ast_type> reader::read(std::string_view module)
-{
-  reader r(module);
-
-  std::vector<ast_type> ast;
-  while(r.current.kind != token_kind::EndOfFile)
-  {
-    auto tmp = r.parse_statement();
-
-    if(std::holds_alternative<stmt_type>(tmp))
-      ast.emplace_back(std::move(std::get<stmt_type>(tmp)));
-    else
-      ast.emplace_back(std::move(std::get<error>(tmp)));
-
-    // accept any tailing semicolons, we allow stuff like `x := y;;;;;;;;;;`
-    while(r.accept<token_kind::Semi>())
-      ;
-  }
-  if(ast.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= (-diagnostic_db::parser::empty_module);
-  return ast;
-}
-
-template<>
-std::vector<token> reader::read(std::string_view module)
-{
-  reader r(module);
-
-  std::vector<token> toks;
-  while(r.current.kind != token_kind::EndOfFile)
-  {
-    toks.push_back(r.current);
-    r.consume();
-  }
-  if(toks.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= (-diagnostic_db::parser::empty_module);
-  return toks;
-}
-
-int reader::precedence() {
-  token_kind prec = current.kind;
-  if (prec == token_kind::Undef || prec == token_kind::EndOfFile || prec == token_kind::Semi)
-    return 0;
-  return token_precedence_map[prec];
-}
-
-
-void reader::find_next_valid_stmt()
+void hx_reader::find_next_valid_stmt()
 {
   bool run = true;
   while(run)
@@ -720,6 +661,176 @@ void reader::find_next_valid_stmt()
        } break;
     }
   }
+}
+
+template<>
+std::vector<ast_type> hx_reader::read(std::string_view module)
+{
+  hx_reader r(module);
+
+  std::vector<ast_type> ast;
+  while(r.current.kind != token_kind::EndOfFile)
+  {
+    auto tmp = r.parse_statement();
+
+    if(std::holds_alternative<stmt_type>(tmp))
+      ast.emplace_back(std::move(std::get<stmt_type>(tmp)));
+    else
+      ast.emplace_back(std::move(std::get<error>(tmp)));
+
+    // accept any tailing semicolons, we allow stuff like `x := y;;;;;;;;;;`
+    while(r.accept<token_kind::Semi>())
+      ;
+  }
+  if(ast.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    diagnostic <<= (-diagnostic_db::parser::empty_module);
+  return ast;
+}
+
+template<>
+std::vector<token> hx_reader::read(std::string_view module)
+{
+  hx_reader r(module);
+
+  std::vector<token> toks;
+  while(r.current.kind != token_kind::EndOfFile)
+  {
+    toks.push_back(r.current);
+    r.consume();
+  }
+  if(toks.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    diagnostic <<= (-diagnostic_db::parser::empty_module);
+  return toks;
+}
+
+int hx_reader::precedence() {
+  token_kind prec = current.kind;
+  if (prec == token_kind::Undef || prec == token_kind::EndOfFile || prec == token_kind::Semi)
+    return 0;
+  return token_precedence_map[prec];
+}
+
+
+void asm_reader::consume()
+{
+  old = current;
+  current = next_toks[0];
+
+  for(std::size_t i = 0, j = 1; j < next_toks.size(); ++i, ++j)
+    std::swap(next_toks[i], next_toks[j]);
+
+  next_toks.back() = gett();
+}
+
+template<ass::token_kind kind, typename F>
+bool asm_reader::expect(F&& f)
+{
+  if(current.kind != kind)
+  {
+    if(current.kind != ass::token_kind::EndOfFile)
+      diagnostic <<= (f + current.loc) | source_context(0);
+    else
+      diagnostic <<= (f + current.loc);
+    return false;
+  }
+  consume();
+  return true;
+}
+
+template<std::uint8_t c, typename F>
+bool asm_reader::expect(F&& f)
+{
+  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
+
+  return expect<static_cast<ass::token_kind>(c)>(std::forward<F>(f));
+}
+
+template<ass::token_kind kind>
+bool asm_reader::accept()
+{
+  if(current.kind != kind)
+    return false;
+
+  consume();
+  return true;
+}
+
+template<std::uint8_t c>
+bool asm_reader::accept()
+{
+  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
+
+  return accept<static_cast<ass::token_kind>(c)>();
+}
+
+
+template<>
+std::vector<ass::instruction> asm_reader::read(std::string_view module)
+{
+  asm_reader r(module);
+
+  std::vector<ass::instruction> instructions;
+  while(r.current.kind != ass::token_kind::EndOfFile)
+  {
+    switch(r.current.kind)
+    {
+    default:
+      // error
+      break;
+    case ass::token_kind::Opcode:
+      {
+        std::vector<ass::token> args;
+        switch(r.current.opc)
+        {
+        default: // No arg
+          break;
+
+          // Single arg
+        case op_code::JMP:
+        case op_code::JMPREL:
+        case op_code::JMP_CMP:
+        case op_code::JMP_NCMP:
+          {
+          r.consume();
+          args.push_back(r.current);
+          } break;
+
+          // Two args
+        case op_code::LOAD:
+        case op_code::EQUAL:
+        case op_code::GREATER:
+        case op_code::LESS:
+        case op_code::GREATER_EQUAL:
+        case op_code::LESS_EQUAL:
+          {
+          r.consume();
+          args.push_back(r.current);
+          r.consume();
+          args.push_back(r.current);
+          } break;
+          
+          // Three args
+          
+        case op_code::ADD:
+        case op_code::SUB:
+        case op_code::MUL:
+        case op_code::DIV:
+          {
+          r.consume();
+          args.push_back(r.current);
+          r.consume();
+          args.push_back(r.current);
+          r.consume();
+          args.push_back(r.current);
+          } break;
+        }
+        instructions.emplace_back(ass::instruction { r.current.opc, args });
+      } break;
+    }
+  }
+  if(instructions.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    diagnostic <<= (-diagnostic_db::parser::empty_module);
+  return instructions;
 }
 
 
