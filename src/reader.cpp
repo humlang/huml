@@ -6,6 +6,7 @@
 #include <reader.hpp>
 #include <token.hpp>
 #include <ast.hpp>
+#include <vm.hpp>
 
 #include <string_view>
 #include <cassert>
@@ -18,12 +19,31 @@
 using namespace std::literals::string_view_literals;
 
 auto keyword_set = std::set<std::string_view>({
-
-    // modules
-    "for"sv,
-    "print"sv,
-    "readin"sv
+  "for"sv,
+  "print"sv,
+  "readin"sv
 });
+
+namespace ass
+{
+auto keyword_map = std::map<std::string_view, op_code>({
+  { "halt"sv,    op_code::HALT },
+  { "load"sv,    op_code::LOAD },
+  { "add"sv,     op_code::ADD },
+  { "sub"sv,     op_code::SUB },
+  { "mul"sv,     op_code::MUL },
+  { "div"sv,     op_code::DIV },
+  { "jmp"sv,     op_code::JMP },
+  { "jrp"sv,     op_code::JMPREL },
+  { "jcmp"sv,    op_code::JMP_CMP },
+  { "jncmp"sv,   op_code::JMP_NCMP },
+  { "eq"sv,      op_code::EQUAL },
+  { "gt"sv,      op_code::GREATER },
+  { "lt"sv,      op_code::LESS },
+  { "ge"sv,      op_code::GREATER_EQUAL },
+  { "le"sv,      op_code::LESS_EQUAL },
+});
+}
 
 auto operator_symbols_map = std::map<std::string_view, token_kind>({
   {":"sv, token_kind::Colon},
@@ -31,9 +51,9 @@ auto operator_symbols_map = std::map<std::string_view, token_kind>({
   {"+"sv,  token_kind::Plus},
   {"-"sv,  token_kind::Minus},
   {"*"sv,  token_kind::Asterisk},
-  {"="sv,  token_kind::Equal}
+  {"="sv,  token_kind::Equal},
 });
-// ordered in increasing preference
+
 auto token_precedence_map = std::map<token_kind, int>( {
   {token_kind::Plus, 1},
   {token_kind::Minus, 1},
@@ -254,6 +274,130 @@ restart_get:
     break;
   }
   return token(kind, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
+}
+
+///////////// ASSEMBLER
+
+template<>
+ass::token reader::get<ass::token>()
+{
+restart_get:
+  symbol data("");
+  ass::token_kind kind = ass::token_kind::Undef;
+  op_code opc = op_code::UNKNOWN;
+
+  char ch = get<char>();
+  std::size_t beg_row = row;
+  std::size_t beg_col = col - 1;
+
+  bool starts_with_zero = false;
+  switch(ch)
+  {
+  default:
+    if(!std::iscntrl(ch) && !std::isspace(ch))
+    {
+      // Optimistically allow any kind of identifier to allow for unicode
+      std::string name;
+      name.push_back(ch);
+      while(col < linebuf.size())
+      {
+        // don't use get<char>() here, identifiers are not connected with a '\n'
+        ch = linebuf[col++];
+
+        // we look up in the operator map only for the single char. otherwise we wont parse y:= not correctly for example
+        std::string ch_s;
+        ch_s.push_back(ch);
+        // break if we hit whitespace (or other control chars) or any other operator symbol char
+        if(std::iscntrl(ch) || std::isspace(ch))
+        {
+          col--;
+          break;
+        }
+        name.push_back(ch);
+      }
+      data = symbol(name);
+      if(auto it = ass::keyword_map.find(name); it != ass::keyword_map.end())
+      { kind = ass::token_kind::Opcode; opc = it->second; }
+      else
+      {
+        // could also be a register
+        if(!name.empty() && name[0] == '$')
+        {
+          try
+          {
+            std::size_t regnum = std::stoi(std::string(std::next(name.begin()), name.end()));
+
+            if(regnum > vm::register_count - 1) // we only have so many registers
+              kind = ass::token_kind::Undef;
+
+            data = symbol(std::string(name.begin(), name.end()));
+            kind = ass::token_kind::Register;
+          }
+          catch(...)
+          { kind = ass::token_kind::Undef; }
+        }
+        else
+          kind = ass::token_kind::Undef;
+      }
+    }
+    else
+    {
+      assert(false && "Control or space character leaked into get<token>!");
+    }
+    break;
+
+  case '0': starts_with_zero = true; case '1': case '2': case '3': case '4':
+  case '5': case '6': case '7': case '8': case '9':
+    {
+      // readin until there is no number anymore. Disallow 000840
+      std::string name;
+      name.push_back(ch);
+      bool emit_not_a_number_error = false;
+      bool emit_starts_with_zero_error = false;
+      while(col < linebuf.size())
+      {
+        // don't use get<char>() here, numbers are not connected with a '\n'
+        ch = linebuf[col++];
+
+        // we look up in the operator map only for the single char. otherwise we wont parse 2; not correctly for example
+        // This could give problems with floaing point numbers since 2.3 will now be parsed as "2" "." "3" so to literals and a point
+        std::string ch_s;
+        ch_s.push_back(ch);
+        // break if we hit whitespace (or other control chars) or any other token char
+        if(std::iscntrl(ch) || std::isspace(ch))
+        {
+          col--;
+          break;
+        }
+        if(!std::isdigit(ch))
+          emit_not_a_number_error = true;
+        if(starts_with_zero && !emit_not_a_number_error)
+          emit_starts_with_zero_error = true;
+        name.push_back(ch);
+      }
+      if(emit_starts_with_zero_error)
+      {
+        diagnostic <<= (diagnostic_db::parser::leading_zeros(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
+          | source_context(0);
+        goto restart_get; // <- SO WHAT
+      }
+      if(emit_not_a_number_error)
+      {
+        diagnostic <<= (diagnostic_db::parser::no_number(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
+                      | source_context(0);
+        goto restart_get;
+      }
+      kind = ass::token_kind::ImmediateValue;
+      data = symbol(name);
+    } break;
+
+  case EOF:
+      kind = ass::token_kind::EndOfFile;
+      opc = op_code::HALT;
+      data = "EOF";
+    break;
+  }
+  return ass::token(kind, opc, data, {module, beg_col + 1, beg_row, col + 1, row + 1});
 }
 
 void reader::consume()

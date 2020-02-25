@@ -1,7 +1,9 @@
 #pragma once
 
 #include <source_range.hpp>
+#include <assembler.hpp>
 #include <symbol.hpp>
+#include <vm_opcodes.hpp>
 
 #include <cstdint>
 #include <cstdio>
@@ -26,13 +28,38 @@ enum class token_kind : std::int8_t
 
 std::string_view kind_to_str(token_kind kind);
 
-class token
+template<typename Kind>
+class generic_token
 {
 public:
-  token(token_kind kind, symbol data, source_range range);
+  generic_token(Kind kind, symbol data, source_range range)
+    : kind(kind), data(data), loc(range)
+  {  }
 
-  token_kind kind;
+  Kind kind;
   symbol data;
   source_range loc;
 };
+
+template<>
+class generic_token<ass::token_kind>
+{
+public:
+  generic_token(ass::token_kind kind, op_code opc, symbol data, source_range range)
+    : kind(kind), opc(opc), data(data), loc(range)
+  {  }
+
+  ass::token_kind kind;
+  op_code opc;
+
+  symbol data;
+  source_range loc;
+};
+
+using token = generic_token<token_kind>;
+
+namespace ass
+{
+  using token = generic_token<ass::token_kind>;
+}
 

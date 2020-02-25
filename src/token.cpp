@@ -1,9 +1,5 @@
 #include <token.hpp>
 
-token::token(token_kind kind, symbol data, source_range range)
-  : kind(kind), data(data), loc(range)
-{  }
-
 std::string_view kind_to_str(token_kind kind)
 {
   switch(kind)
@@ -25,4 +21,5 @@ std::string_view kind_to_str(token_kind kind)
   case token_kind::Undef: return "Undefined";
   }
 }
+
 
