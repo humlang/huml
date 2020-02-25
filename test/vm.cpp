@@ -29,8 +29,8 @@ TEST_CASE( "vm", "" ) {
     vm virt_mach;
 
     SECTION( "HALT" ) {
-      std::vector<unsigned char> prog = { hlt, hlt, hlt, hlt };
-      virt_mach.set_program(prog);
+      virt_mach.set_program({ hlt, hlt, hlt, hlt });
+      virt_mach.run_next_instr();
 
       REQUIRE((virt_mach.program_counter() == 1));
     }
