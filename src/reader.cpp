@@ -763,6 +763,55 @@ bool asm_reader::accept()
   return accept<static_cast<ass::token_kind>(c)>();
 }
 
+ass::instruction asm_reader::parse_op(op_code opc)
+{
+  std::vector<ass::token> args;
+  switch(current.opc)
+  {
+  default: // No arg
+    break;
+
+    // Single arg
+  case op_code::JMP:
+  case op_code::JMPREL:
+  case op_code::JMP_CMP:
+  case op_code::JMP_NCMP:
+    {
+    consume();
+    args.push_back(current);
+    } break;
+
+    // Two args
+  case op_code::LOAD:
+  case op_code::EQUAL:
+  case op_code::GREATER:
+  case op_code::LESS:
+  case op_code::GREATER_EQUAL:
+  case op_code::LESS_EQUAL:
+    {
+    consume();
+    args.push_back(current);
+    consume();
+    args.push_back(current);
+    } break;
+    
+    // Three args
+    
+  case op_code::ADD:
+  case op_code::SUB:
+  case op_code::MUL:
+  case op_code::DIV:
+    {
+    consume();
+    args.push_back(current);
+    consume();
+    args.push_back(current);
+    consume();
+    args.push_back(current);
+    } break;
+  }
+  return { current.opc, args };
+}
 
 template<>
 std::vector<ass::instruction> asm_reader::read(std::string_view module)
@@ -779,52 +828,7 @@ std::vector<ass::instruction> asm_reader::read(std::string_view module)
       break;
     case ass::token_kind::Opcode:
       {
-        std::vector<ass::token> args;
-        switch(r.current.opc)
-        {
-        default: // No arg
-          break;
-
-          // Single arg
-        case op_code::JMP:
-        case op_code::JMPREL:
-        case op_code::JMP_CMP:
-        case op_code::JMP_NCMP:
-          {
-          r.consume();
-          args.push_back(r.current);
-          } break;
-
-          // Two args
-        case op_code::LOAD:
-        case op_code::EQUAL:
-        case op_code::GREATER:
-        case op_code::LESS:
-        case op_code::GREATER_EQUAL:
-        case op_code::LESS_EQUAL:
-          {
-          r.consume();
-          args.push_back(r.current);
-          r.consume();
-          args.push_back(r.current);
-          } break;
-          
-          // Three args
-          
-        case op_code::ADD:
-        case op_code::SUB:
-        case op_code::MUL:
-        case op_code::DIV:
-          {
-          r.consume();
-          args.push_back(r.current);
-          r.consume();
-          args.push_back(r.current);
-          r.consume();
-          args.push_back(r.current);
-          } break;
-        }
-        instructions.emplace_back(ass::instruction { r.current.opc, args });
+        instructions.emplace_back(r.parse_op(r.current.opc));
       } break;
     }
   }

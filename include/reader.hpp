@@ -134,6 +134,8 @@ private:
   bool accept();
   template<std::uint8_t>
   bool accept();
+private:
+  ass::instruction parse_op(op_code opc);
 
 private:
   ass::token old;

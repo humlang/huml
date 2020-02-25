@@ -7,6 +7,21 @@
 #include <fstream>
 #include <sstream>
 
+bool prompt_yes_no()
+{
+  std::string answer;
+  do
+  {
+    std::getline(std::cin, answer);
+  }
+  while(!(answer == "Y" || answer == "y" || answer.empty() || answer == "yes" || answer == "YES"
+     || answer == "Yes" || answer == "n" || answer == "N"  || answer == "no"  || answer == "No"
+     || answer == "NO"));
+
+  return answer == "Y"   || answer == "y"   || answer.empty()
+      || answer == "yes" || answer == "YES" || answer == "Yes";
+}
+
 template<typename T>
 void base_repl<T>::quit()
 { stopped = true; }
@@ -26,18 +41,11 @@ void base_repl<T>::write()
   std::string filepath;
   std::getline(std::cin, filepath);
 
-  fmt::print("\nStore REPL commands? Y/n: ");
+  if(filepath.empty())
+    return;
 
-  std::string answer;
-  do
-  {
-    std::getline(std::cin, answer);
-  }
-  while(!(answer == "Y" || answer == "y" || answer.empty() || answer == "yes" || answer == "YES"
-    || answer == "Yes" || answer == "n" || answer == "N" || answer == "no" || answer == "No"
-    || answer == "NO"));
-  const bool store_cmds = answer == "Y"   || answer == "y" || answer.empty()
-                       || answer == "yes" || answer == "YES" || answer == "Yes";
+  fmt::print("\nStore REPL commands? Y/n: ");
+  const bool store_cmds = prompt_yes_no();
 
   std::fstream file(filepath, std::ios::out);
   for(const auto& str : commands)
@@ -169,6 +177,9 @@ namespace virt
 
     std::string filepath;
     std::getline(std::cin, filepath);
+
+    if(filepath.empty())
+      return;
 
     std::fstream file(filepath, std::ios::in);
     for(std::string line; std::getline(file, line); process_command(line))
