@@ -43,6 +43,7 @@ namespace virt
 
     void program();
     void registers();
+    void load();
   private:
     vm virt_mach;
 

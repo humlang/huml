@@ -109,6 +109,8 @@ namespace virt
       virt_mach.run_next_instr();
     else if(line == "'write")
       write();
+    else if(line == "'load")
+      load();
     else
     {
       auto v = parse_hex(line);
@@ -159,6 +161,19 @@ namespace virt
       fmt::print(", {}", *it);
 
     fmt::print("]\n");
+  }
+
+  void REPL::load()
+  {
+    fmt::print("File: ");
+
+    std::string filepath;
+    std::getline(std::cin, filepath);
+
+    std::fstream file(filepath, std::ios::in);
+    for(std::string line; std::getline(file, line); process_command(line))
+      ;
+    fmt::print("\nState loaded from \"{}\".\n", filepath);
   }
 }
 
