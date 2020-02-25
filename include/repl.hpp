@@ -17,7 +17,12 @@ struct base_repl
   void run()
   { static_cast<repl&>(*this).run_impl(); }
 
+  void quit();
+  void history();
+
   std::vector<std::string> commands;
+
+  bool stopped { false };
 };
 
 
@@ -33,11 +38,14 @@ namespace virt
     void run_impl();
     void process_command(const std::string& str);
 
-    void quit();
+    std::vector<unsigned char> parse_hex(const std::string& str);
+
+    void program();
+    void registers();
   private:
     vm virt_mach;
 
-    bool stopped;
+    std::size_t failed_inputs;
   };
 }
 

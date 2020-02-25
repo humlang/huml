@@ -16,6 +16,9 @@ std::size_t vm::program_counter() const
 void vm::set_program(const std::vector<unsigned char>& program)
 { program_blob = program; }
 
+const std::vector<unsigned char>& vm::get_program() const
+{ return program_blob; }
+
 void vm::run()
 {
   // core loop of our vm

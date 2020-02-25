@@ -20,6 +20,7 @@ public:
   const std::array<std::int_fast32_t, register_count>& registers() const;
 
   void set_program(const std::vector<unsigned char>& program);
+  const std::vector<unsigned char>& get_program() const;
 private:
   op_code fetch_instr();
 
