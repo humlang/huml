@@ -1,12 +1,12 @@
 #include <string_view>
 #include <vector>
 
-#include <vm.hpp>
+#include <repl.hpp>
 
 int main(int argc, char** argv)
 {
-  vm virtmachine;
+  virt::REPL repl;
 
-  // TODO: Add REPL
+  repl.run();
 }
 

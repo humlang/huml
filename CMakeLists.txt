@@ -12,6 +12,7 @@ set(hx-lang_files src/reader.cpp
   )
 
 set(hx-lang_vm_files src/vm.cpp
+  src/repl.cpp
   )
 
 find_package(fmt REQUIRED)
