@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 #include <sstream>
 
 template<typename T>
@@ -15,6 +16,39 @@ void base_repl<T>::history()
 {
   for(const auto& cmd : commands)
     fmt::print("{}\n", cmd);
+}
+
+template<typename T>
+void base_repl<T>::write()
+{
+  fmt::print("File: ");
+
+  std::string filepath;
+  std::getline(std::cin, filepath);
+
+  fmt::print("\nStore REPL commands? Y/n: ");
+
+  std::string answer;
+  do
+  {
+    std::getline(std::cin, answer);
+  }
+  while(!(answer == "Y" || answer == "y" || answer.empty() || answer == "yes" || answer == "YES"
+    || answer == "Yes" || answer == "n" || answer == "N" || answer == "no" || answer == "No"
+    || answer == "NO"));
+  const bool store_cmds = answer == "Y"   || answer == "y" || answer.empty()
+                       || answer == "yes" || answer == "YES" || answer == "Yes";
+
+  std::fstream file(filepath, std::ios::out);
+  for(const auto& str : commands)
+  {
+    if(str.empty() || (!store_cmds && str.front() == '\''))
+      continue;
+
+    file << str << "\n";
+  }
+
+  fmt::print("\nState written to \"{}\".\n", filepath);
 }
 
 namespace virt
@@ -73,6 +107,8 @@ namespace virt
       virt_mach.run();
     else if(line == "'next")
       virt_mach.run_next_instr();
+    else if(line == "'write")
+      write();
     else
     {
       auto v = parse_hex(line);

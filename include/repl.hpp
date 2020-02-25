@@ -19,6 +19,7 @@ struct base_repl
 
   void quit();
   void history();
+  void write();
 
   std::vector<std::string> commands;
 
