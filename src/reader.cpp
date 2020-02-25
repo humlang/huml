@@ -3,9 +3,6 @@
 #include <memory>
 #include <stream_lookup.hpp>
 
-#include <tmp/cxset.hpp>
-#include <tmp/cxmap.hpp>
-
 #include <reader.hpp>
 #include <token.hpp>
 #include <ast.hpp>
@@ -13,12 +10,14 @@
 #include <string_view>
 #include <cassert>
 #include <istream>
-#include <queue>
 #include <vector>
+#include <queue>
+#include <map>
+#include <set>
 
 using namespace std::literals::string_view_literals;
 
-constexpr auto keyword_set = make_set<std::string_view>({
+auto keyword_set = std::set<std::string_view>({
 
     // modules
     "for"sv,
@@ -26,23 +25,22 @@ constexpr auto keyword_set = make_set<std::string_view>({
     "readin"sv
 });
 
-constexpr auto operator_symbols_map = make_map<std::string_view, token_kind>({
-
-        {":"sv, token_kind::Colon},
-        {";"sv, token_kind::Semi},
-        {"+"sv,  token_kind::Plus},
-        {"-"sv,  token_kind::Minus},
-        {"*"sv,  token_kind::Asterisk},
-        {"="sv,  token_kind::Equal}
+auto operator_symbols_map = std::map<std::string_view, token_kind>({
+  {":"sv, token_kind::Colon},
+  {";"sv, token_kind::Semi},
+  {"+"sv,  token_kind::Plus},
+  {"-"sv,  token_kind::Minus},
+  {"*"sv,  token_kind::Asterisk},
+  {"="sv,  token_kind::Equal}
 });
 // ordered in increasing preference
-constexpr auto token_precedence_map = make_map<token_kind, int>( {
-        {token_kind::Plus, 1},
-        {token_kind::Minus, 1},
-        {token_kind::Asterisk, 2},
-        {token_kind::LiteralNumber, 6},
-        {token_kind::Identifier, 6},
-        });
+auto token_precedence_map = std::map<token_kind, int>( {
+  {token_kind::Plus, 1},
+  {token_kind::Minus, 1},
+  {token_kind::Asterisk, 2},
+  {token_kind::LiteralNumber, 6},
+  {token_kind::Identifier, 6},
+});
 
 constexpr static bool isprint(unsigned char c)
 { return (' ' <= c && c <= '~'); }
@@ -145,15 +143,15 @@ restart_get:
         std::string ch_s;
         ch_s.push_back(ch);
         // break if we hit whitespace (or other control chars) or any other operator symbol char
-        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(ch_s.c_str()) || keyword_set.contains(name.c_str()))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.count(ch_s.c_str()) || keyword_set.count(name.c_str()))
         {
           col--;
           break;
         }
         name.push_back(ch);
       }
-      kind = (operator_symbols_map.contains(name.c_str()) ? operator_symbols_map[name.c_str()] : token_kind::Identifier);
-      kind = (keyword_set.contains(name.c_str()) ? token_kind::Keyword : kind);
+      kind = (operator_symbols_map.count(name.c_str()) ? operator_symbols_map[name.c_str()] : token_kind::Identifier);
+      kind = (keyword_set.count(name.c_str()) ? token_kind::Keyword : kind);
       data = symbol(name);
     }
     else
@@ -180,7 +178,7 @@ restart_get:
         std::string ch_s;
         ch_s.push_back(ch);
         // break if we hit whitespace (or other control chars) or any other token char
-        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.contains(ch_s.c_str()) || keyword_set.contains(name.c_str()))
+        if(std::iscntrl(ch) || std::isspace(ch) || operator_symbols_map.count(ch_s.c_str()) || keyword_set.count(name.c_str()))
         {
           col--;
           break;
@@ -358,7 +356,7 @@ maybe_stmt reader::parse_block()
 
 maybe_stmt reader::parse_keyword()
 {
-  assert(keyword_set.contains(current.data.get_string()));
+  assert(keyword_set.count(current.data.get_string()));
 
   consume();
   if("for" == old.data.get_string())
