@@ -40,7 +40,7 @@ std::int_fast16_t vm::fetch16()
 {
   // AE F0   is stored as F0 AE
   auto old = pc++;
-  return (program_blob[old] << 8) | program_blob[pc++];
+  return ((program_blob[old] << 8) | program_blob[pc++]) & 0b1111111111111111;
 }
 
 void vm::run_next_instr()

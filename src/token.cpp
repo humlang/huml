@@ -39,10 +39,10 @@ std::vector<unsigned char> generic_token<ass::token_kind>::to_u8_vec() const
       {
         std::int_fast16_t tmp = std::stoi(data.get_string());
 
-        unsigned char first = (tmp & 0b11110000) >> 4;
-        unsigned char second = tmp & 0b1111;
+        unsigned char first = (tmp & 0b1111111100000000) >> 8;
+        unsigned char second = tmp & 0b11111111;
 
-        return { second, first };
+        return { first, second };
       }
     }
   }
