@@ -13,6 +13,15 @@ set(hx-lang_files src/reader.cpp
 
 set(hx-lang_vm_files src/vm.cpp
   src/repl.cpp
+  src/assembler.cpp
+  src/program.cpp
+  src/symbol.cpp
+  src/reader.cpp
+  src/token.cpp
+  src/ast.cpp
+  src/diagnostic.cpp
+  src/stream_lookup.cpp
+  src/source_range.cpp
   )
 
 find_package(fmt REQUIRED)

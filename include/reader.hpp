@@ -12,21 +12,13 @@
 #include <vector>
 #include <string>
 
-namespace ass
-{
-  struct instruction
-  {
-    op_code op;
-    std::vector<ass::token> args;
-  };
-}
-
 class base_reader
 {
 public:
   ~base_reader();
 protected:
   base_reader(std::string_view module);
+  base_reader(std::istream& stream);
 
   char getc();
 protected:
@@ -37,6 +29,8 @@ protected:
 
   std::size_t col;
   std::size_t row;
+private:
+  bool uses_reader { false };
 };
 
 /// HX_READER
@@ -109,8 +103,20 @@ public:
   template<typename T>
   static std::vector<T> read(std::string_view module) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
 
+  template<typename T>
+  static std::vector<T> read_text(const std::string& text) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
+
 private:
   asm_reader(std::string_view module) : base_reader(module)
+  {
+    for(std::size_t i = 0; i < next_toks.size(); ++i)
+      consume();
+
+    // need one additional consume to initialize `current`
+    consume(); 
+  }
+
+  asm_reader(std::istream& is) : base_reader(is)
   {
     for(std::size_t i = 0; i < next_toks.size(); ++i)
       consume();

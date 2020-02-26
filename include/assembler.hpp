@@ -1,21 +1,15 @@
 #pragma once
 
+#include <program.hpp>
 #include <cstdint>
 #include <vector>
+#include <string>
 
 namespace ass
 {
-  enum class token_kind : std::int_fast8_t
-  {
-    Undef,
-    Opcode,
-    Register,
-    ImmediateValue,
-    EndOfFile = -1,
-  };
-
   struct assembler
   {
-
+    static program parse(std::string_view module);
+    static program parse_code(const std::string& text);
   };
 }

@@ -11,6 +11,7 @@
 #include <string_view>
 #include <cassert>
 #include <istream>
+#include <sstream>
 #include <vector>
 #include <queue>
 #include <map>
@@ -67,11 +68,15 @@ constexpr static bool isprint(unsigned char c)
 
 
 base_reader::base_reader(std::string_view module)
-  : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1)
+  : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1), uses_reader(true)
+{  }
+
+base_reader::base_reader(std::istream& stream)
+  : module("#TXT#"), linebuf(), is(stream), col(0), row(1)
 {  }
 
 base_reader::~base_reader()
-{ stream_lookup.drop(module); }
+{ if(uses_reader) stream_lookup.drop(module); }
 
 char base_reader::getc()
 {
@@ -319,7 +324,7 @@ restart_get:
             if(regnum > vm::register_count - 1) // we only have so many registers
               kind = ass::token_kind::Undef;
 
-            data = symbol(std::string(name.begin(), name.end()));
+            data = symbol(std::string(std::next(name.begin()), name.end()));
             kind = ass::token_kind::Register;
           }
           catch(...)
@@ -765,6 +770,8 @@ bool asm_reader::accept()
 
 ass::instruction asm_reader::parse_op(op_code opc)
 {
+  auto super_old = current;
+
   std::vector<ass::token> args;
   switch(current.opc)
   {
@@ -796,7 +803,6 @@ ass::instruction asm_reader::parse_op(op_code opc)
     } break;
     
     // Three args
-    
   case op_code::ADD:
   case op_code::SUB:
   case op_code::MUL:
@@ -810,7 +816,9 @@ ass::instruction asm_reader::parse_op(op_code opc)
     args.push_back(current);
     } break;
   }
-  return { current.opc, args };
+  // get to next tok
+  consume();
+  return { super_old.opc, args };
 }
 
 template<>
@@ -825,6 +833,32 @@ std::vector<ass::instruction> asm_reader::read(std::string_view module)
     {
     default:
       // error
+      break;
+    case ass::token_kind::Opcode:
+      {
+        instructions.emplace_back(r.parse_op(r.current.opc));
+      } break;
+    }
+  }
+  if(instructions.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    diagnostic <<= (-diagnostic_db::parser::empty_module);
+  return instructions;
+}
+
+template<>
+std::vector<ass::instruction> asm_reader::read_text(const std::string& text)
+{
+  std::stringstream ss(text);
+  asm_reader r(ss);
+
+  std::vector<ass::instruction> instructions;
+  while(r.current.kind != ass::token_kind::EndOfFile)
+  {
+    switch(r.current.kind)
+    {
+    default:
+      // error
+      r.consume();
       break;
     case ass::token_kind::Opcode:
       {

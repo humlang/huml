@@ -1,12 +1,24 @@
 #pragma once
 
 #include <source_range.hpp>
-#include <assembler.hpp>
-#include <symbol.hpp>
 #include <vm_opcodes.hpp>
+#include <symbol.hpp>
 
 #include <cstdint>
 #include <cstdio>
+
+namespace ass
+{
+  enum class token_kind : std::int_fast8_t
+  {
+    Undef,
+    Opcode,
+    Register,
+    ImmediateValue,
+    EndOfFile = -1,
+  };
+}
+
 
 enum class token_kind : std::int8_t
 {
@@ -61,6 +73,8 @@ public:
     : kind(ass::token_kind::Undef), opc(op_code::UNKNOWN), data(""), loc()
   {  }
 
+  std::vector<unsigned char> to_u8_vec() const;
+
   ass::token_kind kind;
   op_code opc;
 
@@ -73,5 +87,14 @@ using token = generic_token<token_kind>;
 namespace ass
 {
   using token = generic_token<ass::token_kind>;
+
+  struct instruction
+  {
+    std::vector<unsigned char> to_u8_vec() const;
+
+    op_code op;
+    std::vector<ass::token> args;
+  };
 }
+
 

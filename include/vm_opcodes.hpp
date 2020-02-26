@@ -4,22 +4,22 @@
 
 enum class op_code : std::int_fast8_t
 {
-  HALT,
-  LOAD,
-  ADD,
-  SUB,
-  MUL,
-  DIV,
-  JMP,
-  JMPREL,
-  JMP_CMP,
-  JMP_NCMP,
-  EQUAL,
-  GREATER,
-  LESS,
-  GREATER_EQUAL,
-  LESS_EQUAL,
-  UNKNOWN
+  HALT           = 0,
+  LOAD           = 1,
+  ADD            = 2,
+  SUB            = 3,
+  MUL            = 4,
+  DIV            = 5,
+  JMP            = 6,
+  JMPREL         = 7,
+  JMP_CMP        = 8,
+  JMP_NCMP       = 9,
+  EQUAL          = 10,
+  GREATER        = 11,
+  LESS           = 12,
+  GREATER_EQUAL  = 13,
+  LESS_EQUAL     = 14,
+  UNKNOWN        = 15
 };
 
 constexpr op_code byte_to_opcode(unsigned char byte)

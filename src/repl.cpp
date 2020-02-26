@@ -1,4 +1,5 @@
 #include <repl.hpp>
+#include <assembler.hpp>
 
 #include <fmt/format.h>
 
@@ -121,7 +122,11 @@ namespace virt
       load();
     else
     {
-      auto v = parse_hex(line);
+      auto prog = ass::assembler::parse_code(line);
+
+      const auto& v = prog.to_u8_vec();
+
+      //auto v = parse_hex(line);
 
       if(v.empty())
       {
