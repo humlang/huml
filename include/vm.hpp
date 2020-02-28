@@ -10,7 +10,7 @@ struct vm
 public:
   static constexpr std::size_t register_count = 32;
 public:
-  vm();
+  vm(std::size_t initial_heap_size = 256 * 256);
 
   void run();
 
@@ -35,5 +35,6 @@ private:
   bool compare_flag;
 
   std::vector<unsigned char> program_blob;
+  std::vector<unsigned char> heap;
 };
 

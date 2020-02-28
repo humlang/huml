@@ -4,7 +4,9 @@
 #include <iomanip>
 #include <cassert>
 
-vm::vm() : regs( { 0 } ), pc(0), program_blob()
+vm::vm(std::size_t initial_heap_size)
+  : regs( { 0 } ), rem(0), pc(0), compare_flag(false),
+    program_blob(), heap(initial_heap_size)
 {  }
 
 const std::array<std::int_fast32_t, vm::register_count>& vm::registers() const
