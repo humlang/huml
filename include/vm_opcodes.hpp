@@ -19,7 +19,8 @@ enum class op_code : std::int_fast8_t
   LESS           = 12,
   GREATER_EQUAL  = 13,
   LESS_EQUAL     = 14,
-  UNKNOWN        = 15
+  ALLOC          = 15,
+  UNKNOWN        
 };
 
 constexpr op_code byte_to_opcode(unsigned char byte)

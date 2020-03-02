@@ -70,6 +70,15 @@ void vm::run_next_instr()
         regs[reg] = num;
       } break;
 
+  case op_code::ALLOC:
+      {
+        const std::size_t reg = fetch8();
+        const unsigned char bytes = regs[reg];
+        const std::size_t size = heap.size() + bytes;
+
+        heap.resize(size, 0);
+      } break;
+
   case op_code::ADD:
       {
         const std::size_t reg = fetch8();

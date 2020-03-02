@@ -43,6 +43,7 @@ auto keyword_map = std::map<std::string_view, op_code>({
   { "lt"sv,      op_code::LESS },
   { "ge"sv,      op_code::GREATER_EQUAL },
   { "le"sv,      op_code::LESS_EQUAL },
+  { "aloc"sv,    op_code::ALLOC },
 });
 }
 
@@ -783,6 +784,7 @@ ass::instruction asm_reader::parse_op(op_code opc)
   case op_code::JMPREL:
   case op_code::JMP_CMP:
   case op_code::JMP_NCMP:
+  case op_code::ALLOC:
     {
     consume();
     args.push_back(current);
