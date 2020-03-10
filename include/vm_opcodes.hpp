@@ -20,6 +20,10 @@ enum class op_code : std::int_fast8_t
   GREATER_EQUAL  = 13,
   LESS_EQUAL     = 14,
   ALLOC          = 15,
+  INC            = 16,
+  DEC            = 17,
+  SHIFT_LEFT     = 18,
+  SHIFT_RIGHT    = 19,
   UNKNOWN        
 };
 

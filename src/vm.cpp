@@ -89,6 +89,36 @@ void vm::run_next_instr()
         regs[reg] = reg0 + reg1;
       } break;
 
+  case op_code::INC:
+      {
+        const std::size_t reg = fetch8();
+
+        ++regs[reg];
+      } break;
+
+  case op_code::DEC:
+      {
+        const std::size_t reg = fetch8();
+
+        --regs[reg];
+      } break;
+
+  case op_code::SHIFT_LEFT:
+      {
+        const std::size_t reg = fetch8();
+        const std::int_fast8_t by = fetch8();
+
+        regs[reg] = reg << by;
+      } break;
+
+  case op_code::SHIFT_RIGHT:
+      {
+        const std::size_t reg = fetch8();
+        const std::int_fast8_t by = fetch8();
+
+        regs[reg] = reg >> by;
+      } break;
+
   case op_code::SUB:
       {
         const std::size_t reg = fetch8();
