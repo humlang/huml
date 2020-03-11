@@ -15,8 +15,13 @@ namespace ass
     Opcode,
     Register,
     ImmediateValue,
+    LabelDef,
+    LabelUse,
+    Directive,
     EndOfFile = -1,
   };
+
+  struct program;
 }
 
 
@@ -73,7 +78,7 @@ public:
     : kind(ass::token_kind::Undef), opc(op_code::UNKNOWN), data(""), loc()
   {  }
 
-  std::vector<unsigned char> to_u8_vec() const;
+  std::vector<unsigned char> to_u8_vec(const ass::program& assm) const;
 
   ass::token_kind kind;
   op_code opc;
@@ -90,9 +95,11 @@ namespace ass
 
   struct instruction
   {
-    std::vector<unsigned char> to_u8_vec() const;
+    std::vector<unsigned char> to_u8_vec(const program& assm) const;
 
-    op_code op;
+    std::optional<op_code> op;
+    std::optional<token> lab;
+    std::optional<token> dir;
     std::vector<ass::token> args;
   };
 }

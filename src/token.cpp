@@ -1,3 +1,4 @@
+#include <assembler.hpp>
 #include <token.hpp>
 #include <cassert>
 
@@ -23,7 +24,7 @@ std::string_view kind_to_str(token_kind kind)
   }
 }
 
-std::vector<unsigned char> generic_token<ass::token_kind>::to_u8_vec() const
+std::vector<unsigned char> generic_token<ass::token_kind>::to_u8_vec(const ass::program& assm) const
 {
   try
   {
@@ -39,8 +40,18 @@ std::vector<unsigned char> generic_token<ass::token_kind>::to_u8_vec() const
       {
         std::int_fast16_t tmp = std::stoi(data.get_string());
 
-        unsigned char first = (tmp & 0b1111111100000000) >> 8;
+        unsigned char first = (tmp & 0b11111111'00000000) >> 8;
         unsigned char second = tmp & 0b11111111;
+
+        return { first, second };
+      }
+
+    case ass::token_kind::LabelUse:
+      {
+        const auto& p = assm.lookup_symbol(data);
+
+        unsigned char first  = (p.second & 0b11111111'00000000) >> 8;
+        unsigned char second = p.second & 0b11111111;
 
         return { first, second };
       }
@@ -57,17 +68,23 @@ std::vector<unsigned char> generic_token<ass::token_kind>::to_u8_vec() const
 namespace ass
 {
 
-std::vector<unsigned char> instruction::to_u8_vec() const
+std::vector<unsigned char> instruction::to_u8_vec(const program& assm) const
 {
-  std::vector<unsigned char> to_return { static_cast<unsigned char>(op) };
-
-  for(auto& t : args)
+  // TODO: Add directives
+  if(op)
   {
-    const auto& arg = t.to_u8_vec();
+    // We have an instruction
+    std::vector<unsigned char> to_return { static_cast<unsigned char>(*op) };
 
-    std::move(arg.begin(), arg.end(), std::back_inserter(to_return));
+    for(auto& t : args)
+    {
+      const auto& arg = t.to_u8_vec(assm);
+
+      std::move(arg.begin(), arg.end(), std::back_inserter(to_return));
+    }
+    return to_return;
   }
-  return to_return;
+  return {};
 }
 
 }

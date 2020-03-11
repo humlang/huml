@@ -335,6 +335,24 @@ restart_get:
           catch(...)
           { kind = ass::token_kind::Undef; }
         }
+        // could also be a labeldef
+        else if(name.size() > 1 && name.back() == ':')
+        {
+          data = symbol(std::string(std::next(name.begin()), name.end()));
+          kind = ass::token_kind::LabelDef;
+        }
+        // or labeluse
+        else if(!name.empty() && name.front() == '%')
+        {
+          data = symbol(std::string(std::next(name.begin()), name.end()));
+          kind = ass::token_kind::LabelUse;
+        }
+        // or directive    i.e. .text/.code, .data
+        else if(!name.empty() && name.front() == '.')
+        {
+          data = symbol(std::string(std::next(name.begin()), name.end()));
+          kind = ass::token_kind::Directive;
+        }
         else
           kind = ass::token_kind::Undef;
       }
@@ -793,7 +811,7 @@ ass::instruction asm_reader::parse_op(op_code opc)
   case op_code::DEC:
     {
     consume();
-    args.push_back(current);
+    args.push_back(current);   // TODO: add error detection
     } break;
 
     // Two args
@@ -828,7 +846,17 @@ ass::instruction asm_reader::parse_op(op_code opc)
   }
   // get to next tok
   consume();
-  return { super_old.opc, args };
+  return { super_old.opc, std::nullopt, std::nullopt, args };
+}
+
+ass::instruction asm_reader::parse_directive()
+{
+  return { std::nullopt, std::nullopt, current };
+}
+
+ass::instruction asm_reader::parse_labeldef()
+{
+  return { std::nullopt, current, std::nullopt };
 }
 
 template<>
@@ -848,6 +876,14 @@ std::vector<ass::instruction> asm_reader::read(std::string_view module)
       {
         instructions.emplace_back(r.parse_op(r.current.opc));
       } break;
+    case ass::token_kind::Directive:
+      {
+        instructions.emplace_back(r.parse_directive());
+      } break;
+    case ass::token_kind::LabelDef:
+      {
+        instructions.emplace_back(r.parse_labeldef());
+      }
     }
   }
   if(instructions.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway

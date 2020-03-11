@@ -142,6 +142,8 @@ private:
   bool accept();
 private:
   ass::instruction parse_op(op_code opc);
+  ass::instruction parse_directive();
+  ass::instruction parse_labeldef();
 
 private:
   ass::token old;
