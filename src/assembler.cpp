@@ -4,6 +4,10 @@
 namespace ass
 {
 
+assembler::assembler(const std::vector<ass::instruction>& v)
+  : prog(v)
+{  }
+
 program assembler::parse(std::string_view module)
 {
   assembler assm(asm_reader::read<ass::instruction>(module));
@@ -25,10 +29,6 @@ program assembler::parse_code(const std::string& text)
 }
 
 
-assembler::assembler(const std::vector<ass::instruction>& v)
-  : prog()
-{  }
-
 void assembler::phase_one()
 {
   std::size_t pos = 0ULL;
@@ -44,7 +44,7 @@ void assembler::phase_one()
 
 void assembler::phase_two()
 {
-  for(auto& x : instructions)
+  for(auto& x : prog.instructions)
   {
     auto tmp = x.to_u8_vec(prog);
 
