@@ -76,16 +76,12 @@ private:
   maybe_expr parse_literal();
   maybe_expr parse_identifier();
   maybe_stmt parse_block();
-  maybe_stmt parse_assign();
   maybe_stmt parse_statement();
 
-  maybe_expr parse_prefix(); // prefix operators like ! - etc. Further this is also used for variables e.g x
+  maybe_expr parse_prefix();
   exp_type parse_binary(maybe_expr left);
-  maybe_expr parse_expression(int precedence); // TODO we need precedence table for Right now only add a (+ -) b
+  maybe_expr parse_expression(int precedence);
   int precedence();
-
-  // Ignores tokens until it finds the next start for a valid statement
-  void find_next_valid_stmt();
 
 private:
   token old;

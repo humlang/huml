@@ -5,7 +5,7 @@
 
 static std::mutex symbol_table_mutex;
 
-std::unordered_map<std::uint_fast32_t, std::string> symbol::symbols = {};
+tsl::robin_map<std::uint_fast64_t, std::string> symbol::symbols = {};
 
 symbol::symbol(const std::string& str)
   : hash(hash_string(str))
@@ -62,7 +62,7 @@ std::ostream& operator<<(std::ostream& os, const symbol& symb)
   return os;
 }
 
-std::string& symbol::lookup_or_emplace(std::uint_fast32_t hash, const char* str)
+std::string& symbol::lookup_or_emplace(std::uint_fast64_t hash, const char* str)
 {
   auto it = symbols.find(hash);
   if(it != symbols.end())
@@ -80,7 +80,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<symbol>& symbs)
   return os;
 }
 
-std::uint_fast32_t symbol::get_hash() const
+std::uint_fast64_t symbol::get_hash() const
 { return hash; }
 
 const std::string& symbol::get_string() const

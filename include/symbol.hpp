@@ -1,7 +1,8 @@
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
+#include <tsl/robin_map.h>
+#include <tsl/robin_set.h>
+
 #include <cstdint>
 #include <vector>
 #include <iosfwd>
@@ -24,13 +25,13 @@ struct symbol
   friend std::ostream& operator<<(std::ostream& os, const symbol& s);
 
   const std::string& get_string() const;
-  std::uint_fast32_t get_hash() const;
+  std::uint_fast64_t get_hash() const;
 private:
-  static std::string& lookup_or_emplace(std::uint_fast32_t hash, const char* str);
+  static std::string& lookup_or_emplace(std::uint_fast64_t hash, const char* str);
 private:
-  static std::unordered_map<std::uint_fast32_t, std::string> symbols;
+  static tsl::robin_map<std::uint_fast64_t, std::string> symbols;
 
-  std::uint_fast32_t hash;
+  std::uint_fast64_t hash;
 };
 struct symbol_hasher
 {
@@ -43,10 +44,10 @@ struct symbol_comparer
   { return lhs.get_hash() == rhs.get_hash(); }
 };
 
-template<class T>
-using symbol_map = std::unordered_map<symbol, T, symbol_hasher, symbol_comparer, std::allocator<std::pair<symbol, T>>>;
+template<class T, bool store_hash = false>
+using symbol_map = tsl::robin_map<symbol, T, symbol_hasher, symbol_comparer, std::allocator<std::pair<symbol, T>>, store_hash>;
 
-using symbol_set = std::unordered_set<symbol, symbol_hasher, symbol_comparer, std::allocator<symbol>>;
+using symbol_set = tsl::robin_set<symbol, symbol_hasher, symbol_comparer, std::allocator<symbol>>;
 
 bool operator==(const symbol& a, const symbol& b);
 bool operator!=(const symbol& a, const symbol& b);

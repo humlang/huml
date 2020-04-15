@@ -8,6 +8,8 @@
 #include <ast.hpp>
 #include <vm.hpp>
 
+#include <tsl/robin_map.h>
+
 #include <string_view>
 #include <cassert>
 #include <istream>
@@ -19,15 +21,9 @@
 
 using namespace std::literals::string_view_literals;
 
-auto keyword_set = std::set<std::string_view>({
-  "for"sv,
-  "print"sv,
-  "readin"sv
-});
-
 namespace ass
 {
-auto keyword_map = std::map<std::string_view, op_code>({
+auto keyword_map = tsl::robin_map<std::string_view, op_code>({
   { "halt"sv,    op_code::HALT },
   { "load"sv,    op_code::LOAD },
   { "add"sv,     op_code::ADD },
@@ -51,7 +47,11 @@ auto keyword_map = std::map<std::string_view, op_code>({
 });
 }
 
-auto operator_symbols_map = std::map<std::string_view, token_kind>({
+auto keyword_set = tsl::robin_set<std::string_view>({
+  "case"sv
+});
+
+auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
   {":"sv, token_kind::Colon},
   {";"sv, token_kind::Semi},
   {"+"sv,  token_kind::Plus},
@@ -60,7 +60,7 @@ auto operator_symbols_map = std::map<std::string_view, token_kind>({
   {"="sv,  token_kind::Equal},
 });
 
-auto token_precedence_map = std::map<token_kind, int>( {
+auto token_precedence_map = tsl::robin_map<token_kind, int>( {
   {token_kind::Plus, 1},
   {token_kind::Minus, 1},
   {token_kind::Asterisk, 2},
@@ -437,7 +437,6 @@ bool hx_reader::expect(F&& f)
       diagnostic <<= (f + current.loc) | source_context(0);
     else
       diagnostic <<= (f + current.loc);
-    find_next_valid_stmt();
     return false;
   }
   consume();
@@ -515,87 +514,9 @@ maybe_stmt hx_reader::parse_block()
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
 }
 
-maybe_stmt hx_reader::parse_keyword()
-{
-  assert(keyword_set.count(current.data.get_string()));
-
-  consume();
-  if("for" == old.data.get_string())
-  {
-    auto very_old = old;
-    auto l = (current.kind == token_kind::Identifier ? parse_identifier() : parse_literal());
-    // If we neither have an identifier nor a literal, emit a useful error
-    if(std::holds_alternative<error>(l))
-      diagnostic.get_last() |= -(diagnostic_db::parser::for_expects_literal_or_id);
-    auto b = parse_block();
-
-    return ast_tags::loop.make_node(very_old, std::move(l), std::move(b));
-  }
-  else if("readin" == old.data.get_string())
-  {
-    auto very_old = old;
-    auto arg = parse_expression(0);
-    if(!expect<';'>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
-      return mk_error();
-    return ast_tags::readin.make_node(very_old, std::move(arg));
-  }
-  else if("print" == old.data.get_string())
-  {
-    auto very_old = old;
-    auto arg = parse_expression(0);
-    if(!expect<';'>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
-      return mk_error();
-    return ast_tags::print.make_node(very_old, std::move(arg));
-  }
-
-  return mk_error();
-}
-
-maybe_stmt hx_reader::parse_assign()
-{
-  // we know we have an identifier here
-  auto id = parse_identifier();
-
-  // check if next sign is an = for
-  if(!expect<token_kind::Assign>(diagnostic_db::parser::assign_expects_colon_equal(current.data.get_string())))
-    return mk_error();
-
-  token assign_tok = old;
-
-  // the next part is an expression
-  auto right = parse_expression(0);
-
-  if(!expect<token_kind::Semi>(diagnostic_db::parser::statements_expect_semicolon(current.data.get_string())))
-    return mk_error();
-  return ast_tags::assign.make_node(std::move(one::get<identifier>(id)), assign_tok, std::move(right));
-}
-
 maybe_stmt hx_reader::parse_statement()
 {
-  switch(current.kind)
-  {
-  default:
-  {
-    diagnostic <<= (diagnostic_db::parser::unknown_token(current.data.get_string()) + current.loc)
-                  | source_context(0);
-    consume();
-
-    return mk_error();
-  } break;
-
-  case token_kind::Keyword:
-  {
-    return std::move(parse_keyword());
-  }
-  case token_kind::LBrace:
-  {
-    return std::move(parse_block());
-  }
-  case token_kind::Identifier:
-  {
-    return std::move(parse_assign());
-  }
-  }
+  return nullptr;
 }
 
 maybe_expr hx_reader::parse_prefix() // operator
@@ -662,56 +583,12 @@ maybe_expr hx_reader::parse_expression(int precedence)
   return prefix;
 }
 
-void hx_reader::find_next_valid_stmt()
-{
-  bool run = true;
-  while(run)
-  {
-    switch(current.kind)
-    {
-    default: consume(); break;
-
-    // Edge cases
-    case token_kind::Undef:
-    case token_kind::EndOfFile:
-
-    // Beginning tokens of statements
-    case token_kind::LBrace:
-    case token_kind::Keyword:
-       run = false; break;
-
-    case token_kind::Identifier:
-       {
-         if(next_toks[0].kind == token_kind::Assign)
-           run = false;
-         else
-           consume();
-       } break;
-    }
-  }
-}
-
 template<>
 std::vector<ast_type> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
 
   std::vector<ast_type> ast;
-  while(r.current.kind != token_kind::EndOfFile)
-  {
-    auto tmp = r.parse_statement();
-
-    if(std::holds_alternative<stmt_type>(tmp))
-      ast.emplace_back(std::move(std::get<stmt_type>(tmp)));
-    else
-      ast.emplace_back(std::move(std::get<error>(tmp)));
-
-    // accept any tailing semicolons, we allow stuff like `x := y;;;;;;;;;;`
-    while(r.accept<token_kind::Semi>())
-      ;
-  }
-  if(ast.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= (-diagnostic_db::parser::empty_module);
   return ast;
 }
 

@@ -35,7 +35,12 @@ jobs:
         cd lib/fmt/build
         make -j8
         cd ../../..
-        cmake -B./build -H. -Dfmt_DIR=./lib/fmt/build -DCatch2_DIR=./catch_install/lib/cmake/Catch2
+        cmake -B./lib/json/build -H./lib/json/ -DBUILD_TESTING=OFF
+        cd lib/json/build
+        make -j8
+        cd ../../..
+
+        cmake -B./build -H. -Dnlohmann_json_DIR=./lib/json/build -Dfmt_DIR=./lib/fmt/build -DCatch2_DIR=./catch_install/lib/cmake/Catch2
         cd build
         export CXX=/usr/bin/clang++
         export CC=/usr/bin/clang

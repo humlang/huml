@@ -4,3 +4,12 @@
 [submodule "lib/fmt"]
 	path = lib/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "lib/hat-trie"]
+	path = lib/hat-trie
+	url = https://github.com/Tessil/hat-trie.git
+[submodule "lib/robin-map"]
+	path = lib/robin-map
+	url = https://github.com/Tessil/robin-map.git
+[submodule "lib/json"]
+	path = lib/json
+	url = https://github.com/nlohmann/json.git
