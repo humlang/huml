@@ -55,19 +55,6 @@ private:
   token gett();
 
   void consume();
-
-  // "hard error"   -> always consumes
-  template<token_kind, typename F>
-  bool expect(F&& f);
-  template<std::uint8_t, typename F>
-  bool expect(F&& f);
-
-  // "soft error"    -> only consumes if ==
-  template<token_kind>
-  bool accept();
-  template<std::uint8_t>
-  bool accept();
-
 private:
   // always uses old for the error
   error mk_error();

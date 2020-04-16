@@ -16,13 +16,13 @@ cd lib/fmt/build
 make -j8
 cd ../../..
 
-cmake -B./lib/json/build -H./lib/json/ -DBUILD_TESTING=OFF
-cd lib/json/build
+cmake -B./lib/nlohmann_json/build -H./lib/nlohmann_json/ -DBUILD_TESTING=OFF
+cd lib/nlohmann_json/build
 make -j8
 cd ../../..
 
 
-cmake -B./build -H. -Dnlohmann_json_DIR=./lib/json/build -Dfmt_DIR=./lib/fmt/build -DCatch2_DIR=$(find catch_install/ -name "ParseAndAddCatchTests.cmake" | xargs dirname | head -n 1)
+cmake -B./build -H. -Dnlohmann_json_DIR=./lib/nlohmann_json/build -Dfmt_DIR=./lib/fmt/build -DCatch2_DIR=$(find catch_install/ -name "ParseAndAddCatchTests.cmake" | xargs dirname | head -n 1)
 
 cd build
 make -j8

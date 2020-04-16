@@ -38,14 +38,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
 # tests
 find_package(Catch2 REQUIRED)
 
-## unit tests
-add_executable(hx-lang_parsing_tests test/parsing_and_tokenization.cpp
-  "${hx-lang_files}")
-target_compile_definitions(hx-lang_parsing_tests PUBLIC -DH_LANG_TESTING)
-target_link_libraries(hx-lang_parsing_tests Catch2::Catch2 fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json)
-set_property(TARGET hx-lang_parsing_tests PROPERTY CXX_STANDARD 17)
-
-
 add_executable(hx-lang_vm_tests test/vm.cpp
   "${hx-lang_vm_files}")
 target_compile_definitions(hx-lang_vm_tests PUBLIC -DH_LANG_TESTING)
@@ -56,7 +48,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/lib/Catc
 
 include(CTest)
 include(ParseAndAddCatchTests)
-ParseAndAddCatchTests(hx-lang_parsing_tests)
 ParseAndAddCatchTests(hx-lang_vm_tests)
 
 ## integration tests

@@ -30,7 +30,9 @@ enum class token_kind : std::int8_t
     Identifier = 1,
     LiteralNumber = 2,
     Keyword = 3,
-    Assign = 4, // will be :=
+    Doublearrow = 4, // =>
+    Backslash = '\\',
+    Pipe = '|',
     Colon = ':',
     Semi = ';',
     LBrace = '{',
@@ -39,6 +41,11 @@ enum class token_kind : std::int8_t
     Minus = '-',
     Asterisk = '*',
     Equal = '=',
+    Dot = '.',
+    LParen = '(',
+    RParen = ')',
+    Comma = ',',
+    Underscore = '_',
     Undef = 0,
     EndOfFile = EOF
 };

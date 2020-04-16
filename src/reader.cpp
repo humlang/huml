@@ -213,19 +213,41 @@ restart_get:
       }
       if(emit_starts_with_zero_error)
       {
-        diagnostic <<= (diagnostic_db::parser::leading_zeros(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
-          | source_context(0);
+        diagnostic <<= diagnostic_db::parser::leading_zeros(module, beg_row, beg_col + 1, name);
         goto restart_get; // <- SO WHAT
       }
       if(emit_not_a_number_error)
       {
-        diagnostic <<= (diagnostic_db::parser::no_number(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
-                      | source_context(0);
+        diagnostic <<= diagnostic_db::parser::no_number(module, beg_row, beg_col + 1, name);
         goto restart_get;
       }
       kind = token_kind::LiteralNumber;
       data = symbol(name);
     } break;
+  case '=':
+  {
+    if(col < linebuf.size() && linebuf[col] == '>')
+    {
+      kind = token_kind::Doublearrow;
+      data = "=>";
+      ch = linebuf[col++];
+    }
+    else
+    {
+      kind = token_kind::Equal;
+      data = "=";
+    }
+  }
+  case '_':
+  {
+    kind = token_kind::Underscore;
+    data = "_";
+  } break;
+  case '|':
+  {
+    kind = token_kind::Pipe;
+    data = "|";
+  } break;
   case '*':
   {
     kind = token_kind::Asterisk;
@@ -256,19 +278,35 @@ restart_get:
     kind = token_kind::Semi;
     data = ";";
   } break;
-  case ':': // also used for assign in :=
+  case ':':
   {
-    if(col < linebuf.size() && linebuf[col] == '=')
-    {
-      kind = token_kind::Assign;
-      data = ":=";
-      ch = linebuf[col++];
-    }
-    else
-    {
-      kind = token_kind::Colon;
-      data = ":";
-    }
+    kind = token_kind::Colon;
+    data = ":";
+  } break;
+  case '\\':
+  {
+    kind = token_kind::Backslash;
+    data = "\\";
+  } break;
+  case '.':
+  {
+    kind = token_kind::Dot;
+    data = ".";
+  } break;
+  case '(':
+  {
+    kind = token_kind::LParen;
+    data = "(";
+  } break;
+  case ')':
+  {
+    kind = token_kind::RParen;
+    data = ")";
+  } break;
+  case ',':
+  {
+    kind = token_kind::Comma;
+    data = ",";
   } break;
   case EOF:
       kind = token_kind::EndOfFile;
@@ -394,14 +432,12 @@ restart_get:
       }
       if(emit_starts_with_zero_error)
       {
-        diagnostic <<= (diagnostic_db::parser::leading_zeros(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
-          | source_context(0);
+        diagnostic <<= diagnostic_db::parser::leading_zeros(module, beg_row, beg_col + 1, name);
         goto restart_get; // <- SO WHAT
       }
       if(emit_not_a_number_error)
       {
-        diagnostic <<= (diagnostic_db::parser::no_number(name) + source_range(module, beg_col + 1, beg_row, col + 1, row + 1))
-                      | source_context(0);
+        diagnostic <<= diagnostic_db::parser::no_number(module, beg_row, beg_col + 1, name);
         goto restart_get;
       }
       kind = ass::token_kind::ImmediateValue;
@@ -428,63 +464,30 @@ void hx_reader::consume()
   next_toks.back() = gett();
 }
 
-template<token_kind kind, typename F>
-bool hx_reader::expect(F&& f)
-{
-  if(current.kind != kind)
-  {
-    if(current.kind != token_kind::EndOfFile)
-      diagnostic <<= (f + current.loc) | source_context(0);
-    else
-      diagnostic <<= (f + current.loc);
-    return false;
-  }
-  consume();
-  return true;
-}
+#define expect(kind__, f) ([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
+    diagnostic <<= f(module, current.loc.row_beg, current.loc.column_beg + 1, current.data.get_string()); \
+    consume(); \
+    return false; \
+    } consume(); return true; })()
 
-template<std::uint8_t c, typename F>
-bool hx_reader::expect(F&& f)
-{
-  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
-
-  return expect<static_cast<token_kind>(c)>(std::forward<F>(f));
-}
-
-template<token_kind kind>
-bool hx_reader::accept()
-{
-  if(current.kind != kind)
-    return false;
-
-  consume();
-  return true;
-}
-
-template<std::uint8_t c>
-bool hx_reader::accept()
-{
-  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
-
-  return accept<static_cast<token_kind>(c)>();
-}
+#define accept(kind__, f) ([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
+    return false; \
+    } consume(); return true; })()
 
 error hx_reader::mk_error()
-{
-  return ast_tags::error.make_node(old);
-}
+{ return ast_tags::error.make_node(old); }
 
 maybe_expr hx_reader::parse_literal()
 {
   // Only have numbers as literals for now
-  if(!expect<token_kind::LiteralNumber>(diagnostic_db::parser::literal_expected(current.data.get_string())))
+  if(!expect(token_kind::LiteralNumber, diagnostic_db::parser::literal_expected))
     return mk_error();
   return ast_tags::literal.make_node(old);
 }
 
 maybe_expr hx_reader::parse_identifier()
 {
-  if(!expect<token_kind::Identifier>(diagnostic_db::parser::identifier_expected(current.data.get_string())))
+  if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
     return mk_error();
   return ast_tags::identifier.make_node(old);
 }
@@ -494,7 +497,7 @@ maybe_stmt hx_reader::parse_block()
   auto tmp = current;
 
   // ensure we see an opening brace
-  if(!expect<'{'>(diagnostic_db::parser::block_expects_lbrace(current.data.get_string())))
+  if(!expect('{', diagnostic_db::parser::block_expects_lbrace))
     return mk_error();
 
   std::vector<maybe_stmt> v;
@@ -508,7 +511,7 @@ maybe_stmt hx_reader::parse_block()
       v.emplace_back(std::move(std::get<error>(stmt)));
   }
   // ensure that we see a closing brace
-  if(!expect<'}'>(diagnostic_db::parser::block_expects_rbrace(current.data.get_string())))
+  if(!expect('}', diagnostic_db::parser::block_expects_rbrace))
     return mk_error();
 
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
@@ -525,9 +528,7 @@ maybe_expr hx_reader::parse_prefix() // operator
   {
     default:
     {
-      diagnostic <<= (diagnostic_db::parser::unknown_token(current.data.get_string()) + current.loc) // expected prefix expression
-                     | source_context(0);
-      consume();
+      diagnostic <<= diagnostic_db::parser::unknown_token(module, current.loc.row_beg, current.loc.column_beg + 1, current.data.get_string());
 
       return mk_error();
     }
@@ -604,7 +605,7 @@ std::vector<token> hx_reader::read(std::string_view module)
     r.consume();
   }
   if(toks.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= (-diagnostic_db::parser::empty_module);
+    diagnostic <<= diagnostic_db::parser::empty_module(module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return toks;
 }
 
@@ -625,47 +626,6 @@ void asm_reader::consume()
     std::swap(next_toks[i], next_toks[j]);
 
   next_toks.back() = gett();
-}
-
-template<ass::token_kind kind, typename F>
-bool asm_reader::expect(F&& f)
-{
-  if(current.kind != kind)
-  {
-    if(current.kind != ass::token_kind::EndOfFile)
-      diagnostic <<= (f + current.loc) | source_context(0);
-    else
-      diagnostic <<= (f + current.loc);
-    return false;
-  }
-  consume();
-  return true;
-}
-
-template<std::uint8_t c, typename F>
-bool asm_reader::expect(F&& f)
-{
-  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
-
-  return expect<static_cast<ass::token_kind>(c)>(std::forward<F>(f));
-}
-
-template<ass::token_kind kind>
-bool asm_reader::accept()
-{
-  if(current.kind != kind)
-    return false;
-
-  consume();
-  return true;
-}
-
-template<std::uint8_t c>
-bool asm_reader::accept()
-{
-  static_assert(isprint(c), "c must be printable. Anything else should explicitly use token_kind::*");
-
-  return accept<static_cast<ass::token_kind>(c)>();
 }
 
 ass::instruction asm_reader::parse_op(op_code opc)
@@ -764,7 +724,7 @@ std::vector<ass::instruction> asm_reader::read(std::string_view module)
     }
   }
   if(instructions.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= (-diagnostic_db::parser::empty_module);
+    diagnostic <<= diagnostic_db::parser::empty_module(r.module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return instructions;
 }
 
@@ -790,8 +750,10 @@ std::vector<ass::instruction> asm_reader::read_text(const std::string& text)
     }
   }
   if(instructions.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= (-diagnostic_db::parser::empty_module);
+    diagnostic <<= diagnostic_db::parser::empty_module(r.module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return instructions;
 }
 
+#undef expect
+#undef accept
 

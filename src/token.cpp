@@ -11,7 +11,9 @@ std::string_view kind_to_str(token_kind kind)
   case token_kind::Identifier: return "Identifier";
   case token_kind::LiteralNumber: return "LiteralNumber";
   case token_kind::Keyword: return "Keyword";
-  case token_kind::Assign: return "Assign";
+  case token_kind::Doublearrow: return "Doublearrow";
+  case token_kind::Backslash: return "Backslash";
+  case token_kind::Pipe: return "Pipe";
   case token_kind::Colon: return "Colon";
   case token_kind::Semi: return "Semicolon";
   case token_kind::LBrace: return "LBrace";
@@ -20,6 +22,11 @@ std::string_view kind_to_str(token_kind kind)
   case token_kind::Minus: return "Minus";
   case token_kind::Asterisk: return "Asterisk";
   case token_kind::Equal: return "Equal";
+  case token_kind::Dot: return "Dot";
+  case token_kind::LParen: return "LParen";
+  case token_kind::RParen: return "RParen";
+  case token_kind::Comma: return "Comma";
+  case token_kind::Underscore: return "Underscore";
   case token_kind::Undef: return "Undefined";
   }
 }
