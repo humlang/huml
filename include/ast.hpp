@@ -61,30 +61,28 @@ namespace ast_tags
   };
 }
 
-struct loop_;       using loop = rec_wrap_t<loop_>;
 struct error_;      using error = rec_wrap_t<error_>;
-struct block_;      using block = rec_wrap_t<block_>;
-struct readin_;     using readin = rec_wrap_t<readin_>;
-struct print_;      using print = rec_wrap_t<print_>;
 struct assign_;     using assign = rec_wrap_t<assign_>;
 
 // expressions
 struct binary_exp_; using binary_exp = rec_wrap_t<binary_exp_>;
 struct identifier_; using identifier = rec_wrap_t<identifier_>;
 struct literal_;    using literal = rec_wrap_t<literal_>;
+struct block_;      using block = rec_wrap_t<block_>;
+struct unit_;       using unit = rec_wrap_t<unit_>;
+struct tuple_;      using tuple = rec_wrap_t<tuple_>;
 
 using stmt_type = std::variant<std::monostate,
-        loop,
-        block,
-        assign,
-        print,
-        readin
+        assign
 >;
 
 using exp_type = std::variant<std::monostate,
+        unit,
+        tuple,
         literal,
         identifier,
-        binary_exp
+        binary_exp,
+        block
 >;
 
 using ast_type = std::variant<std::monostate,
@@ -142,6 +140,22 @@ public:
   literal_(tag, token tok);
 };
 
+struct unit_ : base<unit_>
+{
+public:
+  unit_(tag, token tok);
+};
+
+struct tuple_ : base<tuple_>
+{
+public:
+  tuple_(tag, token tok, std::vector<maybe_expr> args);
+
+  const std::vector<maybe_expr>& expressions() const { return exprs; }
+private:
+  std::vector<maybe_expr> exprs;
+};
+
 struct identifier_ : base<identifier_>
 {
 public:
@@ -154,27 +168,14 @@ public:
   error_(tag, token tok);
 };
 
-struct loop_ : base<loop_>
-{
-public:
-  loop_(tag, token tok, maybe_expr times, maybe_stmt body);
-
-  const maybe_expr& num_times() const { return times; }
-  const maybe_stmt& loop_body() const { return body; }
-
-private:
-  maybe_expr times;
-  maybe_stmt body;
-};
-
 struct block_ : base<block_>
 {
 public:
-  block_(tag, token tok, std::vector<maybe_stmt> stmts);
+  block_(tag, token tok, std::vector<maybe_expr> exprs);
 
-  const std::vector<maybe_stmt>& statements() const { return stmts; }
+  const std::vector<maybe_expr>& expressions() const { return exprs; }
 private:
-  std::vector<maybe_stmt> stmts;
+  std::vector<maybe_expr> exprs;
 };
 
 struct assign_ : base<assign_>
@@ -187,27 +188,6 @@ public:
 private:
   exp_type variable;
   maybe_expr right;
-};
-
-struct print_ : base<print_>
-{
-public:
-  print_(tag, token tok, maybe_expr arg);
-
-  const maybe_expr& arg() const { return argument; }
-private:
-  maybe_expr argument;
-};
-
-
-struct readin_ : base<readin_>
-{
-public:
-  readin_(tag, token tok, maybe_expr arg);
-
-  const maybe_expr& arg() const { return argument; }
-private:
-  maybe_expr argument;
 };
 
 struct binary_exp_ : base<binary_exp_>
@@ -227,12 +207,11 @@ namespace ast_tags
 {
   static constexpr inline tag<literal_> literal = {};
   static constexpr inline tag<identifier_> identifier = {};
-  static constexpr inline tag<loop_> loop = {};
   static constexpr inline tag<error_> error = {};
   static constexpr inline tag<block_> block = {};
   static constexpr inline tag<assign_> assign = {};
-  static constexpr inline tag<print_> print = {};
-  static constexpr inline tag<readin_> readin = {};
   static constexpr inline tag<binary_exp_> binary_exp = {};
+  static constexpr inline tag<unit_> unit = {};
+  static constexpr inline tag<tuple_> tuple = {};
 }
 

@@ -30,15 +30,22 @@ namespace parser
 
 db_entry(error, empty_module, "Module must not be empty.");
 db_entry_arg(error, unknown_token, "Can not tokenize \"{}\".");
-db_entry_arg(error, statements_expect_semicolon, "Statement expected semicolon at its end, instead got \"{}\".");
+db_entry_arg(error, not_a_prefix, "Token \"{}\" is not a prefix.");
 db_entry_arg(error, leading_zeros, "Leading zeros for literal number \"{}\".");
 db_entry_arg(error, no_number, "\"{}\" is not a number.");
+db_entry_arg(error, tuple_or_unit_expr_expect_lparen, "Tuple or unit expression expected a '(', instead got \"{}\".");
+db_entry_arg(error, tuple_expects_comma, "Tuple expects a comma here, instead got \"{}\".");
+db_entry_arg(error, tuple_expects_closing_paranthesis, "Tuple expected a closing parenthesis, instead got \"{}\".");
 db_entry_arg(error, block_expects_lbrace, "\'{{\' expected before block, instead got \"{}\".");
 db_entry_arg(error, block_expects_rbrace, "\'}}\' expected before block, instead got \"{}\".");
 db_entry_arg(error, identifier_expected, "Expected identifier, instead got \"{}\".");
 db_entry_arg(error, literal_expected, "Expected literal, instead got \"{}\".");
 
 }
+
+
+#undef db_entry
+#undef db_entry_arg
 
 }
 

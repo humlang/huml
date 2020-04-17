@@ -59,15 +59,15 @@ private:
   // always uses old for the error
   error mk_error();
 
-  maybe_stmt parse_keyword();
   maybe_expr parse_literal();
   maybe_expr parse_identifier();
-  maybe_stmt parse_block();
+  maybe_expr parse_block();
+  maybe_expr parse_tuple();
   maybe_stmt parse_statement();
 
   maybe_expr parse_prefix();
   exp_type parse_binary(maybe_expr left);
-  maybe_expr parse_expression(int precedence);
+  maybe_expr parse_expression(int precedence = 0);
   int precedence();
 
 private:

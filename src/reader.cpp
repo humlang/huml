@@ -470,13 +470,14 @@ void hx_reader::consume()
     return false; \
     } consume(); return true; })()
 
-#define accept(kind__, f) ([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
+#define accept(kind__) ([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
     return false; \
     } consume(); return true; })()
 
 error hx_reader::mk_error()
 { return ast_tags::error.make_node(old); }
 
+// nat
 maybe_expr hx_reader::parse_literal()
 {
   // Only have numbers as literals for now
@@ -485,6 +486,7 @@ maybe_expr hx_reader::parse_literal()
   return ast_tags::literal.make_node(old);
 }
 
+// id
 maybe_expr hx_reader::parse_identifier()
 {
   if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
@@ -492,7 +494,8 @@ maybe_expr hx_reader::parse_identifier()
   return ast_tags::identifier.make_node(old);
 }
 
-maybe_stmt hx_reader::parse_block()
+// block := `{` e1 `;` ... `;` en `}`
+maybe_expr hx_reader::parse_block()
 {
   auto tmp = current;
 
@@ -500,15 +503,17 @@ maybe_stmt hx_reader::parse_block()
   if(!expect('{', diagnostic_db::parser::block_expects_lbrace))
     return mk_error();
 
-  std::vector<maybe_stmt> v;
+  std::vector<maybe_expr> v;
   while(current.kind != token_kind::RBrace && current.kind != token_kind::EndOfFile)
   {
     // just propagate error nodes
-    auto stmt = parse_statement();
-    if(std::holds_alternative<stmt_type>(stmt))
-      v.emplace_back(std::move(std::get<stmt_type>(stmt)));
+    auto expr = parse_expression(0);
+    if(std::holds_alternative<exp_type>(expr))
+      v.emplace_back(std::move(std::get<exp_type>(expr)));
     else 
-      v.emplace_back(std::move(std::get<error>(stmt)));
+      v.emplace_back(std::move(std::get<error>(expr)));
+
+    accept(';');
   }
   // ensure that we see a closing brace
   if(!expect('}', diagnostic_db::parser::block_expects_rbrace))
@@ -517,18 +522,20 @@ maybe_stmt hx_reader::parse_block()
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
 }
 
+// TODO
 maybe_stmt hx_reader::parse_statement()
 {
-  return nullptr;
+  return std::monostate {};
 }
 
-maybe_expr hx_reader::parse_prefix() // operator
+// e := identifier, number
+maybe_expr hx_reader::parse_prefix()
 {
   switch(current.kind)
   {
     default:
     {
-      diagnostic <<= diagnostic_db::parser::unknown_token(module, current.loc.row_beg, current.loc.column_beg + 1, current.data.get_string());
+      diagnostic <<= diagnostic_db::parser::not_a_prefix(module, current.loc.row_beg, current.loc.column_beg + 1, current.data.get_string());
 
       return mk_error();
     }
@@ -544,6 +551,7 @@ maybe_expr hx_reader::parse_prefix() // operator
   }
 }
 
+// e := e1 +-* e2
 exp_type hx_reader::parse_binary(maybe_expr left)
 {
   token op = current;
@@ -554,6 +562,42 @@ exp_type hx_reader::parse_binary(maybe_expr left)
   return ast_tags::binary_exp.make_node(std::move(left), op, std::move(right));
 }
 
+// e := `(` e `)` | `(` e1 `,` ... `,` en `)`
+maybe_expr hx_reader::parse_tuple()
+{
+  expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen);
+
+  // See if we have a unit
+  if(accept(')'))
+    return ast_tags::unit.make_node();
+  
+  auto first_expr = parse_expression();
+
+  // See if we have a parenthesized expression
+  if(accept(')'))
+    return first_expr;
+
+  expect(',', diagnostic_db::parser::tuple_expects_comma);
+
+  std::vector<maybe_expr> v;
+  while(current.kind != token_kind::RParen && current.kind != token_kind::EndOfFile)
+  {
+    // just propagate error nodes
+    auto expr = parse_expression(0);
+    if(std::holds_alternative<exp_type>(expr))
+      v.emplace_back(std::move(std::get<exp_type>(expr)));
+    else 
+      v.emplace_back(std::move(std::get<error>(expr)));
+
+    accept(',');
+  }
+  // ensure that we see a closing brace
+  if(!expect(')', diagnostic_db::parser::tuple_expects_closing_paranthesis))
+    return mk_error();
+  return ast_tags::tuple.make_node(v);
+}
+
+// e
 maybe_expr hx_reader::parse_expression(int precedence)
 {
   auto prefix = parse_prefix();
