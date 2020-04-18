@@ -39,6 +39,24 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ">", rec.state.depth);
   },
 
+  [](auto&& rec, const unit& id) -> void { PrinterFn print;
+    print("< unit, id=\"" + std::to_string(id->id()) + "\""
+        + ", location=\"" + id->loc().to_string() + "\""
+        + ">", rec.state.depth);
+  },
+
+  [](auto&& rec, const top& id) -> void { PrinterFn print;
+    print("< TOP, id=\"" + std::to_string(id->id()) + "\""
+        + ", location=\"" + id->loc().to_string() + "\""
+        + ">", rec.state.depth);
+  },
+
+  [](auto&& rec, const bot& id) -> void { PrinterFn print;
+    print("< BOT, id=\"" + std::to_string(id->id()) + "\""
+        + ", location=\"" + id->loc().to_string() + "\""
+        + ">", rec.state.depth);
+  },
+
   [](auto&& rec, const error& err) -> void { PrinterFn print;
     print("< error, id=\"" + std::to_string(err->id()) + "\""
         + ", location=\"" + err->loc().to_string() + "\""
@@ -46,27 +64,28 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ">", rec.state.depth);
   },
 
-  [](auto&& rec, const readin& rd) -> void { PrinterFn print;
+  [](auto&& rec, const pattern& rd) -> void { PrinterFn print;
     print("<|readin, id=\"" + std::to_string(rd->id()) + "\""
         + ", location=\"" + rd->loc().to_string() + "\""
         + ", symbol=\"" + rd->symb().get_string() + "\""
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, rd->arg());
+    std::visit(rec, rd->pattern());
     rec.state.depth--;
 
     print("|readin>", rec.state.depth);
   },
 
-  [](auto&& rec, const print& pt) -> void { PrinterFn print;
+  [](auto&& rec, const match& pt) -> void { PrinterFn print;
     print("<|print, id=\"" + std::to_string(pt->id()) + "\""
         + ", location=\"" + pt->loc().to_string() + "\""
         + ", symbol=\"" + pt->symb().get_string() + "\""
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, pt->arg());
+    std::visit(rec, pt->pattern());
+    std::visit(rec, pt->expression());
     rec.state.depth--;
 
     print("|print>", rec.state.depth);
@@ -86,15 +105,16 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     print("|assign>", rec.state.depth);
   },
 
-  [](auto&& rec, const loop& l) -> void { PrinterFn print;
+  [](auto&& rec, const pattern_matcher& l) -> void { PrinterFn print;
     print("<|loop, id=\"" + std::to_string(l->id()) + "\""
         + ", location=\"" + l->loc().to_string() + "\""
         + ", symbol=\"" + l->symb().get_string() + "\""
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, l->num_times());
-    std::visit(rec, l->loop_body());
+    std::visit(rec, l->to_be_matched());
+    for(auto& v : l->match_patterns())
+      std::visit(rec, v);
     rec.state.depth--;
 
     print("|loop>", rec.state.depth);
@@ -107,11 +127,61 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    for(auto& v : b->statements())
+    for(auto& v : b->expressions())
       std::visit(rec, v);
     rec.state.depth--;
 
     print("|block>", rec.state.depth);
+  },
+
+  [](auto&& rec, const tuple& b) -> void { PrinterFn print;
+    print("<|block, id=\"" + std::to_string(b->id()) + "\""
+        + ", location=\"" + b->loc().to_string() + "\""
+        + ", symbol=\"" + b->symb().get_string() + "\""
+        + ", ", rec.state.depth);
+
+    rec.state.depth++;
+    for(auto& v : b->expressions())
+      std::visit(rec, v);
+    rec.state.depth--;
+
+    print("|block>", rec.state.depth);
+  },
+
+  [](auto&& rec, const access& a) -> void { PrinterFn print;
+    print("<|access id=\"" + std::to_string(a->id()) + "\""
+        + ", location=\"" + a->loc().to_string() + "\"", rec.state.depth);
+
+    rec.state.depth++;
+    std::visit(rec, a->tuple());
+    std::visit(rec, a->accessed_at());
+    rec.state.depth--;
+
+    print("|access>", rec.state.depth);
+  },
+
+  [](auto&& rec, const lambda& a) -> void { PrinterFn print;
+    print("<|lambda id=\"" + std::to_string(a->id()) + "\""
+        + ", location=\"" + a->loc().to_string() + "\"", rec.state.depth);
+
+    rec.state.depth++;
+    rec(a->argument());
+    std::visit(rec, a->fbody());
+    rec.state.depth--;
+
+    print("|lambda>", rec.state.depth);
+  },
+
+  [](auto&& rec, const app& a) -> void { PrinterFn print;
+    print("<|app id=\"" + std::to_string(a->id()) + "\""
+        + ", location=\"" + a->loc().to_string() + "\"", rec.state.depth);
+
+    rec.state.depth++;
+    std::visit(rec, a->fun());
+    std::visit(rec, a->argument());
+    rec.state.depth--;
+
+    print("|app>", rec.state.depth);
   },
 
   [](auto&& rec, const binary_exp& bin) -> void { PrinterFn print;

@@ -59,13 +59,23 @@ private:
   // always uses old for the error
   error mk_error();
 
+  maybe_stmt parse_assign();
+
   maybe_expr parse_literal();
   maybe_expr parse_identifier();
   maybe_expr parse_block();
   maybe_expr parse_tuple();
+  maybe_expr parse_case();
+  maybe_expr parse_top();
+  maybe_expr parse_bot();
+  maybe_expr parse_app(maybe_expr lhs);
+  maybe_expr parse_access(maybe_expr lhs);
+  maybe_expr parse_lambda();
+  maybe_expr parse_keyword();
+  maybe_match parse_match();
   maybe_stmt parse_statement();
-
   maybe_expr parse_prefix();
+  maybe_patt parse_pattern();
   exp_type parse_binary(maybe_expr left);
   maybe_expr parse_expression(int precedence = 0);
   int precedence();
@@ -74,6 +84,8 @@ private:
   token old;
   token current;
   std::array<token, lookahead_size> next_toks;
+
+  bool parsing_pattern { false };
 };
 
 // ASSEMBLER

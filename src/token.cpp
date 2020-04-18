@@ -27,6 +27,8 @@ std::string_view kind_to_str(token_kind kind)
   case token_kind::RParen: return "RParen";
   case token_kind::Comma: return "Comma";
   case token_kind::Underscore: return "Underscore";
+  case token_kind::LBracket: return "LBracket";
+  case token_kind::RBracket: return "RBracket";
   case token_kind::Undef: return "Undefined";
   }
 }

@@ -61,16 +61,28 @@ namespace ast_tags
   };
 }
 
-struct error_;      using error = rec_wrap_t<error_>;
-struct assign_;     using assign = rec_wrap_t<assign_>;
+struct error_;             using error = rec_wrap_t<error_>;
+struct assign_;            using assign = rec_wrap_t<assign_>;
 
 // expressions
-struct binary_exp_; using binary_exp = rec_wrap_t<binary_exp_>;
-struct identifier_; using identifier = rec_wrap_t<identifier_>;
-struct literal_;    using literal = rec_wrap_t<literal_>;
-struct block_;      using block = rec_wrap_t<block_>;
-struct unit_;       using unit = rec_wrap_t<unit_>;
-struct tuple_;      using tuple = rec_wrap_t<tuple_>;
+struct binary_exp_;        using binary_exp = rec_wrap_t<binary_exp_>;
+struct identifier_;        using identifier = rec_wrap_t<identifier_>;
+struct literal_;           using literal = rec_wrap_t<literal_>;
+struct block_;             using block = rec_wrap_t<block_>;
+struct unit_;              using unit = rec_wrap_t<unit_>;
+struct tuple_;             using tuple = rec_wrap_t<tuple_>;
+struct bot_;               using bot = rec_wrap_t<bot_>;
+struct top_;               using top = rec_wrap_t<top_>;
+struct app_;               using app = rec_wrap_t<app_>;
+struct access_;            using access = rec_wrap_t<access_>;
+struct lambda_;            using lambda = rec_wrap_t<lambda_>;
+struct pattern_matcher_;   using pattern_matcher = rec_wrap_t<pattern_matcher_>;
+
+// pattern match arm
+struct match_;             using match = rec_wrap_t<match_>;
+
+// pattern
+struct pattern_;           using pattern = rec_wrap_t<pattern_>;
 
 using stmt_type = std::variant<std::monostate,
         assign
@@ -82,7 +94,13 @@ using exp_type = std::variant<std::monostate,
         literal,
         identifier,
         binary_exp,
-        block
+        block,
+        top,
+        bot,
+        app,
+        access,
+        lambda,
+        pattern_matcher
 >;
 
 using ast_type = std::variant<std::monostate,
@@ -96,6 +114,9 @@ using ast_type = std::variant<std::monostate,
 //  -> This forces us to really handle errors somewhat correctly in the parser
 using maybe_expr = std::variant<std::monostate, exp_type, rec_wrap_t<error_>>;
 using maybe_stmt = std::variant<std::monostate, stmt_type, rec_wrap_t<error_>>;
+using maybe_match = std::variant<std::monostate, match, rec_wrap_t<error_>>;
+using maybe_patt = std::variant<std::monostate, pattern, tuple, identifier, literal,
+                                                unit, app, rec_wrap_t<error_>>;
 
 // POLICY: Every getter must return one of the previously declared variants.
 //          Otherwise, have fun parsing the error messages coming from our visitors
@@ -146,6 +167,42 @@ public:
   unit_(tag, token tok);
 };
 
+struct top_ : base<top_>
+{
+public:
+  top_(tag, token tok);
+};
+
+struct bot_ : base<bot_>
+{
+public:
+  bot_(tag, token tok);
+};
+
+struct app_ : base<app_>
+{
+public:
+  app_(tag, maybe_expr f, maybe_expr arg);
+
+  const maybe_expr& fun() const { return f; }
+  const maybe_expr& argument() const { return arg; }
+private:
+  maybe_expr f;
+  maybe_expr arg;
+};
+
+struct access_ : base<access_>
+{
+public:
+  access_(tag, token tok, maybe_expr tup, maybe_expr at);
+
+  const maybe_expr& tuple() const { return tup; }
+  const maybe_expr& accessed_at() const { return at; }
+private:
+  maybe_expr tup;
+  maybe_expr at;
+};
+
 struct tuple_ : base<tuple_>
 {
 public:
@@ -154,6 +211,52 @@ public:
   const std::vector<maybe_expr>& expressions() const { return exprs; }
 private:
   std::vector<maybe_expr> exprs;
+};
+
+struct lambda_ : base<lambda_>
+{
+public:
+  lambda_(tag, token tok, identifier arg, maybe_expr body);
+
+  const identifier& argument() const { return arg; }
+  const maybe_expr& fbody() const { return body; }
+private:
+  identifier arg;
+  maybe_expr body;
+};
+
+struct pattern_ : base<pattern_>
+{
+public:
+  pattern_(tag, token tok, maybe_patt patt);
+
+  const maybe_patt& pattern() const { return patt; }
+private:
+  maybe_patt patt;
+};
+
+struct match_ : base<match_>
+{
+public:
+  match_(tag, token tok, maybe_patt pat, maybe_expr expr);
+
+  const maybe_patt& pattern() const { return pat; }
+  const maybe_expr& expression() const { return expr; }
+private:
+  maybe_patt pat;
+  maybe_expr expr;
+};
+
+struct pattern_matcher_ : base<pattern_matcher_>
+{
+public:
+  pattern_matcher_(tag, token tok, maybe_expr to_match, std::vector<maybe_match> patterns);
+
+  const maybe_expr& to_be_matched() const { return to_match; }
+  const std::vector<maybe_match>& match_patterns() const { return patterns; }
+private:
+  maybe_expr to_match;
+  std::vector<maybe_match> patterns;
 };
 
 struct identifier_ : base<identifier_>
@@ -181,12 +284,12 @@ private:
 struct assign_ : base<assign_>
 {
 public:
-  assign_(tag, identifier variable, token op, maybe_expr right);
+  assign_(tag, maybe_expr variable, token op, maybe_expr right);
 
-  const exp_type& var() const { return variable; }
+  const maybe_expr& var() const { return variable; }
   const maybe_expr& exp() const { return right; }
 private:
-  exp_type variable;
+  maybe_expr variable;
   maybe_expr right;
 };
 
@@ -213,5 +316,13 @@ namespace ast_tags
   static constexpr inline tag<binary_exp_> binary_exp = {};
   static constexpr inline tag<unit_> unit = {};
   static constexpr inline tag<tuple_> tuple = {};
+  static constexpr inline tag<top_> top = {};
+  static constexpr inline tag<bot_> bot = {};
+  static constexpr inline tag<pattern_> pattern = {};
+  static constexpr inline tag<match_> match = {};
+  static constexpr inline tag<pattern_matcher_> pattern_matcher = {};
+  static constexpr inline tag<app_> app = {};
+  static constexpr inline tag<access_> access = {};
+  static constexpr inline tag<lambda_> lambda = {};
 }
 

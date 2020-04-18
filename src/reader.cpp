@@ -48,7 +48,9 @@ auto keyword_map = tsl::robin_map<std::string_view, op_code>({
 }
 
 auto keyword_set = tsl::robin_set<std::string_view>({
-  "case"sv
+  "case"sv,
+  "TOP"sv,
+  "BOT"sv
 });
 
 auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
@@ -61,11 +63,10 @@ auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
 });
 
 auto token_precedence_map = tsl::robin_map<token_kind, int>( {
-  {token_kind::Plus, 1},
-  {token_kind::Minus, 1},
-  {token_kind::Asterisk, 2},
-  {token_kind::LiteralNumber, 6},
-  {token_kind::Identifier, 6},
+  {token_kind::Dot, 2},
+  {token_kind::Plus, 6},
+  {token_kind::Minus, 6},
+  {token_kind::Asterisk, 5},
 });
 
 constexpr static bool isprint(unsigned char c)
@@ -486,12 +487,146 @@ maybe_expr hx_reader::parse_literal()
   return ast_tags::literal.make_node(old);
 }
 
-// id
+// id  or special identifier "_" if pattern parsing is enabled
 maybe_expr hx_reader::parse_identifier()
 {
   if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
     return mk_error();
+  if(!parsing_pattern && old.data == symbol("_"))
+  {
+    diagnostic <<= diagnostic_db::parser::invalid_identifier_for_non_pattern(module, old.loc.row_beg, old.loc.column_beg + 1, old.data.get_string());
+    return mk_error();
+  }
   return ast_tags::identifier.make_node(old);
+}
+
+// e := e1 e2
+maybe_expr hx_reader::parse_app(maybe_expr lhs)
+{
+  return ast_tags::app.make_node(std::move(lhs), std::move(parse_expression()));
+}
+
+// e := e1 `.` e2
+maybe_expr hx_reader::parse_access(maybe_expr lhs)
+{
+  if(!expect('.', diagnostic_db::parser::access_expects_dot))
+    return mk_error();
+  return ast_tags::access.make_node(old, std::move(lhs), std::move(parse_expression()));
+}
+
+// e := `\\` id `.` e       id can be _ to simply ignore the argument
+maybe_expr hx_reader::parse_lambda()
+{
+  auto lam_tok = current;
+  if(!expect('\\', diagnostic_db::parser::lambda_expects_lambda))
+    return mk_error();
+  parsing_pattern = true;
+
+  auto param = one::get<identifier>(parse_identifier());
+
+  parsing_pattern = false;
+  
+  if(!expect('.', diagnostic_db::parser::lambda_expects_dot))
+    return mk_error();
+  auto expr = parse_expression();
+
+  return ast_tags::lambda.make_node(lam_tok, std::move(param), std::move(expr));
+}
+
+// e := `case` e `[` p1 `=>` e1 `|` ... `|` pn `=>` en `]`
+maybe_expr hx_reader::parse_case()
+{
+  auto keyword = current;
+  if(!expect(token_kind::Keyword, diagnostic_db::parser::case_expects_keyword))
+    return mk_error();
+
+  auto to_match = parse_expression();
+
+  if(!expect('[', diagnostic_db::parser::case_expects_lbracket))
+    return mk_error();
+
+  std::vector<maybe_match> patterns;
+  auto mat = parse_match();
+  patterns.emplace_back(std::move(mat));
+  while(current.kind != token_kind::RBracket && current.kind != token_kind::EndOfFile)
+  {
+    if(!expect('|', diagnostic_db::parser::case_expects_pipe))
+      return mk_error();
+
+    mat = std::move(parse_match());
+    patterns.emplace_back(std::move(mat));
+  }
+
+  if(!expect(']', diagnostic_db::parser::case_expects_rbracket))
+    return mk_error();
+
+  return ast_tags::pattern_matcher.make_node(keyword, std::move(to_match), std::move(patterns));
+}
+
+// effectively just an expression that allows the `_` to occur
+maybe_patt hx_reader::parse_pattern()
+{
+  parsing_pattern = true;
+  // check if we have the placeholder
+  if(current.kind == token_kind::Identifier && current.data == symbol("_"))
+  {
+    auto id = parse_identifier();
+    auto arg = std::move(one::get<identifier>(id));
+    auto to_return = ast_tags::pattern.make_node(old, std::move(arg));
+    parsing_pattern = false;
+
+    return to_return;
+  }
+  auto vold = current;
+
+  auto expr = parse_expression();
+  parsing_pattern = false;
+
+#define __if(id) \
+  if(one::holds_alternative<id>(expr)) \
+    return ast_tags::pattern.make_node(vold, std::move(one::get<id>(expr)));
+
+  __if(pattern)
+//  else __if(tuple)
+//  else __if(identifier)
+//  else __if(literal)
+//  else __if(unit)
+//  else __if(app)
+  else
+  {
+    assert(false && "bug in parser");
+    return mk_error();
+  }
+}
+
+// p `=>` e
+maybe_match hx_reader::parse_match()
+{
+  auto pat = parse_pattern();
+
+  auto arrow = current;
+  if(!expect(token_kind::Doublearrow, diagnostic_db::parser::pattern_expects_double_arrow))
+    return mk_error();
+
+  auto expr = parse_expression();
+
+  return ast_tags::match.make_node(arrow, std::move(pat), std::move(expr));
+}
+
+// e := top
+maybe_expr hx_reader::parse_top()
+{
+  if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_top))
+    return mk_error();
+  return ast_tags::top.make_node(old);
+}
+
+// e := bot
+maybe_expr hx_reader::parse_bot()
+{
+  if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_bot))
+    return mk_error();
+  return ast_tags::bot.make_node(old);
 }
 
 // block := `{` e1 `;` ... `;` en `}`
@@ -504,16 +639,20 @@ maybe_expr hx_reader::parse_block()
     return mk_error();
 
   std::vector<maybe_expr> v;
+  auto expr = parse_expression(0);
+  if(std::holds_alternative<exp_type>(expr))
+    v.emplace_back(std::move(std::get<exp_type>(expr)));
+  else 
+    v.emplace_back(std::move(std::get<error>(expr)));
   while(current.kind != token_kind::RBrace && current.kind != token_kind::EndOfFile)
   {
-    // just propagate error nodes
-    auto expr = parse_expression(0);
+    expect(';', diagnostic_db::parser::block_expects_semicolon);
+
+    expr = std::move(parse_expression(0));
     if(std::holds_alternative<exp_type>(expr))
       v.emplace_back(std::move(std::get<exp_type>(expr)));
     else 
       v.emplace_back(std::move(std::get<error>(expr)));
-
-    accept(';');
   }
   // ensure that we see a closing brace
   if(!expect('}', diagnostic_db::parser::block_expects_rbrace))
@@ -522,10 +661,85 @@ maybe_expr hx_reader::parse_block()
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
 }
 
-// TODO
+maybe_stmt hx_reader::parse_assign()
+{
+  auto var = parse_identifier();
+  if(!expect('=', diagnostic_db::parser::assign_expects_equal))
+    return mk_error();
+
+  return ast_tags::assign.make_node(std::move(var), old, std::move(parse_expression()));
+}
+
 maybe_stmt hx_reader::parse_statement()
 {
-  return std::monostate {};
+  return parse_assign();
+}
+
+maybe_expr hx_reader::parse_keyword()
+{
+  if(current.data == symbol("case"))
+  {
+    return parse_case();
+  }
+  else if(current.data == symbol("TOP"))
+  {
+    return parse_top();
+  }
+  else if(current.data == symbol("BOT"))
+  {
+    return parse_bot();
+  }
+  assert(false && "bug in lexer, we would not see a keyword token otherwise");
+  return mk_error();
+}
+
+// e := e1 +-* e2
+exp_type hx_reader::parse_binary(maybe_expr left)
+{
+  assert(!parsing_pattern);
+
+  token op = current;
+  consume();
+  int precedence = token_precedence_map[op.kind];
+  auto right = parse_expression(precedence);
+
+  return ast_tags::binary_exp.make_node(std::move(left), op, std::move(right));
+}
+
+// e := `(` e `)` | `(` e1 `,` ... `,` en `)`
+maybe_expr hx_reader::parse_tuple()
+{
+  expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen);
+  auto open = old;
+
+  // See if we have a unit
+  if(accept(')'))
+    return ast_tags::unit.make_node(open);
+  
+  auto first_expr = parse_expression();
+
+  // See if we have a parenthesized expression
+  if(accept(')'))
+    return first_expr;
+
+  expect(',', diagnostic_db::parser::tuple_expects_comma);
+
+  std::vector<maybe_expr> v;
+  v.emplace_back(std::move(first_expr));
+  while(current.kind != token_kind::RParen && current.kind != token_kind::EndOfFile)
+  {
+    expect(',', diagnostic_db::parser::tuple_expects_comma);
+
+    auto expr = parse_expression(0);
+    if(std::holds_alternative<exp_type>(expr))
+      v.emplace_back(std::move(std::get<exp_type>(expr)));
+    else 
+      v.emplace_back(std::move(std::get<error>(expr)));
+  }
+  // ensure that we see a closing brace
+  if(!expect(')', diagnostic_db::parser::tuple_expects_closing_paranthesis))
+    return mk_error();
+  return ast_tags::tuple.make_node(open, std::move(v));
 }
 
 // e := identifier, number
@@ -548,53 +762,23 @@ maybe_expr hx_reader::parse_prefix()
     {
       return std::move(parse_identifier());
     }
+    case token_kind::LParen:
+    {
+      return std::move(parse_tuple());
+    }
+    case token_kind::LBrace:
+    {
+      return std::move(parse_block());
+    }
+    case token_kind::Keyword:
+    {
+      return std::move(parse_keyword());
+    }
+    case token_kind::Backslash:
+    {
+      return std::move(parse_lambda());
+    }
   }
-}
-
-// e := e1 +-* e2
-exp_type hx_reader::parse_binary(maybe_expr left)
-{
-  token op = current;
-  consume();
-  int precedence = token_precedence_map[op.kind];
-  auto right = parse_expression(precedence);
-
-  return ast_tags::binary_exp.make_node(std::move(left), op, std::move(right));
-}
-
-// e := `(` e `)` | `(` e1 `,` ... `,` en `)`
-maybe_expr hx_reader::parse_tuple()
-{
-  expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen);
-
-  // See if we have a unit
-  if(accept(')'))
-    return ast_tags::unit.make_node();
-  
-  auto first_expr = parse_expression();
-
-  // See if we have a parenthesized expression
-  if(accept(')'))
-    return first_expr;
-
-  expect(',', diagnostic_db::parser::tuple_expects_comma);
-
-  std::vector<maybe_expr> v;
-  while(current.kind != token_kind::RParen && current.kind != token_kind::EndOfFile)
-  {
-    // just propagate error nodes
-    auto expr = parse_expression(0);
-    if(std::holds_alternative<exp_type>(expr))
-      v.emplace_back(std::move(std::get<exp_type>(expr)));
-    else 
-      v.emplace_back(std::move(std::get<error>(expr)));
-
-    accept(',');
-  }
-  // ensure that we see a closing brace
-  if(!expect(')', diagnostic_db::parser::tuple_expects_closing_paranthesis))
-    return mk_error();
-  return ast_tags::tuple.make_node(v);
 }
 
 // e
@@ -610,18 +794,39 @@ maybe_expr hx_reader::parse_expression(int precedence)
   {
     switch(current.kind)
     {
-      default: return prefix;
+      // only stop if the expression cannot be expanded further
+      case token_kind::Semi:
+      case token_kind::RParen:
+      case token_kind::RBracket:
+      case token_kind::RBrace:
+      case token_kind::Pipe:
+      case token_kind::Comma:
+      case token_kind::LBracket:
+      case token_kind::Doublearrow:
+      {
+        return prefix;
+      } break;
+
+      default:
+      {
+        prefix = parse_app(std::move(prefix));
+      } break;
+
+      case token_kind::Dot:
+      {
+        prefix = parse_access(std::move(prefix));
+      } break;
 
       case token_kind::Plus:
       case token_kind::Minus:
       case token_kind::Asterisk:
       {
         prefix = parse_binary(std::move(prefix));
-        if(std::holds_alternative<error>(prefix))
-        {
-          return prefix;
-        }
-      }
+      } break;
+    }
+    if(std::holds_alternative<error>(prefix))
+    {
+      return prefix;
     }
   }
 
