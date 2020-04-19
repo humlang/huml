@@ -1,48 +1,48 @@
 #!/usr/bin/env bats
 
-@test "block expects lbrace" {
-  # run populates variables "output" and "status", containing the output and statuscode
-  run "$HX_LANG_PATH"/hx-lang --emit=ast << EOF
-for 5 ; :=
-EOF
-
-  echo "$output" | grep "PA-BR-000"
-}
-
-@test "block expects rbrace" {
+@test "not closed unit" {
   # run populates variables "output" and "status", containing the output and statuscode
   run "$HX_LANG_PATH"/hx-lang --emit=ast <<EOF
-for 5 { :=
+(
 EOF
 
-  echo "$output" | grep "PA-BR-001"
+  echo "$output" | grep -i "not a prefix"
 }
 
-@test "assign expects colon-equal" {
-    # run populates variables "output" and "status", containing the output and statuscode
-      run "$HX_LANG_PATH"/hx-lang --emit=ast <<EOF
-x = 2;
-EOF
-
-      echo "$output" | grep "PA-BR-002"
-}
-
-@test "statement expects semicolon at end" {
+@test "not closed parenthesized expression" {
   # run populates variables "output" and "status", containing the output and statuscode
   run "$HX_LANG_PATH"/hx-lang --emit=ast <<EOF
-x := 5
+( 5 
 EOF
 
-  echo "$output" | grep "PA-UT-000"
+  echo "$output" | grep -i "expects a comma"
 }
 
-@test "not a number" {
+@test "not closed tuple" {
   # run populates variables "output" and "status", containing the output and statuscode
   run "$HX_LANG_PATH"/hx-lang --emit=ast <<EOF
-x := 5t;
+( 5, 4
 EOF
 
-  echo "$output" | grep "PA-NN-000"
+  echo "$output" | grep -i "closing parenthesis"
+}
+
+@test "missing comma in tuple" {
+  # run populates variables "output" and "status", containing the output and statuscode
+  run "$HX_LANG_PATH"/hx-lang --emit=ast <<EOF
+( 5 4 )
+EOF
+
+  echo "$output" | grep -i "expects a comma"
+}
+
+@test "too many closed tuples" {
+  # run populates variables "output" and "status", containing the output and statuscode
+  run "$HX_LANG_PATH"/hx-lang --emit=ast <<EOF
+( 5, 4 ))))))))))))
+EOF
+
+  echo "$output" | grep -i "not a prefix"
 }
 
 @test "module not empty" {
@@ -50,5 +50,5 @@ EOF
   run "$HX_LANG_PATH"/hx-lang --emit=ast <<EOF
 EOF
 
-  echo "$output" | grep "PA-EM-000"
+  echo "$output" | grep -i "must not be empty"
 }

@@ -54,24 +54,47 @@ auto keyword_set = tsl::robin_set<std::string_view>({
 });
 
 auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
+  {"\\"sv, token_kind::Backslash},
+  {"|"sv, token_kind::Pipe},
   {":"sv, token_kind::Colon},
   {";"sv, token_kind::Semi},
-  {"+"sv,  token_kind::Plus},
-  {"-"sv,  token_kind::Minus},
+  {"{"sv, token_kind::LBrace},
+  {"}"sv, token_kind::RBrace},
+  {"+"sv, token_kind::Plus},
+  {"-"sv, token_kind::Minus},
   {"*"sv,  token_kind::Asterisk},
   {"="sv,  token_kind::Equal},
+  {"."sv,  token_kind::Dot},
+  {"("sv,  token_kind::LParen},
+  {")"sv,  token_kind::RParen},
+  {"["sv,  token_kind::LBracket},
+  {"]"sv,  token_kind::RBracket},
+  {","sv,  token_kind::Comma},
 });
 
 auto token_precedence_map = tsl::robin_map<token_kind, int>( {
-  {token_kind::Dot, 2},
-  {token_kind::Plus, 6},
-  {token_kind::Minus, 6},
-  {token_kind::Asterisk, 5},
+  {token_kind::Dot, 7},
+  {token_kind::Plus, 5},
+  {token_kind::Minus, 5},
+  {token_kind::Asterisk, 6},
+  {token_kind::LParen, 65535},
+  {token_kind::LBrace, 65535},
+  {token_kind::Identifier, 65535},
+  {token_kind::LiteralNumber, 65535},
 });
 
 constexpr static bool isprint(unsigned char c)
 { return (' ' <= c && c <= '~'); }
 
+static bool is_syntactically_callable(maybe_expr& prefix)
+{
+  return !(one::holds_alternative<binary_exp>(prefix)
+            || one::holds_alternative<literal>(prefix)
+            || one::holds_alternative<unit>(prefix)
+            || one::holds_alternative<tuple>(prefix)
+            || one::holds_alternative<top>(prefix)
+            || one::holds_alternative<bot>(prefix));
+}
 
 base_reader::base_reader(std::string_view module)
   : module(module), linebuf(), is(stream_lookup[module]), col(0), row(1), uses_reader(true)
@@ -238,7 +261,7 @@ restart_get:
       kind = token_kind::Equal;
       data = "=";
     }
-  }
+  } break;
   case '_':
   {
     kind = token_kind::Underscore;
@@ -671,7 +694,7 @@ maybe_stmt hx_reader::parse_assign()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
-  return ast_tags::assign.make_node(std::move(var), old, std::move(parse_expression()));
+  return ast_tags::assign.make_node(std::move(var), old, std::move(arg));
 }
 
 maybe_stmt hx_reader::parse_expr_stmt()
@@ -737,7 +760,22 @@ maybe_expr hx_reader::parse_tuple()
   if(accept(')'))
     return first_expr;
 
-  expect(',', diagnostic_db::parser::tuple_expects_comma);
+  if(current.kind != token_kind::Comma)
+  {
+    if(is_syntactically_callable(first_expr))
+    {
+      auto to_ret = parse_app(std::move(first_expr));
+
+      if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
+        return mk_error();
+      return parse_app(std::move(first_expr));
+    }
+    else
+    {
+      expect(',', diagnostic_db::parser::tuple_expects_comma);
+      return mk_error();
+    }
+  }
 
   std::vector<maybe_expr> v;
   v.emplace_back(std::move(first_expr));
@@ -764,6 +802,7 @@ maybe_expr hx_reader::parse_prefix()
   {
     default:
     {
+      // TODO: improve error message depending on current.kind
       diagnostic <<= diagnostic_db::parser::not_a_prefix(module, current.loc.row_beg, current.loc.column_beg + 1, current.data.get_string());
 
       return mk_error();
@@ -824,6 +863,12 @@ maybe_expr hx_reader::parse_expression(int precedence)
 
       default:
       {
+        // ensure before that prefix is something callable
+        if(!is_syntactically_callable(prefix))
+        {
+          // not callable
+          return prefix;
+        }
         prefix = parse_app(std::move(prefix));
       } break;
 
@@ -854,6 +899,18 @@ std::vector<ast_type> hx_reader::read(std::string_view module)
   hx_reader r(module);
 
   std::vector<ast_type> ast;
+  while(r.current.kind != token_kind::EndOfFile)
+  {
+    auto stmt = r.parse_statement();
+
+    if(one::holds_alternative<error>(stmt))
+      ast.emplace_back(std::move(one::get<error>(stmt)));
+    else
+      ast.emplace_back(std::move(one::get<stmt_type>(stmt)));
+  }
+
+  if(ast.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    diagnostic <<= diagnostic_db::parser::empty_module(module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return ast;
 }
 

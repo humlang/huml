@@ -6,7 +6,7 @@
 123abc
 EOF
 
-  echo "$output" | grep "PA-NN-000"
+  echo "$output" | grep -i "not a number"
 }
 
 @test "do not lex octal numbers" {
@@ -15,6 +15,6 @@ EOF
 0123
 EOF
 
-  echo "$output" | grep "PA-LZ-000"
+  echo "$output" | grep -i "leading zeros"
 }
 

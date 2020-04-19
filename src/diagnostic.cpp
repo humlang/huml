@@ -27,6 +27,8 @@ diagnostics_manager& diagnostics_manager::operator<<=(const json::json& msg)
 {
   std::lock_guard<std::mutex> guard(mut);
 
+  if(msg["level"].get<diag_level>() == diag_level::error)
+    err = 1;
   data.push_back(msg);
 
   return *this;

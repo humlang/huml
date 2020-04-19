@@ -149,7 +149,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
   },
 
   [](auto&& rec, const tuple& b) -> void { PrinterFn print;
-    print("<|block, id=\"" + std::to_string(b->id()) + "\""
+    print("<|tuple, id=\"" + std::to_string(b->id()) + "\""
         + ", location=\"" + b->loc().to_string() + "\""
         + ", symbol=\"" + b->symb().get_string() + "\""
         + ", ", rec.state.depth);
@@ -159,7 +159,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
       std::visit(rec, v);
     rec.state.depth--;
 
-    print("|block>", rec.state.depth);
+    print("|tuple>", rec.state.depth);
   },
 
   [](auto&& rec, const access& a) -> void { PrinterFn print;

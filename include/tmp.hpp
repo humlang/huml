@@ -94,11 +94,11 @@ constexpr void for_(F&& func)
 { for_(std::forward<F>(func), std::make_index_sequence<N>()); }
 
 template<typename T, typename D>
-constexpr std::optional<std::variant<std::monostate, T>> magical_get(D&&)
+constexpr std::variant<std::monostate, T> magical_get(D&&)
 { return std::monostate{}; }
 
 template<typename T, int n = 0, typename... Args>
-constexpr std::optional<std::variant<std::monostate, T>> magical_get(std::variant<Args...>&& w)
+constexpr std::variant<std::monostate, T> magical_get(std::variant<Args...>&& w)
 {
   if constexpr(is_in_there<T>(w) && n == 0)
     return std::get<T>(w);
@@ -111,8 +111,8 @@ constexpr std::optional<std::variant<std::monostate, T>> magical_get(std::varian
       {
         auto res = magical_get<T>(*x);
 
-        if(res != std::nullopt && std::holds_alternative<T>(*res))
-          v = *res;
+        if(std::holds_alternative<T>(res))
+          v = res;
       }
     });
     return v;
@@ -120,11 +120,11 @@ constexpr std::optional<std::variant<std::monostate, T>> magical_get(std::varian
 }
 
 template<typename T, typename D>
-constexpr std::optional<std::variant<std::monostate, const T*>> magical_get(const D&)
+constexpr std::variant<std::monostate, const T*> magical_get(const D&)
 { return std::monostate{}; }
 
 template<typename T, typename... Args>
-constexpr std::optional<std::variant<std::monostate, const T*>> magical_get(const std::variant<Args...>& w)
+constexpr std::variant<std::monostate, const T*> magical_get(const std::variant<Args...>& w)
 {
   if constexpr(is_in_there<T>(w))
     return &std::get<T>(w);
@@ -137,8 +137,8 @@ constexpr std::optional<std::variant<std::monostate, const T*>> magical_get(cons
       {
         auto res = magical_get<T>(*x);
 
-        if(res != std::nullopt && std::holds_alternative<const T*>(*res))
-          v = *res;
+        if(std::holds_alternative<const T*>(res))
+          v = res;
       }
     });
     return v;
@@ -146,11 +146,11 @@ constexpr std::optional<std::variant<std::monostate, const T*>> magical_get(cons
 }
 
 template<typename T, typename D>
-constexpr std::optional<std::variant<std::monostate, T*>> magical_get(D&)
+constexpr std::variant<std::monostate, T*> magical_get(D&)
 { return std::monostate{}; }
 
 template<typename T, typename... Args>
-constexpr std::optional<std::variant<std::monostate, T*>> magical_get(std::variant<Args...>& w)
+constexpr std::variant<std::monostate, T*> magical_get(std::variant<Args...>& w)
 {
   if constexpr(is_in_there<T>(w))
     return &std::get<T>(w);
@@ -163,37 +163,98 @@ constexpr std::optional<std::variant<std::monostate, T*>> magical_get(std::varia
       {
         auto res = magical_get<T>(*x);
 
-        if(res != std::nullopt && std::holds_alternative<T*>(*res))
-          v = *res;
+        if(std::holds_alternative<T*>(res))
+          v = res;
       }
     });
     return v;
   }
 }
+
+template<typename T, typename D>
+constexpr bool magical_holds_alternative(D&&)
+{ return false; }
+
+template<typename T, int n = 0, typename... Args>
+constexpr bool magical_holds_alternative(std::variant<Args...>&& w)
+{
+  if constexpr(is_in_there<T>(w))
+    return std::holds_alternative<T>(w);
+  bool v = false;
+  for_<sizeof...(Args)>([&w, &v](auto i)
+  {
+    if(auto x = std::get_if<i.value>(&w))
+    {
+      auto res = magical_holds_alternative<T>(*x);
+
+      v = v || res;
+    }
+  });
+  return v;
+}
+
+template<typename T, typename D>
+constexpr bool magical_holds_alternative(const D&)
+{ return false; }
+
+template<typename T, typename... Args>
+constexpr bool magical_holds_alternative(const std::variant<Args...>& w)
+{
+  if constexpr(is_in_there<T>(w))
+    return std::holds_alternative<T>(w);
+  bool v = false;
+  for_<sizeof...(Args)>([&w, &v](auto i)
+  {
+    if(auto x = std::get_if<i.value>(&w))
+    {
+      auto res = magical_holds_alternative<T>(*x);
+
+      v = v || res;
+    }
+  });
+  return v;
+}
+
+template<typename T, typename D>
+constexpr bool magical_holds_alternative(D&)
+{ return false; }
+
+template<typename T, typename... Args>
+constexpr bool magical_holds_alternative(std::variant<Args...>& w)
+{
+  if constexpr(is_in_there<T>(w))
+    return std::holds_alternative<T>(w);
+  bool v = false;
+  for_<sizeof...(Args)>([&w, &v](auto i)
+  {
+    if(auto x = std::get_if<i.value>(&w))
+    {
+      auto res = magical_holds_alternative<T>(*x);
+
+      v = v || res;
+    }
+  });
+  return v;
+}
+
 }
 
 template<typename T, typename... Args>
 constexpr bool holds_alternative(std::variant<Args...>&& w)
 {
-  auto x = detail::magical_get<T>(w);
-
-  return x != std::nullopt;
+  return detail::magical_holds_alternative<T>(w);
 }
 
 template<typename T, typename... Args>
 constexpr bool holds_alternative(std::variant<Args...>& w)
 {
-  auto x = detail::magical_get<T>(w);
-
-  return x != std::nullopt;
+  return detail::magical_holds_alternative<T>(w);
 }
 
 template<typename T, typename... Args>
 constexpr bool holds_alternative(const std::variant<Args...>& w)
 {
-  auto x = detail::magical_get<T>(w);
-
-  return x != std::nullopt;
+  return detail::magical_holds_alternative<T>(w);
 }
 
 template<typename T, typename... Args>
@@ -201,10 +262,9 @@ constexpr T get(std::variant<Args...>&& w)
 {
   auto x = detail::magical_get<T>(w);
 
-  assert(x != std::nullopt);
-  assert(std::holds_alternative<T*>(*x));
+  assert(std::holds_alternative<T*>(x));
 
-  return std::move(*(std::get<T*>(*x)));
+  return std::move(*(std::get<T*>(x)));
 }
 
 template<typename T, typename... Args>
@@ -212,10 +272,9 @@ constexpr T& get(std::variant<Args...>& w)
 {
   auto x = detail::magical_get<T>(w);
 
-  assert(x != std::nullopt);
-  assert(std::holds_alternative<T*>(*x));
+  assert(std::holds_alternative<T*>(x));
   
-  return *(std::get<T*>(*x));
+  return *(std::get<T*>(x));
 }
 
 template<typename T, typename... Args>
@@ -223,10 +282,9 @@ constexpr const T& get(const std::variant<Args...>& w)
 {
   auto x = detail::magical_get<T>(w);
 
-  assert(x != std::nullopt);
-  assert(std::holds_alternative<T*>(*x));
+  assert(std::holds_alternative<T*>(x));
   
-  return *(std::get<T*>(*x));
+  return *(std::get<T*>(x));
 }
 
 }
