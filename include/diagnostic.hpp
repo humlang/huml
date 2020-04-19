@@ -31,10 +31,38 @@ NLOHMANN_JSON_SERIALIZE_ENUM( diag_level, {
 json::json mk_diag(const std::string_view& module, std::uint_fast32_t row, std::uint_fast32_t column,
                    std::uint_fast16_t hrc, diag_level lvl, const std::string_view& message);
 
+namespace detail
+{
+  struct position
+  {
+    std::uint_fast32_t row;
+    std::uint_fast32_t col;
+
+    bool operator==(const position& other) const
+    { return row == other.row && col == other.col; }
+  };
+  inline position make_position(std::uint_fast32_t row, std::uint_fast32_t col)
+  {
+    return position { row, col };
+  }
+}
+namespace std
+{
+  template<>
+  struct hash<::detail::position>
+  {
+    std::size_t operator()(const ::detail::position& p) const
+    {
+      return ((std::hash<std::uint_fast32_t>()(p.row)
+               ^ (std::hash<std::uint_fast32_t>()(p.col) << 1)) >> 1);
+    }
+  };
+}
+
 struct diagnostics_manager
 {
 private:
-  diagnostics_manager() {  }
+  diagnostics_manager()  {  }
 public:
   ~diagnostics_manager();
 
@@ -46,14 +74,14 @@ public:
 
   diagnostics_manager& operator<<=(const json::json& msg);
 
-  const std::vector<json::json>& get_all() const { return data; }
+  bool empty() const { return data.empty(); }
 
   void print(std::FILE* file);
   int error_code() const;
 
   inline void reset() { err = 0; _print_codes = true; data.clear(); }
 private:
-  std::vector<json::json> data;
+  tsl::robin_map<::detail::position, std::vector<json::json>> data;
 
   int err { 0 };
   bool _print_codes { true };

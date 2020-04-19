@@ -909,7 +909,7 @@ std::vector<ast_type> hx_reader::read(std::string_view module)
       ast.emplace_back(std::move(one::get<stmt_type>(stmt)));
   }
 
-  if(ast.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+  if(ast.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= diagnostic_db::parser::empty_module(module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return ast;
 }
@@ -925,7 +925,7 @@ std::vector<token> hx_reader::read(std::string_view module)
     toks.push_back(r.current);
     r.consume();
   }
-  if(toks.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+  if(toks.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= diagnostic_db::parser::empty_module(module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return toks;
 }
@@ -1044,7 +1044,7 @@ std::vector<ass::instruction> asm_reader::read(std::string_view module)
       }
     }
   }
-  if(instructions.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+  if(instructions.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= diagnostic_db::parser::empty_module(r.module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return instructions;
 }
@@ -1070,7 +1070,7 @@ std::vector<ass::instruction> asm_reader::read_text(const std::string& text)
       } break;
     }
   }
-  if(instructions.empty() && diagnostic.get_all().empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+  if(instructions.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= diagnostic_db::parser::empty_module(r.module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
   return instructions;
 }
