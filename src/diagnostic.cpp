@@ -33,7 +33,7 @@ diagnostics_manager& diagnostics_manager::operator<<=(const json::json& msg)
   auto row = msg["row"].get<std::uint_fast32_t>();
   auto col = msg["col"].get<std::uint_fast32_t>();
 
-  data[::detail::make_position(row, col)].push_back(msg);
+  data[::detail::make_position(symbol(msg["module"].get<std::string_view>().data()), row, col)].push_back(msg);
 
   return *this;
 }

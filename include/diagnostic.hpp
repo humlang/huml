@@ -35,15 +35,16 @@ namespace detail
 {
   struct position
   {
+    symbol module;
     std::uint_fast32_t row;
     std::uint_fast32_t col;
 
     bool operator==(const position& other) const
-    { return row == other.row && col == other.col; }
+    { return module.get_hash() == other.module.get_hash() && row == other.row && col == other.col; }
   };
-  inline position make_position(std::uint_fast32_t row, std::uint_fast32_t col)
+  inline position make_position(symbol module, std::uint_fast32_t row, std::uint_fast32_t col)
   {
-    return position { row, col };
+    return position { module, row, col };
   }
 }
 namespace std
