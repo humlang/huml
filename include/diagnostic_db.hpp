@@ -53,6 +53,7 @@ db_entry_arg(error, invalid_identifier_for_non_pattern, "Underscore is not a val
 db_entry_arg(error, access_expects_dot, "Access expects a dot here, instead got \"{}\".");
 db_entry_arg(error, lambda_expects_lambda, "Lambda expression expects `\\` as lambda symbol, instead got \"{}\".");
 db_entry_arg(error, lambda_expects_dot, "Lambda expects a dot after the parameter, instead got \"{}\".");
+db_entry_arg(error, statement_expects_semicolon_at_end, "Statement expects semicolon at end, instead got \"{}\".");
 
 }
 

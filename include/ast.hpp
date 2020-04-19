@@ -62,7 +62,10 @@ namespace ast_tags
 }
 
 struct error_;             using error = rec_wrap_t<error_>;
+
+// statements
 struct assign_;            using assign = rec_wrap_t<assign_>;
+struct expr_stmt_;         using expr_stmt = rec_wrap_t<expr_stmt_>;
 
 // expressions
 struct binary_exp_;        using binary_exp = rec_wrap_t<binary_exp_>;
@@ -85,7 +88,8 @@ struct match_;             using match = rec_wrap_t<match_>;
 struct pattern_;           using pattern = rec_wrap_t<pattern_>;
 
 using stmt_type = std::variant<std::monostate,
-        assign
+        assign,
+        expr_stmt
 >;
 
 using exp_type = std::variant<std::monostate,
@@ -293,6 +297,16 @@ private:
   maybe_expr right;
 };
 
+struct expr_stmt_ : base<expr_stmt_>
+{
+public:
+  expr_stmt_(tag, maybe_expr expr);
+
+  const maybe_expr& exp() const { return expr; }
+private:
+  maybe_expr expr;
+};
+
 struct binary_exp_ : base<binary_exp_>
 {
 public:
@@ -313,6 +327,7 @@ namespace ast_tags
   static constexpr inline tag<error_> error = {};
   static constexpr inline tag<block_> block = {};
   static constexpr inline tag<assign_> assign = {};
+  static constexpr inline tag<expr_stmt_> expr_stmt = {};
   static constexpr inline tag<binary_exp_> binary_exp = {};
   static constexpr inline tag<unit_> unit = {};
   static constexpr inline tag<tuple_> tuple = {};

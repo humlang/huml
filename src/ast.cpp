@@ -23,6 +23,10 @@ app_::app_(app_::tag, maybe_expr f, maybe_expr arg)
   : base({}, {}), f(std::move(f)), arg(std::move(arg))
 {  }
 
+expr_stmt_::expr_stmt_(expr_stmt_::tag, maybe_expr exp)
+  : base({}, {}), expr(std::move(exp))
+{  }
+
 access_::access_(access_::tag, token tok, maybe_expr tup, maybe_expr at)
   : base({}, tok), tup(std::move(tup)), at(std::move(at))
 {  }

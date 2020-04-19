@@ -60,6 +60,7 @@ private:
   error mk_error();
 
   maybe_stmt parse_assign();
+  maybe_stmt parse_expr_stmt();
 
   maybe_expr parse_literal();
   maybe_expr parse_identifier();

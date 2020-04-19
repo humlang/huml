@@ -666,13 +666,28 @@ maybe_stmt hx_reader::parse_assign()
   auto var = parse_identifier();
   if(!expect('=', diagnostic_db::parser::assign_expects_equal))
     return mk_error();
+  auto arg = parse_expression();
+
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+    return mk_error();
 
   return ast_tags::assign.make_node(std::move(var), old, std::move(parse_expression()));
 }
 
+maybe_stmt hx_reader::parse_expr_stmt()
+{
+  auto expr = parse_expression();
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+    return mk_error();
+
+  return ast_tags::expr_stmt.make_node(std::move(expr));
+}
+
 maybe_stmt hx_reader::parse_statement()
 {
-  return parse_assign();
+  if(next_toks[0].kind == token_kind::Equal)
+    return parse_assign();
+  return parse_expr_stmt();
 }
 
 maybe_expr hx_reader::parse_keyword()
