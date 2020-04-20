@@ -9,11 +9,11 @@
 namespace diagnostic_db
 {
 
-#define db_entry(lv, name, txt) static const auto name = [](const std::string_view& module, std::uint_fast32_t row, std::uint_fast32_t column) \
-{ return mk_diag(module, row, column, __COUNTER__, diag_level::lv, txt); }
+#define db_entry(lv, name, txt) static const auto name = [](const source_range& range) \
+{ return mk_diag::lv(range, __COUNTER__, txt); }
 
-#define db_entry_arg(lv, name, txt) static const auto name = [](const std::string_view& module, std::uint_fast32_t row, std::uint_fast32_t column, auto t) \
-{ return mk_diag(module, row, column, __COUNTER__, diag_level::lv, format(FMT_STRING(txt), t)); }
+#define db_entry_arg(lv, name, txt) static const auto name = [](const source_range& range, auto t) \
+{ return mk_diag::lv(range, __COUNTER__, format(FMT_STRING(txt), t)); }
 
 namespace args
 {

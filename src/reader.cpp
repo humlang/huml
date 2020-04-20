@@ -1,7 +1,7 @@
 #include <diagnostic.hpp>
 #include <diagnostic_db.hpp>
-#include <memory>
 #include <stream_lookup.hpp>
+#include <fixit_info.hpp>
 
 #include <reader.hpp>
 #include <token.hpp>
@@ -14,6 +14,7 @@
 #include <cassert>
 #include <istream>
 #include <sstream>
+#include <memory>
 #include <vector>
 #include <queue>
 #include <map>
@@ -237,12 +238,12 @@ restart_get:
       }
       if(emit_starts_with_zero_error)
       {
-        diagnostic <<= diagnostic_db::parser::leading_zeros(module, beg_row, beg_col + 1, name);
+        diagnostic <<= diagnostic_db::parser::leading_zeros(source_range {module, beg_col + 1, beg_row, col + 1, row + 1}, name);
         goto restart_get; // <- SO WHAT
       }
       if(emit_not_a_number_error)
       {
-        diagnostic <<= diagnostic_db::parser::no_number(module, beg_row, beg_col + 1, name);
+        diagnostic <<= diagnostic_db::parser::no_number(source_range {module, beg_col + 1, beg_row, col + 1, row + 1}, name);
         goto restart_get;
       }
       kind = token_kind::LiteralNumber;
@@ -456,12 +457,12 @@ restart_get:
       }
       if(emit_starts_with_zero_error)
       {
-        diagnostic <<= diagnostic_db::parser::leading_zeros(module, beg_row, beg_col + 1, name);
+        diagnostic <<= diagnostic_db::parser::leading_zeros(source_range {module, beg_col + 1, beg_row, col + 1, row + 1 }, name);
         goto restart_get; // <- SO WHAT
       }
       if(emit_not_a_number_error)
       {
-        diagnostic <<= diagnostic_db::parser::no_number(module, beg_row, beg_col + 1, name);
+        diagnostic <<= diagnostic_db::parser::no_number(source_range {module, beg_col + 1, beg_row, col + 1, row + 1 }, name);
         goto restart_get;
       }
       kind = ass::token_kind::ImmediateValue;
@@ -488,15 +489,15 @@ void hx_reader::consume()
   next_toks.back() = gett();
 }
 
-#define expect(kind__, f) ([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
-    diagnostic <<= f(module, current.loc.row_beg, current.loc.column_beg + 1, current.data.get_string()); \
+#define expect(kind__, f) (([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
+    diagnostic <<= f(current.loc, current.data.get_string()); \
     consume(); \
     return false; \
-    } consume(); return true; })()
+    } consume(); return true; })())
 
-#define accept(kind__) ([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
+#define accept(kind__) (([this](){ if(current.kind != static_cast<token_kind>(kind__)) {\
     return false; \
-    } consume(); return true; })()
+    } consume(); return true; })())
 
 error hx_reader::mk_error()
 { return ast_tags::error.make_node(old); }
@@ -517,7 +518,7 @@ maybe_expr hx_reader::parse_identifier()
     return mk_error();
   if(!parsing_pattern && old.data == symbol("_"))
   {
-    diagnostic <<= diagnostic_db::parser::invalid_identifier_for_non_pattern(module, old.loc.row_beg, old.loc.column_beg + 1, old.data.get_string());
+    diagnostic <<= diagnostic_db::parser::invalid_identifier_for_non_pattern(old.loc, old.data.get_string());
     return mk_error();
   }
   return ast_tags::identifier.make_node(old);
@@ -686,13 +687,23 @@ maybe_expr hx_reader::parse_block()
 
 maybe_stmt hx_reader::parse_assign()
 {
+  fixit_info info;
+  auto current_source_loc = current.loc;
   auto var = parse_identifier();
   if(!expect('=', diagnostic_db::parser::assign_expects_equal))
     return mk_error();
   auto arg = parse_expression();
 
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+  {
+    auto loc = std::visit(ast_get_loc, arg);
+    info.changes[loc.fst_proj()] = ";";
+
+    diagnostic <<= mk_diag::fixit(current_source_loc + loc, info,
+                                  "Add a semicolon after assign statement:");
+
     return mk_error();
+  }
 
   return ast_tags::assign.make_node(std::move(var), old, std::move(arg));
 }
@@ -803,7 +814,7 @@ maybe_expr hx_reader::parse_prefix()
     default:
     {
       // TODO: improve error message depending on current.kind
-      diagnostic <<= diagnostic_db::parser::not_a_prefix(module, current.loc.row_beg, current.loc.column_beg + 1, current.data.get_string());
+      diagnostic <<= diagnostic_db::parser::not_a_prefix(current.loc, current.data.get_string());
 
       return mk_error();
     }
@@ -910,7 +921,7 @@ std::vector<ast_type> hx_reader::read(std::string_view module)
   }
 
   if(ast.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= diagnostic_db::parser::empty_module(module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
+    diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
   return ast;
 }
 
@@ -926,7 +937,7 @@ std::vector<token> hx_reader::read(std::string_view module)
     r.consume();
   }
   if(toks.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= diagnostic_db::parser::empty_module(module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
+    diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
   return toks;
 }
 
@@ -1045,7 +1056,7 @@ std::vector<ass::instruction> asm_reader::read(std::string_view module)
     }
   }
   if(instructions.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= diagnostic_db::parser::empty_module(r.module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
+    diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
   return instructions;
 }
 
@@ -1071,7 +1082,7 @@ std::vector<ass::instruction> asm_reader::read_text(const std::string& text)
     }
   }
   if(instructions.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
-    diagnostic <<= diagnostic_db::parser::empty_module(r.module, r.current.loc.row_beg, r.current.loc.column_beg + 1);
+    diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
   return instructions;
 }
 

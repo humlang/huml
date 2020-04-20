@@ -28,21 +28,32 @@ NLOHMANN_JSON_SERIALIZE_ENUM( diag_level, {
   { diag_level::fixit, "fixit" }
 })
 
-json::json mk_diag(const std::string_view& module, std::uint_fast32_t row, std::uint_fast32_t column,
-                   std::uint_fast16_t hrc, diag_level lvl, const std::string_view& message);
+struct fixit_info;
+
+namespace mk_diag
+{
+json::json error(const source_range& range,
+                 std::uint_fast16_t hrc, const std::string_view& message);
+
+json::json warn(const source_range& range,
+                 std::uint_fast16_t hrc, const std::string_view& message);
+
+json::json fixit(const source_range& range, const fixit_info& info,
+                 const std::string_view& message);
+}
 
 namespace detail
 {
   struct position
   {
     symbol module;
-    std::uint_fast32_t row;
-    std::uint_fast32_t col;
+    std::size_t row;
+    std::size_t col;
 
     bool operator==(const position& other) const
     { return module.get_hash() == other.module.get_hash() && row == other.row && col == other.col; }
   };
-  inline position make_position(symbol module, std::uint_fast32_t row, std::uint_fast32_t col)
+  inline position make_position(symbol module, std::size_t row, std::size_t col)
   {
     return position { module, row, col };
   }

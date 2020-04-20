@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source_range.hpp"
 #include <atomic>
 #include <token.hpp>
 
@@ -340,4 +341,33 @@ namespace ast_tags
   static constexpr inline tag<access_> access = {};
   static constexpr inline tag<lambda_> lambda = {};
 }
+
+inline static constexpr auto ast_get_loc_helper = base_visitor {
+  // always add the following four edge cases
+  [](auto&& rec, const std::monostate& t) -> source_range
+  { assert(false && "Should never be called."); return source_range{}; },
+
+  [](auto&& rec, auto& arg) -> source_range {
+    return arg->loc();
+  },
+  [](auto&& rec, const stmt_type& typ) -> source_range {
+    return std::visit(rec, typ);
+  },
+  [](auto&& rec, const exp_type& typ) -> source_range {
+    return std::visit(rec, typ);
+  }
+};
+
+inline static constexpr auto ast_get_loc = 
+			[](const auto& arg) -> source_range
+      {
+        struct state
+        {  };
+
+        auto rec = stateful_recursor(state{  }, ast_get_loc_helper);
+
+        return ast_get_loc_helper(rec, arg);
+      };
+
+
 

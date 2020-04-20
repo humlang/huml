@@ -36,7 +36,7 @@ void parse(int argc, const char** argv, std::FILE* out)
         else if(v == "ast") return emit_classes::ast;
         else if(v == "help") return emit_classes::help;
 
-        diagnostic <<= diagnostic_db::args::emit_not_present("args", 0, 0);
+        diagnostic <<= diagnostic_db::args::emit_not_present(source_range { "args", 0, 0, 0, 0 });
         return emit_classes::help;
       })
     ("j,-num-cores", "Number of cores to use for processing modules. \"*\" to determine automatically.", std::make_any<std::size_t>(1), "1",
@@ -47,9 +47,9 @@ void parse(int argc, const char** argv, std::FILE* out)
         auto v = static_cast<std::size_t>(std::stoull(std::string(x.front())));
 
         if(v == 0)
-          diagnostic <<= diagnostic_db::args::num_cores_too_small("args", 0, 0);
+          diagnostic <<= diagnostic_db::args::num_cores_too_small(source_range { "args", 0, 0, 0, 0 });
         else if(v > std::thread::hardware_concurrency())
-          diagnostic <<= diagnostic_db::args::num_cores_too_large("args", 0, 0);
+          diagnostic <<= diagnostic_db::args::num_cores_too_large(source_range { "args", 0, 0, 0, 0 });
         return v;
       })
     ;
@@ -176,7 +176,7 @@ private:
       }
     }
     if(!cur_opt.has_value())
-      diagnostic <<= diagnostic_db::args::unknown_arg("args", 0, 0);
+      diagnostic <<= diagnostic_db::args::unknown_arg(source_range { "args", 0, 0, 0, 0 });
     opt_args.clear();
   }
 

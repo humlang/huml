@@ -10,6 +10,7 @@ set(hx-lang_files src/reader.cpp
   src/diagnostic.cpp
   src/stream_lookup.cpp
   src/program.cpp
+  src/fixit_info.cpp
   )
 
 set(hx-lang_vm_files src/vm.cpp
@@ -23,6 +24,7 @@ set(hx-lang_vm_files src/vm.cpp
   src/diagnostic.cpp
   src/stream_lookup.cpp
   src/source_range.cpp
+  src/fixit_info.cpp
   )
 
 # Dependencies
