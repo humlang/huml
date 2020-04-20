@@ -40,16 +40,13 @@ json::json error(const source_range& range,
   return j;
 }
 
-json::json fixit(const source_range& range, const fixit_info& info,
-                 const std::string_view& message)
+json::json fixit(const source_range& range, const fixit_info& info)
 {
   json::json j;
 
   j["range"] = range;
 
   j["level"] = diag_level::fixit;
-
-  j["message"] = message;
   j["fixit"] = info;
 
   return j;
@@ -117,40 +114,71 @@ void diagnostics_manager::print(std::FILE* file)
 
       case diag_level::fixit:
         {
-          fmt::print(file, fmt::emphasis::bold | fg(fmt::color::sea_green), "fixit: ");
-          fmt::print(file, fg(fmt::color::white), "{}", v["message"].get<std::string_view>());
+          fmt::print(file, fmt::emphasis::bold | fg(fmt::color::sea_green), "fixit: \n");
           // TODO: can be made faster by doing only one pass over the code for *all* messages instead of for every
           auto info = v["fixit"].get<fixit_info>();
 
           auto& ifile = stream_lookup[v["range"]["module"].get<std::string_view>()];
+
+          std::sort(info.changes.begin(), info.changes.end(), [](auto& lhs, auto& rhs) { return lhs.first < rhs.first; });
+          auto correction = info.changes.begin();
+
           std::size_t row = 0;
-          for(auto& correction : info.changes)
-          {
-            std::string buf;
-            while(row < correction.first.row && ifile.good())
-            { std::getline(ifile, buf); row++; }
 
-            //ifile.seekg(std::ios::beg);
-            //for(; row < correction.first.row - 1; ++row){
-            //    ifile.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
-            //}
-
-            if(buf.begin() != buf.begin() + correction.first.column)
-            {
-              std::string first_half(buf.begin(), buf.begin() + correction.first.column);
-              fmt::print(file, fg(fmt::color::white), "{}", first_half);
-            }
-
-            fmt::print(file, fg(fmt::color::light_green) | bg(fmt::color::dark_magenta), "{}", correction.second);
-
-            if(buf.begin() + correction.first.column != buf.end())
-            {
-              std::string second_half(buf.begin() + correction.first.column, buf.end());
-              fmt::print(file, fg(fmt::color::white), "{}", second_half);
-            }
-
-            // TODO: perhaps print some context somehow?
+          // move file pointer to line right before the first line we need to perform std::getline at
+          ifile.seekg(std::ios::beg);
+          for(; row + 1 < correction->first.row - 1; ++row){
+            ifile.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
           }
+          std::size_t already_printed_col = 0;
+          std::string buf;
+          while(correction != info.changes.end())
+          {
+            // fetch line. Doesn't change if two corrections are on the same row
+            while(row < correction->first.row - 1 && ifile.good())
+            { std::getline(ifile, buf); row++; already_printed_col = 0; }
+
+            // print line number
+            if(already_printed_col == 0)
+            {
+              fmt::print(file, fg(fmt::color::sandy_brown), " {:>7} ", row);
+            }
+            auto ignore_range = correction->second["what"].get<source_range>();
+
+            //const std::size_t leftmost = std::min(correction->first.column - 1, ignore_range.column_beg);
+            const std::size_t leftmost = ignore_range.column_beg;
+
+            if(already_printed_col < leftmost - 1 && buf.size() != 0)
+            {
+              std::string first_half(buf.begin() + already_printed_col, buf.begin() + leftmost - 1);
+              fmt::print(file, fg(fmt::color::white), "{}", first_half);
+
+              already_printed_col += first_half.size();
+            }
+
+            /// Print the actual fix!!
+            fmt::print(file, fg(fmt::color::light_green) | bg(fmt::color::dark_magenta),
+                             "{}", correction->second["how"].get<std::string>());
+
+//            const std::size_t rightmost = std::max(correction->first.column, ignore_range.column_end);
+            const std::size_t rightmost = ignore_range.column_end;
+
+            // only print second half if the next correction is on a different line
+            if(already_printed_col < buf.size() &&
+                (std::next(correction) == info.changes.end()
+             || (std::next(correction) != info.changes.end() && std::next(correction)->first.row != correction->first.row)))
+            {
+              std::string second_half(buf.begin() + rightmost, buf.end());
+              fmt::print(file, fg(fmt::color::white), "{}", second_half);
+
+              already_printed_col += second_half.size();
+            }
+            already_printed_col += rightmost - leftmost;
+            // TODO: perhaps print some context somehow? i.e. surrounding lines
+
+            ++correction;
+          }
+
           stream_lookup.drop(v["range"]["module"].get<std::string_view>());
         } break;
       }

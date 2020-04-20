@@ -38,8 +38,7 @@ json::json error(const source_range& range,
 json::json warn(const source_range& range,
                  std::uint_fast16_t hrc, const std::string_view& message);
 
-json::json fixit(const source_range& range, const fixit_info& info,
-                 const std::string_view& message);
+json::json fixit(const source_range& range, const fixit_info& info);
 }
 
 namespace detail

@@ -8,6 +8,6 @@ void to_json(nlohmann::json& j, const fixit_info& info)
 
 void from_json(const nlohmann::json& j, fixit_info& info)
 {
-  info.changes = j.get<std::map<untied_source_pos, std::string>>();
+  info.changes = j.get<std::vector<std::pair<untied_source_pos, nlohmann::json>>>();
 }
 

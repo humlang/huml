@@ -3,11 +3,10 @@
 #include <nlohmann/json.hpp>
 
 #include <source_range.hpp>
-#include <map>
 
 struct fixit_info
 {
-  std::map<untied_source_pos, std::string> changes; 
+  std::vector<std::pair<untied_source_pos, nlohmann::json>> changes; 
 };
 
 void to_json(nlohmann::json& j, const fixit_info& info);

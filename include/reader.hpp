@@ -1,6 +1,7 @@
 #pragma once
 
 #include <source_range.hpp>
+#include <fixit_info.hpp>
 #include <symbol.hpp>
 #include <ast.hpp>
 
@@ -87,6 +88,7 @@ private:
   std::array<token, lookahead_size> next_toks;
 
   bool parsing_pattern { false };
+  std::vector<fixit_info> fixits_stack;
 };
 
 // ASSEMBLER

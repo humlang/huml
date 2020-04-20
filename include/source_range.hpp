@@ -13,6 +13,7 @@ inline bool operator<(const untied_source_pos& lhs, const untied_source_pos& rhs
 {
   return lhs.row < rhs.row && lhs.column < rhs.column;
 }
+
 void to_json(nlohmann::json& j, const untied_source_pos& s);
 void from_json(const nlohmann::json& j, untied_source_pos& s);
 

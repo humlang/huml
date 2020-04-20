@@ -515,10 +515,17 @@ maybe_expr hx_reader::parse_literal()
 maybe_expr hx_reader::parse_identifier()
 {
   if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
+  {
+    fixits_stack.back().changes.emplace_back(old.loc.snd_proj(), nlohmann::json { {"what", old.loc},
+                                                                       {"how", "id"} });
     return mk_error();
+  }
   if(!parsing_pattern && old.data == symbol("_"))
   {
     diagnostic <<= diagnostic_db::parser::invalid_identifier_for_non_pattern(old.loc, old.data.get_string());
+
+    fixits_stack.back().changes.emplace_back(old.loc.snd_proj(), nlohmann::json { {"what", old.loc},
+                                                                       {"how", "id"} });
     return mk_error();
   }
   return ast_tags::identifier.make_node(old);
@@ -685,9 +692,12 @@ maybe_expr hx_reader::parse_block()
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
 }
 
+template class std::map<untied_source_pos, nlohmann::json>;
+
 maybe_stmt hx_reader::parse_assign()
 {
-  fixit_info info;
+  fixits_stack.emplace_back();
+
   auto current_source_loc = current.loc;
   auto var = parse_identifier();
   if(!expect('=', diagnostic_db::parser::assign_expects_equal))
@@ -697,14 +707,18 @@ maybe_stmt hx_reader::parse_assign()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
   {
     auto loc = std::visit(ast_get_loc, arg);
-    info.changes[loc.fst_proj()] = ";";
+    auto proj = loc.snd_proj();
+    // do not want to ignore this token
+    loc.column_beg = loc.column_end;
+    fixits_stack.back().changes.emplace_back(proj, nlohmann::json { {"what", loc}, {"how", ";"} });
 
-    diagnostic <<= mk_diag::fixit(current_source_loc + loc, info,
-                                  "Add a semicolon after assign statement:");
+    diagnostic <<= mk_diag::fixit(current_source_loc + loc, fixits_stack.back());
 
+    fixits_stack.pop_back();
     return mk_error();
   }
 
+  fixits_stack.pop_back();
   return ast_tags::assign.make_node(std::move(var), old, std::move(arg));
 }
 

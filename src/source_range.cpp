@@ -74,7 +74,7 @@ void from_json(const nlohmann::json& j, source_range& s)
   s = source_range { j["module"].get<std::string_view>(),
                      j["col_beg"].get<std::size_t>(),
                      j["row_beg"].get<std::size_t>(),
-                     j["col_beg"].get<std::size_t>(),
+                     j["col_end"].get<std::size_t>(),
                      j["row_end"].get<std::size_t>()
   };
 }
