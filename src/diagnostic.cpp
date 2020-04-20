@@ -114,7 +114,7 @@ void diagnostics_manager::print(std::FILE* file)
 
       case diag_level::fixit:
         {
-          fmt::print(file, fmt::emphasis::bold | fg(fmt::color::sea_green), "fixit: \n");
+          fmt::print(file, fmt::emphasis::bold | fg(fmt::color::sea_green), "fixit: ");
           // TODO: can be made faster by doing only one pass over the code for *all* messages instead of for every
           auto info = v["fixit"].get<fixit_info>();
 
@@ -136,12 +136,20 @@ void diagnostics_manager::print(std::FILE* file)
           {
             // fetch line. Doesn't change if two corrections are on the same row
             while(row < correction->first.row - 1 && ifile.good())
-            { std::getline(ifile, buf); row++; already_printed_col = 0; }
+            {
+              std::getline(ifile, buf);
+              row++;
+              already_printed_col = 0;
+
+              // also print intermediate lines
+              if(row + 1 < correction->first.row && ifile.good())
+                fmt::print(file, fg(fmt::color::sandy_brown), "\n {:>7} {}", row, buf);
+            }
 
             // print line number
             if(already_printed_col == 0)
             {
-              fmt::print(file, fg(fmt::color::sandy_brown), " {:>7} ", row);
+              fmt::print(file, fg(fmt::color::sandy_brown), "\n {:>7} ", row);
             }
             auto ignore_range = correction->second["what"].get<source_range>();
 
@@ -150,7 +158,7 @@ void diagnostics_manager::print(std::FILE* file)
 
             if(already_printed_col < leftmost - 1 && buf.size() != 0)
             {
-              std::string first_half(buf.begin() + already_printed_col, buf.begin() + leftmost - 1);
+              std::string first_half(buf.begin() + already_printed_col, buf.begin() + std::min(buf.size(), leftmost - 1));
               fmt::print(file, fg(fmt::color::white), "{}", first_half);
 
               already_printed_col += first_half.size();
@@ -168,7 +176,7 @@ void diagnostics_manager::print(std::FILE* file)
                 (std::next(correction) == info.changes.end()
              || (std::next(correction) != info.changes.end() && std::next(correction)->first.row != correction->first.row)))
             {
-              std::string second_half(buf.begin() + rightmost, buf.end());
+              std::string second_half(buf.begin() + std::min(buf.size(), rightmost), buf.end());
               fmt::print(file, fg(fmt::color::white), "{}", second_half);
 
               already_printed_col += second_half.size();

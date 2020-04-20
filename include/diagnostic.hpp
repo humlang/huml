@@ -48,26 +48,14 @@ namespace detail
     symbol module;
     std::size_t row;
     std::size_t col;
-
-    bool operator==(const position& other) const
-    { return module.get_hash() == other.module.get_hash() && row == other.row && col == other.col; }
   };
+  inline bool operator<(const position& lhs, const position& rhs)
+  { return lhs.row < rhs.row && lhs.col < rhs.col && lhs.module.get_hash() == rhs.module.get_hash(); }
+
   inline position make_position(symbol module, std::size_t row, std::size_t col)
   {
     return position { module, row, col };
   }
-}
-namespace std
-{
-  template<>
-  struct hash<::detail::position>
-  {
-    std::size_t operator()(const ::detail::position& p) const
-    {
-      return ((std::hash<std::uint_fast32_t>()(p.row)
-               ^ (std::hash<std::uint_fast32_t>()(p.col) << 1)) >> 1);
-    }
-  };
 }
 
 struct diagnostics_manager
@@ -92,7 +80,7 @@ public:
 
   inline void reset() { err = 0; _print_codes = true; data.clear(); }
 private:
-  tsl::robin_map<::detail::position, std::vector<json::json>> data;
+  std::map<::detail::position, std::vector<json::json>> data;
 
   int err { 0 };
   bool _print_codes { true };
