@@ -79,7 +79,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
 
 
   [](auto&& rec, const pattern& rd) -> void { PrinterFn print;
-    print("<|readin, id=\"" + std::to_string(rd->id()) + "\""
+    print("<|pattern, id=\"" + std::to_string(rd->id()) + "\""
         + ", location=\"" + rd->loc().to_string() + "\""
         + ", symbol=\"" + rd->symb().get_string() + "\""
         + ", ", rec.state.depth);
@@ -88,11 +88,11 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     std::visit(rec, rd->pattern());
     rec.state.depth--;
 
-    print("|readin>", rec.state.depth);
+    print("|pattern>", rec.state.depth);
   },
 
   [](auto&& rec, const match& pt) -> void { PrinterFn print;
-    print("<|print, id=\"" + std::to_string(pt->id()) + "\""
+    print("<|match, id=\"" + std::to_string(pt->id()) + "\""
         + ", location=\"" + pt->loc().to_string() + "\""
         + ", symbol=\"" + pt->symb().get_string() + "\""
         + ", ", rec.state.depth);
@@ -102,7 +102,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     std::visit(rec, pt->expression());
     rec.state.depth--;
 
-    print("|print>", rec.state.depth);
+    print("|match>", rec.state.depth);
   },
 
   [](auto&& rec, const assign& ass) -> void { PrinterFn print;
@@ -120,7 +120,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
   },
 
   [](auto&& rec, const pattern_matcher& l) -> void { PrinterFn print;
-    print("<|loop, id=\"" + std::to_string(l->id()) + "\""
+    print("<|pattern_matcher, id=\"" + std::to_string(l->id()) + "\""
         + ", location=\"" + l->loc().to_string() + "\""
         + ", symbol=\"" + l->symb().get_string() + "\""
         + ", ", rec.state.depth);
@@ -131,7 +131,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
       std::visit(rec, v);
     rec.state.depth--;
 
-    print("|loop>", rec.state.depth);
+    print("|pattern_matcher>", rec.state.depth);
   },
 
   [](auto&& rec, const block& b) -> void { PrinterFn print;
