@@ -14,7 +14,7 @@ using namespace std::string_view_literals;
 void print_emit_classes(std::FILE* f)
 {
   fmt::print(f, "emit classes: ");
-  fmt::print(f, "help, tokens, ast\n");
+  fmt::print(f, "help, tokens, ast, pretty\n");
 }
 
 namespace arguments
@@ -35,6 +35,7 @@ void parse(int argc, const char** argv, std::FILE* out)
         if(v == "tokens") return emit_classes::tokens;
         else if(v == "ast") return emit_classes::ast;
         else if(v == "help") return emit_classes::help;
+        else if(v == "pretty") return emit_classes::ast_pretty;
 
         diagnostic <<= diagnostic_db::args::emit_not_present(source_range { "args", 0, 0, 0, 0 });
         return emit_classes::help;
@@ -120,6 +121,16 @@ struct CmdParse
   CmdParse(const std::vector<std::string_view>& args, std::map<std::string, std::any>& map, CmdOptions& cmdopts)
     : args(&args), map(&map), cmdopts(&cmdopts)
   {
+    reset_cur_opt();
+  }
+
+  operator std::map<std::string, std::any>&()
+  { return parse(); }
+private:
+  void reset_cur_opt()
+  {
+    cur_opt = std::nullopt;
+
     for(auto v : this->cmdopts->data)
     {
       for(auto f : v.opt)
@@ -130,9 +141,6 @@ struct CmdParse
     }
   }
 
-  operator std::map<std::string, std::any>&()
-  { return parse(); }
-private:
   std::map<std::string, std::any>& parse()
   {
     using namespace std::literals;
@@ -160,6 +168,13 @@ private:
       std::any a = (*cur_opt).parser(opt_args);
       for(auto& o : cur_opt->opt)
         (*map)[static_cast<std::string>(o) + (cur_opt->has_equals ? "=" : "")] = a;
+
+      if(cur_opt->has_equals) // we know this has only one arg
+        // TODO: generalise by just setting an argc for options
+      {
+        reset_cur_opt();
+        opt_args.clear();
+      }
     }
     // TODO: add destructor that collects all superfluous args and emits error
   }
