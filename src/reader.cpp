@@ -298,6 +298,16 @@ restart_get:
       kind = token_kind::RBrace;
       data = "}";
     } break;
+  case '[':
+    {
+      kind = token_kind::LBracket;
+      data = "[";
+    } break;
+  case ']':
+    {
+      kind = token_kind::RBracket;
+      data = "]";
+    } break;
   case ';':
   {
     kind = token_kind::Semi;
@@ -534,7 +544,7 @@ maybe_expr hx_reader::parse_identifier()
 // e := e1 e2
 maybe_expr hx_reader::parse_app(maybe_expr lhs)
 {
-  return ast_tags::app.make_node(std::move(lhs), std::move(parse_expression()));
+  return ast_tags::app.make_node(std::move(lhs), std::move(parse_expression(9)));
 }
 
 // e := e1 `.` e2
@@ -561,6 +571,7 @@ maybe_expr hx_reader::parse_lambda()
     return mk_error();
   auto expr = parse_expression();
 
+  lam_tok.loc += old.loc;
   return ast_tags::lambda.make_node(lam_tok, std::move(param), std::move(expr));
 }
 
@@ -618,11 +629,11 @@ maybe_patt hx_reader::parse_pattern()
     return ast_tags::pattern.make_node(vold, std::move(one::get<id>(expr)));
 
   __if(pattern)
-//  else __if(tuple)
-//  else __if(identifier)
-//  else __if(literal)
-//  else __if(unit)
-//  else __if(app)
+  else __if(tuple)
+  else __if(identifier)
+  else __if(literal)
+  else __if(unit)
+  else __if(app)
   else
   {
     assert(false && "bug in parser");
