@@ -6,6 +6,7 @@
 #include <ast.hpp>
 
 #include <ast_printer.hpp>
+#include <ast_pretty_printer.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -15,12 +16,17 @@
 #include <string>
 #include <vector>
 
+template<bool print_newline>
 struct printer
 {
   void operator()(std::string str, std::size_t indent_depth = 0)
   {
     indent(indent_depth);
-    std::cout << str << "\n";
+
+    if constexpr(print_newline)
+      std::cout << str << "\n";
+    else
+      std::cout << str;
   }
 
   void indent(std::size_t depth)
@@ -39,7 +45,16 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
 
       for(auto& v : w)
       {
-        std::visit(ast_printer<printer>, v);
+        std::visit(ast_printer<printer<true>>, v);
+      }
+    } },
+  { emit_classes::ast_pretty, [](std::string_view t)
+    {
+      auto w = hx_reader::read<ast_type>(t);
+
+      for(auto& v : w)
+      {
+        std::visit(ast_pretty_printer<printer<false>>, v);
       }
     } },
   { emit_classes::tokens, [](std::string_view t)

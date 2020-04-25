@@ -46,7 +46,7 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
   },
 
   [](auto&& rec, const error& err) -> void { PrinterFn print;
-    print("1_error");
+    print("\n1_error\n");
   },
 
   [](auto&& rec, const expr_stmt& rd) -> void { PrinterFn print;
@@ -67,7 +67,7 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
   [](auto&& rec, const match& pt) -> void { PrinterFn print;
     rec.state.depth++;
     std::visit(rec, pt->pattern());
-    print(" => ", rec.state.depth);
+    print(" => ");
     std::visit(rec, pt->expression());
     rec.state.depth--;
   },
@@ -79,28 +79,35 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     std::visit(rec, ass->exp());
     rec.state.depth--;
 
-    print(";", rec.state.depth);
+    print(";\n");
   },
 
   [](auto&& rec, const pattern_matcher& l) -> void { PrinterFn print;
     rec.state.depth++;
-    print("case ", rec.state.depth++);
+    print("case ");
     std::visit(rec, l->to_be_matched());
     print(" [\n");
     rec.state.depth++;
 
+    bool printed_newline = false;
     for(auto vit = l->match_patterns().begin(); vit != l->match_patterns().end(); ++vit)
     {
       auto& v = *vit;
       std::visit(rec, v);
 
       if(std::next(vit) != l->match_patterns().end())
+      {
         print("\n| ");
+        printed_newline = true;
+      }
     }
     rec.state.depth--;
     rec.state.depth--;
 
-    print("]", rec.state.depth);
+    if(printed_newline)
+      print("\n]");
+    else
+      print("]");
   },
 
   [](auto&& rec, const block& b) -> void { PrinterFn print;
@@ -160,9 +167,11 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
 
   [](auto&& rec, const app& a) -> void { PrinterFn print;
     rec.state.depth++;
+    print("((");
     std::visit(rec, a->fun());
-    print(" ");
+    print(") (");
     std::visit(rec, a->argument());
+    print("))");
     rec.state.depth--;
   },
 
