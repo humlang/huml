@@ -62,6 +62,9 @@ private:
 
   maybe_stmt parse_assign();
   maybe_stmt parse_expr_stmt();
+  maybe_stmt parse_type_assign();
+
+  maybe_expr parse_constructor();
 
   maybe_expr parse_literal();
   maybe_expr parse_identifier();
@@ -88,6 +91,7 @@ private:
   std::array<token, lookahead_size> next_toks;
 
   bool parsing_pattern { false };
+  bool parsing_constructor { false };
   std::vector<fixit_info> fixits_stack;
 };
 

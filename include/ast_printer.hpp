@@ -119,6 +119,21 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     print("|assign>", rec.state.depth);
   },
 
+  [](auto&& rec, const assign_type& ass) -> void { PrinterFn print;
+    print("<|assign_type, id=\"" + std::to_string(ass->id()) + "\""
+        + ", location=\"" + ass->loc().to_string() + "\""
+        + ", symbol=\"" + ass->symb().get_string() + "\""
+        + ", ", rec.state.depth);
+
+    rec.state.depth++;
+    std::visit(rec, ass->name());
+    for(auto& v : ass->constructors())
+      std::visit(rec, v);
+    rec.state.depth--;
+
+    print("|assign_type>", rec.state.depth);
+  },
+
   [](auto&& rec, const pattern_matcher& l) -> void { PrinterFn print;
     print("<|pattern_matcher, id=\"" + std::to_string(l->id()) + "\""
         + ", location=\"" + l->loc().to_string() + "\""

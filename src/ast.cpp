@@ -67,6 +67,10 @@ assign_::assign_(assign_::tag, maybe_expr variable, token op, maybe_expr right)
   : base({}, op), variable(std::move(variable)), right(std::move(right))
 {  }
 
+assign_type_::assign_type_(assign_type_::tag, token op, maybe_expr variable, std::vector<maybe_expr> constructors)
+  : base({}, op), variable(std::move(variable)), ctors(std::move(constructors))
+{  }
+
 binary_exp_::binary_exp_(binary_exp_::tag, maybe_expr left, token op, maybe_expr right)
   : base({}, op), left(std::move(left)), right(std::move(right))
 {  }

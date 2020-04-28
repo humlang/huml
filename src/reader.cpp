@@ -51,7 +51,8 @@ auto keyword_map = tsl::robin_map<std::string_view, op_code>({
 auto keyword_set = tsl::robin_set<std::string_view>({
   "case"sv,
   "TOP"sv,
-  "BOT"sv
+  "BOT"sv,
+  "type"sv
 });
 
 auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
@@ -703,7 +704,53 @@ maybe_expr hx_reader::parse_block()
   return std::move(ast_tags::block.make_node(tmp, std::move(v)));
 }
 
-template class std::map<untied_source_pos, nlohmann::json>;
+maybe_stmt hx_reader::parse_type_assign()
+{
+  auto old_loc = current.loc;
+  if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
+    return mk_error();
+
+  auto type_name = parse_identifier();
+
+  auto equals = current;
+  if(!expect('=', diagnostic_db::parser::type_assign_expects_equal))
+    return mk_error();
+
+  // TODO: Add explicit type annotations
+  std::vector<maybe_expr> v;
+  auto expr = parse_constructor();
+  if(std::holds_alternative<exp_type>(expr))
+    v.emplace_back(std::move(std::get<exp_type>(expr)));
+  else
+    v.emplace_back(std::move(std::get<error>(expr)));
+
+  while(current.kind != token_kind::Semi && current.kind != token_kind::EndOfFile)
+  {
+    expect('|', diagnostic_db::parser::type_expects_pipe);
+
+    expr = parse_constructor();
+    if(std::holds_alternative<exp_type>(expr))
+      v.emplace_back(std::move(std::get<exp_type>(expr)));
+    else
+      v.emplace_back(std::move(std::get<error>(expr)));
+  }
+  // ensure that we see a semicolon
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+    return mk_error();
+
+  equals.loc += old_loc + old.loc;
+  return std::move(ast_tags::assign_type.make_node(equals, std::move(type_name), std::move(v)));
+}
+
+maybe_expr hx_reader::parse_constructor()
+{
+  parsing_constructor = true;
+
+  auto expr = parse_expression();
+
+  parsing_constructor = false;
+  return std::move(expr);
+}
 
 maybe_stmt hx_reader::parse_assign()
 {
@@ -735,16 +782,33 @@ maybe_stmt hx_reader::parse_assign()
 
 maybe_stmt hx_reader::parse_expr_stmt()
 {
+  fixits_stack.emplace_back();
+  auto current_source_loc = current.loc;
+
   auto expr = parse_expression();
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
-    return mk_error();
+  {
+    auto loc = std::visit(ast_get_loc, expr);
+    auto proj = loc.snd_proj();
+    // do not want to ignore this token
+    loc.column_beg = loc.column_end;
+    fixits_stack.back().changes.emplace_back(proj, nlohmann::json { {"what", loc}, {"how", ";"} });
 
+    diagnostic <<= mk_diag::fixit(current_source_loc + loc, fixits_stack.back());
+
+    fixits_stack.pop_back();
+    return mk_error();
+  }
+
+  fixits_stack.pop_back();
   return ast_tags::expr_stmt.make_node(std::move(expr));
 }
 
 maybe_stmt hx_reader::parse_statement()
 {
-  if(next_toks[0].kind == token_kind::Equal)
+  if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("type").get_hash())
+    return parse_type_assign();
+  else if(next_toks[0].kind == token_kind::Equal)
     return parse_assign();
   return parse_expr_stmt();
 }
@@ -846,6 +910,11 @@ maybe_expr hx_reader::parse_prefix()
 
     case token_kind::LiteralNumber:
     {
+      if(parsing_constructor)
+      {
+        diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
+        return mk_error();
+      }
       return std::move(parse_literal());
     }
     case token_kind::Identifier:
@@ -858,14 +927,29 @@ maybe_expr hx_reader::parse_prefix()
     }
     case token_kind::LBrace:
     {
+      if(parsing_constructor)
+      {
+        diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
+        return mk_error();
+      }
       return std::move(parse_block());
     }
     case token_kind::Keyword:
     {
+      if(parsing_constructor)
+      {
+        diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
+        return mk_error();
+      }
       return std::move(parse_keyword());
     }
     case token_kind::Backslash:
     {
+      if(parsing_constructor)
+      {
+        diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
+        return mk_error();
+      }
       return std::move(parse_lambda());
     }
   }
@@ -910,6 +994,11 @@ maybe_expr hx_reader::parse_expression(int precedence)
 
       case token_kind::Dot:
       {
+        if(parsing_constructor)
+        {
+          diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
+          return mk_error();
+        }
         prefix = parse_access(std::move(prefix));
       } break;
 
@@ -917,6 +1006,11 @@ maybe_expr hx_reader::parse_expression(int precedence)
       case token_kind::Minus:
       case token_kind::Asterisk:
       {
+        if(parsing_constructor)
+        {
+          diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
+          return mk_error();
+        }
         prefix = parse_binary(std::move(prefix));
       } break;
     }

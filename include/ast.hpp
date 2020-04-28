@@ -66,6 +66,7 @@ struct error_;             using error = rec_wrap_t<error_>;
 
 // statements
 struct assign_;            using assign = rec_wrap_t<assign_>;
+struct assign_type_;       using assign_type = rec_wrap_t<assign_type_>;
 struct expr_stmt_;         using expr_stmt = rec_wrap_t<expr_stmt_>;
 
 // expressions
@@ -90,7 +91,8 @@ struct pattern_;           using pattern = rec_wrap_t<pattern_>;
 
 using stmt_type = std::variant<std::monostate,
         assign,
-        expr_stmt
+        expr_stmt,
+        assign_type
 >;
 
 using exp_type = std::variant<std::monostate,
@@ -298,6 +300,18 @@ private:
   maybe_expr right;
 };
 
+struct assign_type_ : base<assign_type_>
+{
+public:
+  assign_type_(tag, token tok, maybe_expr variable, std::vector<maybe_expr> constructors);
+
+  const maybe_expr& name() const { return variable; }
+  const std::vector<maybe_expr>& constructors() const { return ctors; }
+private:
+  maybe_expr variable;
+  std::vector<maybe_expr> ctors;
+};
+
 struct expr_stmt_ : base<expr_stmt_>
 {
 public:
@@ -340,6 +354,7 @@ namespace ast_tags
   static constexpr inline tag<app_> app = {};
   static constexpr inline tag<access_> access = {};
   static constexpr inline tag<lambda_> lambda = {};
+  static constexpr inline tag<assign_type_> assign_type = {};
 }
 
 inline static constexpr auto ast_get_loc_helper = base_visitor {

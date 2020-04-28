@@ -82,6 +82,23 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     print(";\n");
   },
 
+  [](auto&& rec, const assign_type& ass) -> void { PrinterFn print;
+    rec.state.depth++;
+    std::visit(rec, ass->name());
+    print(" = ");
+    for(auto vit = ass->constructors().begin(); vit != ass->constructors().end(); ++vit)
+    {
+      auto& v = *vit;
+      std::visit(rec, v);
+
+      if(std::next(vit) != ass->constructors().end())
+        print("\n| ");
+    }
+    rec.state.depth--;
+
+    print(";\n");
+  },
+
   [](auto&& rec, const pattern_matcher& l) -> void { PrinterFn print;
     rec.state.depth++;
     print("case ");
