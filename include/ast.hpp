@@ -384,5 +384,34 @@ inline static constexpr auto ast_get_loc =
         return ast_get_loc_helper(rec, arg);
       };
 
+inline static constexpr auto ast_get_id_helper = base_visitor {
+  // always add the following four edge cases
+  [](auto&& rec, const std::monostate& t) -> std::int64_t
+  { assert(false && "Should never be called."); return std::int64_t{}; },
+
+  [](auto&& rec, auto& arg) -> std::int64_t {
+    return arg->id();
+  },
+  [](auto&& rec, const stmt_type& typ) -> std::int64_t {
+    return std::visit(rec, typ);
+  },
+  [](auto&& rec, const exp_type& typ) -> std::int64_t {
+    return std::visit(rec, typ);
+  }
+};
+
+inline static constexpr auto ast_get_id = 
+			[](const auto& arg) -> std::int64_t
+      {
+        struct state
+        {  };
+
+        auto rec = stateful_recursor(state{  }, ast_get_id_helper);
+
+        return ast_get_id_helper(rec, arg);
+      };
+
+
+
 
 

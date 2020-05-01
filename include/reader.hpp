@@ -3,6 +3,7 @@
 #include <source_range.hpp>
 #include <fixit_info.hpp>
 #include <symbol.hpp>
+#include <scope.hpp>
 #include <ast.hpp>
 
 #include <unordered_map>
@@ -89,6 +90,8 @@ private:
   token old;
   token current;
   std::array<token, lookahead_size> next_toks;
+
+  scope global_scope;
 
   bool parsing_pattern { false };
   bool parsing_constructor { false };

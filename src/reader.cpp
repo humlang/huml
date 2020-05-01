@@ -716,6 +716,8 @@ maybe_stmt hx_reader::parse_type_assign()
   if(!expect('=', diagnostic_db::parser::type_assign_expects_equal))
     return mk_error();
 
+  auto& type = global_scope.types[one::get<identifier>(type_name)->symb()];
+
   // TODO: Add explicit type annotations
   std::vector<maybe_expr> v;
   auto expr = parse_constructor();
@@ -723,6 +725,7 @@ maybe_stmt hx_reader::parse_type_assign()
     v.emplace_back(std::move(std::get<exp_type>(expr)));
   else
     v.emplace_back(std::move(std::get<error>(expr)));
+  type.emplace_back(std::visit(ast_get_id, v.back()));
 
   while(current.kind != token_kind::Semi && current.kind != token_kind::EndOfFile)
   {
@@ -733,6 +736,7 @@ maybe_stmt hx_reader::parse_type_assign()
       v.emplace_back(std::move(std::get<exp_type>(expr)));
     else
       v.emplace_back(std::move(std::get<error>(expr)));
+    type.emplace_back(std::visit(ast_get_id, v.back()));
   }
   // ensure that we see a semicolon
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
@@ -761,6 +765,8 @@ maybe_stmt hx_reader::parse_assign()
   if(!expect('=', diagnostic_db::parser::assign_expects_equal))
     return mk_error();
   auto arg = parse_expression();
+
+  global_scope.globals[one::get<identifier>(var)->symb()] = std::visit(ast_get_id, arg);
 
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
   {
