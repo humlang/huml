@@ -15,9 +15,9 @@ template<typename PrinterFn>
 inline static constexpr auto ast_pretty_printer_helper = base_visitor {
   // always add the following four edge cases
   [](auto&& rec, const std::monostate& t) -> void { assert(false && "Should never be called."); },
-  [](auto&& rec, auto& arg) -> void { PrinterFn print;
-    print("unknown argument", rec.state.depth);
-  },
+//  [](auto&& rec, auto& arg) -> void { PrinterFn print;
+//    print("unknown argument", rec.state.depth);
+//  },
   [](auto&& rec, const stmt_type& typ) -> void {
     std::visit(rec, typ);
   },
@@ -51,7 +51,7 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
 
   [](auto&& rec, const expr_stmt& rd) -> void { PrinterFn print;
     rec.state.depth++;
-    std::visit(rec, rd->exp());
+    std::visit(rec, rec.state.w[rd->exp()]);
     rec.state.depth--;
 
     print(";\n");
@@ -60,23 +60,23 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
 
   [](auto&& rec, const pattern& rd) -> void { PrinterFn print;
     rec.state.depth++;
-    std::visit(rec, rd->pattern());
+    std::visit(rec, rec.state.w[rd->pattern()]);
     rec.state.depth--;
   },
 
   [](auto&& rec, const match& pt) -> void { PrinterFn print;
     rec.state.depth++;
-    std::visit(rec, pt->pattern());
+    std::visit(rec, rec.state.w[pt->pattern()]);
     print(" => ");
-    std::visit(rec, pt->expression());
+    std::visit(rec, rec.state.w[pt->expression()]);
     rec.state.depth--;
   },
 
   [](auto&& rec, const assign& ass) -> void { PrinterFn print;
     rec.state.depth++;
-    std::visit(rec, ass->var());
+    std::visit(rec, rec.state.w[ass->var()]);
     print(" = ");
-    std::visit(rec, ass->exp());
+    std::visit(rec, rec.state.w[ass->exp()]);
     rec.state.depth--;
 
     print(";\n");
@@ -84,12 +84,12 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
 
   [](auto&& rec, const assign_type& ass) -> void { PrinterFn print;
     rec.state.depth++;
-    std::visit(rec, ass->name());
+    std::visit(rec, rec.state.w[ass->name()]);
     print(" = ");
     for(auto vit = ass->constructors().begin(); vit != ass->constructors().end(); ++vit)
     {
       auto& v = *vit;
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
 
       if(std::next(vit) != ass->constructors().end())
         print("\n| ");
@@ -102,7 +102,7 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
   [](auto&& rec, const pattern_matcher& l) -> void { PrinterFn print;
     rec.state.depth++;
     print("case ");
-    std::visit(rec, l->to_be_matched());
+    std::visit(rec, rec.state.w[l->to_be_matched()]);
     print(" [\n");
     rec.state.depth++;
 
@@ -110,7 +110,7 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     for(auto vit = l->match_patterns().begin(); vit != l->match_patterns().end(); ++vit)
     {
       auto& v = *vit;
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
 
       if(std::next(vit) != l->match_patterns().end())
       {
@@ -134,7 +134,7 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     for(auto vit = b->expressions().begin(); vit != b->expressions().end(); ++vit)
     {
       auto& v = *vit;
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
 
       if(std::next(vit) != b->expressions().end())
         print(" ; ");
@@ -150,7 +150,7 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     for(auto vit = b->expressions().begin(); vit != b->expressions().end(); ++vit)
     {
       auto& v = *vit;
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
 
       if(std::next(vit) != b->expressions().end())
         print(", ");
@@ -164,9 +164,9 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     rec.state.depth++;
 
     print("(");
-    std::visit(rec, a->tuple());
+    std::visit(rec, rec.state.w[a->tuple()]);
     print(").(");
-    std::visit(rec, a->accessed_at());
+    std::visit(rec, rec.state.w[a->accessed_at()]);
     print(")");
 
     rec.state.depth--;
@@ -175,9 +175,9 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
   [](auto&& rec, const lambda& a) -> void { PrinterFn print;
     rec.state.depth++;
     print("(\\");
-    rec(a->argument());
+    std::visit(rec, rec.state.w[a->argument()]);
     print(". ");
-    std::visit(rec, a->fbody());
+    std::visit(rec, rec.state.w[a->fbody()]);
     print(")");
     rec.state.depth--;
   },
@@ -185,9 +185,9 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
   [](auto&& rec, const app& a) -> void { PrinterFn print;
     rec.state.depth++;
     print("((");
-    std::visit(rec, a->fun());
+    std::visit(rec, rec.state.w[a->fun()]);
     print(") (");
-    std::visit(rec, a->argument());
+    std::visit(rec, rec.state.w[a->argument()]);
     print("))");
     rec.state.depth--;
   },
@@ -196,9 +196,9 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     rec.state.depth++;
 
     print("(");
-    std::visit(rec, bin->get_left_exp());
+    std::visit(rec, rec.state.w[bin->get_left_exp()]);
     print(") " + bin->symb().get_string() + " (");
-    std::visit(rec, bin->get_right_exp());
+    std::visit(rec, rec.state.w[bin->get_right_exp()]);
     print(")");
 
     rec.state.depth--;
@@ -210,12 +210,17 @@ std::mutex ast_pretty_printer_mutex;
 // The actual ast_printer now just needs to plug everything accordingly
 template<typename PrinterFn>
 inline static constexpr auto ast_pretty_printer = 
-			[](const auto& arg) -> void
+			[](auto& vec, const auto& arg) -> void
       {
         struct state
-        { std::size_t depth; };
+        { decltype(vec)& w; std::size_t depth; };
 
-        const std::lock_guard<std::mutex> lock(ast_pretty_printer_mutex);
-        return ast_pretty_printer_helper<PrinterFn>(stateful_recursor(state{0}, ast_pretty_printer_helper<PrinterFn>), arg);
+        auto lam = [&vec](const auto& arg)
+        {
+          const std::lock_guard<std::mutex> lock(ast_pretty_printer_mutex);
+          return ast_pretty_printer_helper<PrinterFn>(stateful_recursor(state{vec, 0}, ast_pretty_printer_helper<PrinterFn>), arg);
+        };
+
+        return std::visit(lam, arg);
       };
 

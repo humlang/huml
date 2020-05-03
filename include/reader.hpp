@@ -59,31 +59,31 @@ private:
   void consume();
 private:
   // always uses old for the error
-  error mk_error();
+  std::size_t mk_error();
 
-  maybe_stmt parse_assign();
-  maybe_stmt parse_expr_stmt();
-  maybe_stmt parse_type_assign();
+  std::size_t parse_assign();
+  std::size_t parse_expr_stmt();
+  std::size_t parse_type_assign();
 
-  maybe_expr parse_constructor();
+  std::size_t parse_constructor();
 
-  maybe_expr parse_literal();
-  maybe_expr parse_identifier();
-  maybe_expr parse_block();
-  maybe_expr parse_tuple();
-  maybe_expr parse_case();
-  maybe_expr parse_top();
-  maybe_expr parse_bot();
-  maybe_expr parse_app(maybe_expr lhs);
-  maybe_expr parse_access(maybe_expr lhs);
-  maybe_expr parse_lambda();
-  maybe_expr parse_keyword();
-  maybe_match parse_match();
-  maybe_stmt parse_statement();
-  maybe_expr parse_prefix();
-  maybe_patt parse_pattern();
-  exp_type parse_binary(maybe_expr left);
-  maybe_expr parse_expression(int precedence = 0);
+  std::size_t parse_literal();
+  std::size_t parse_identifier();
+  std::size_t parse_block();
+  std::size_t parse_tuple();
+  std::size_t parse_case();
+  std::size_t parse_top();
+  std::size_t parse_bot();
+  std::size_t parse_app(std::size_t lhs);
+  std::size_t parse_access(std::size_t lhs);
+  std::size_t parse_lambda();
+  std::size_t parse_keyword();
+  std::size_t parse_match();
+  std::size_t parse_statement();
+  std::size_t parse_prefix();
+  std::size_t  parse_pattern();
+  std::size_t parse_binary(std::size_t left);
+  std::size_t parse_expression(int precedence = 0);
   int precedence();
 
 private:

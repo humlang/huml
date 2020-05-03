@@ -88,14 +88,16 @@ auto token_precedence_map = tsl::robin_map<token_kind, int>( {
 constexpr static bool isprint(unsigned char c)
 { return (' ' <= c && c <= '~'); }
 
-static bool is_syntactically_callable(maybe_expr& prefix)
+static bool is_syntactically_callable(scope& sc, std::size_t prefix)
 {
-  return !(one::holds_alternative<binary_exp>(prefix)
-            || one::holds_alternative<literal>(prefix)
-            || one::holds_alternative<unit>(prefix)
-            || one::holds_alternative<tuple>(prefix)
-            || one::holds_alternative<top>(prefix)
-            || one::holds_alternative<bot>(prefix));
+  auto pref = sc.ast_storage[prefix];
+
+  return !(one::holds_alternative<binary_exp>(pref)
+            || one::holds_alternative<literal>(pref)
+            || one::holds_alternative<unit>(pref)
+            || one::holds_alternative<tuple>(pref)
+            || one::holds_alternative<top>(pref)
+            || one::holds_alternative<bot>(pref));
 }
 
 base_reader::base_reader(std::string_view module)
@@ -510,20 +512,20 @@ void hx_reader::consume()
     return false; \
     } consume(); return true; })())
 
-error hx_reader::mk_error()
-{ return ast_tags::error.make_node(old); }
+std::size_t hx_reader::mk_error()
+{ return ast_tags::error.make_node(global_scope.ast_storage, old); }
 
 // nat
-maybe_expr hx_reader::parse_literal()
+std::size_t hx_reader::parse_literal()
 {
   // Only have numbers as literals for now
   if(!expect(token_kind::LiteralNumber, diagnostic_db::parser::literal_expected))
     return mk_error();
-  return ast_tags::literal.make_node(old);
+  return ast_tags::literal.make_node(global_scope.ast_storage, old);
 }
 
 // id  or special identifier "_" if pattern parsing is enabled
-maybe_expr hx_reader::parse_identifier()
+std::size_t hx_reader::parse_identifier()
 {
   if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
   {
@@ -539,32 +541,32 @@ maybe_expr hx_reader::parse_identifier()
                                                                        {"how", "id"} });
     return mk_error();
   }
-  return ast_tags::identifier.make_node(old);
+  return ast_tags::identifier.make_node(global_scope.ast_storage, old);
 }
 
 // e := e1 e2
-maybe_expr hx_reader::parse_app(maybe_expr lhs)
+std::size_t hx_reader::parse_app(std::size_t lhs)
 {
-  return ast_tags::app.make_node(std::move(lhs), std::move(parse_expression(9)));
+  return ast_tags::app.make_node(global_scope.ast_storage, lhs, parse_expression(9));
 }
 
 // e := e1 `.` e2
-maybe_expr hx_reader::parse_access(maybe_expr lhs)
+std::size_t hx_reader::parse_access(std::size_t lhs)
 {
   if(!expect('.', diagnostic_db::parser::access_expects_dot))
     return mk_error();
-  return ast_tags::access.make_node(old, std::move(lhs), std::move(parse_expression()));
+  return ast_tags::access.make_node(global_scope.ast_storage, old, lhs, parse_expression());
 }
 
 // e := `\\` id `.` e       id can be _ to simply ignore the argument
-maybe_expr hx_reader::parse_lambda()
+std::size_t hx_reader::parse_lambda()
 {
   auto lam_tok = current;
   if(!expect('\\', diagnostic_db::parser::lambda_expects_lambda))
     return mk_error();
   parsing_pattern = true;
 
-  auto param = one::get<identifier>(parse_identifier());
+  auto param = parse_identifier();
 
   parsing_pattern = false;
   
@@ -573,11 +575,11 @@ maybe_expr hx_reader::parse_lambda()
   auto expr = parse_expression();
 
   lam_tok.loc += old.loc;
-  return ast_tags::lambda.make_node(lam_tok, std::move(param), std::move(expr));
+  return ast_tags::lambda.make_node(global_scope.ast_storage, lam_tok, param, expr);
 }
 
 // e := `case` e `[` p1 `=>` e1 `|` ... `|` pn `=>` en `]`
-maybe_expr hx_reader::parse_case()
+std::size_t hx_reader::parse_case()
 {
   auto keyword = current;
   if(!expect(token_kind::Keyword, diagnostic_db::parser::case_expects_keyword))
@@ -588,34 +590,34 @@ maybe_expr hx_reader::parse_case()
   if(!expect('[', diagnostic_db::parser::case_expects_lbracket))
     return mk_error();
 
-  std::vector<maybe_match> patterns;
+  std::vector<std::size_t> patterns;
   auto mat = parse_match();
-  patterns.emplace_back(std::move(mat));
+  patterns.emplace_back(mat);
   while(current.kind != token_kind::RBracket && current.kind != token_kind::EndOfFile)
   {
     if(!expect('|', diagnostic_db::parser::case_expects_pipe))
       return mk_error();
 
-    mat = std::move(parse_match());
-    patterns.emplace_back(std::move(mat));
+    mat = parse_match();
+    patterns.emplace_back(mat);
   }
 
   if(!expect(']', diagnostic_db::parser::case_expects_rbracket))
     return mk_error();
 
-  return ast_tags::pattern_matcher.make_node(keyword, std::move(to_match), std::move(patterns));
+  return ast_tags::pattern_matcher.make_node(global_scope.ast_storage, keyword, to_match, patterns);
 }
 
 // effectively just an expression that allows the `_` to occur
-maybe_patt hx_reader::parse_pattern()
+std::size_t hx_reader::parse_pattern()
 {
   parsing_pattern = true;
   // check if we have the placeholder
   if(current.kind == token_kind::Identifier && current.data == symbol("_"))
   {
     auto id = parse_identifier();
-    auto arg = std::move(one::get<identifier>(id));
-    auto to_return = ast_tags::pattern.make_node(old, std::move(arg));
+    auto arg = id;
+    auto to_return = ast_tags::pattern.make_node(global_scope.ast_storage, old, arg);
     parsing_pattern = false;
 
     return to_return;
@@ -625,25 +627,11 @@ maybe_patt hx_reader::parse_pattern()
   auto expr = parse_expression();
   parsing_pattern = false;
 
-#define __if(id) \
-  if(one::holds_alternative<id>(expr)) \
-    return ast_tags::pattern.make_node(vold, std::move(one::get<id>(expr)));
-
-  __if(pattern)
-  else __if(tuple)
-  else __if(identifier)
-  else __if(literal)
-  else __if(unit)
-  else __if(app)
-  else
-  {
-    assert(false && "bug in parser");
-    return mk_error();
-  }
+  return ast_tags::pattern.make_node(global_scope.ast_storage, vold, expr);
 }
 
 // p `=>` e
-maybe_match hx_reader::parse_match()
+std::size_t hx_reader::parse_match()
 {
   auto pat = parse_pattern();
 
@@ -653,27 +641,27 @@ maybe_match hx_reader::parse_match()
 
   auto expr = parse_expression();
 
-  return ast_tags::match.make_node(arrow, std::move(pat), std::move(expr));
+  return ast_tags::match.make_node(global_scope.ast_storage, arrow, pat, expr);
 }
 
 // e := top
-maybe_expr hx_reader::parse_top()
+std::size_t hx_reader::parse_top()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_top))
     return mk_error();
-  return ast_tags::top.make_node(old);
+  return ast_tags::top.make_node(global_scope.ast_storage, old);
 }
 
 // e := bot
-maybe_expr hx_reader::parse_bot()
+std::size_t hx_reader::parse_bot()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_bot))
     return mk_error();
-  return ast_tags::bot.make_node(old);
+  return ast_tags::bot.make_node(global_scope.ast_storage, old);
 }
 
 // block := `{` e1 `;` ... `;` en `}`
-maybe_expr hx_reader::parse_block()
+std::size_t hx_reader::parse_block()
 {
   auto tmp = current;
 
@@ -681,30 +669,26 @@ maybe_expr hx_reader::parse_block()
   if(!expect('{', diagnostic_db::parser::block_expects_lbrace))
     return mk_error();
 
-  std::vector<maybe_expr> v;
   auto expr = parse_expression(0);
-  if(std::holds_alternative<exp_type>(expr))
-    v.emplace_back(std::move(std::get<exp_type>(expr)));
-  else 
-    v.emplace_back(std::move(std::get<error>(expr)));
+
+  std::vector<std::size_t> v;
+  v.emplace_back(expr);
   while(current.kind != token_kind::RBrace && current.kind != token_kind::EndOfFile)
   {
     expect(';', diagnostic_db::parser::block_expects_semicolon);
 
-    expr = std::move(parse_expression(0));
-    if(std::holds_alternative<exp_type>(expr))
-      v.emplace_back(std::move(std::get<exp_type>(expr)));
-    else 
-      v.emplace_back(std::move(std::get<error>(expr)));
+    expr = parse_expression(0);
+
+    v.emplace_back(expr);
   }
   // ensure that we see a closing brace
   if(!expect('}', diagnostic_db::parser::block_expects_rbrace))
     return mk_error();
 
-  return std::move(ast_tags::block.make_node(tmp, std::move(v)));
+  return ast_tags::block.make_node(global_scope.ast_storage, tmp, v);
 }
 
-maybe_stmt hx_reader::parse_type_assign()
+std::size_t hx_reader::parse_type_assign()
 {
   auto old_loc = current.loc;
   if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
@@ -716,47 +700,45 @@ maybe_stmt hx_reader::parse_type_assign()
   if(!expect('=', diagnostic_db::parser::type_assign_expects_equal))
     return mk_error();
 
-  auto& type = global_scope.types[one::get<identifier>(type_name)->symb()];
+  symbol typ_symb = "";
+  global_scope.ast_storage.use_in(type_name, [&typ_symb](auto& id) { typ_symb = id.symb(); });
+
+  auto& type = global_scope.types[typ_symb];
 
   // TODO: Add explicit type annotations
-  std::vector<maybe_expr> v;
   auto expr = parse_constructor();
-  if(std::holds_alternative<exp_type>(expr))
-    v.emplace_back(std::move(std::get<exp_type>(expr)));
-  else
-    v.emplace_back(std::move(std::get<error>(expr)));
-  type.emplace_back(std::visit(ast_get_id, v.back()));
 
+  std::vector<std::size_t> v;
+  v.emplace_back(expr);
+  type.emplace_back(expr);
   while(current.kind != token_kind::Semi && current.kind != token_kind::EndOfFile)
   {
     expect('|', diagnostic_db::parser::type_expects_pipe);
 
     expr = parse_constructor();
-    if(std::holds_alternative<exp_type>(expr))
-      v.emplace_back(std::move(std::get<exp_type>(expr)));
-    else
-      v.emplace_back(std::move(std::get<error>(expr)));
-    type.emplace_back(std::visit(ast_get_id, v.back()));
+
+    v.emplace_back(expr);
+    type.emplace_back(expr);
   }
   // ensure that we see a semicolon
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
   equals.loc += old_loc + old.loc;
-  return std::move(ast_tags::assign_type.make_node(equals, std::move(type_name), std::move(v)));
+  return ast_tags::assign_type.make_node(global_scope.ast_storage, equals, type_name, v);
 }
 
-maybe_expr hx_reader::parse_constructor()
+std::size_t hx_reader::parse_constructor()
 {
   parsing_constructor = true;
 
   auto expr = parse_expression();
 
   parsing_constructor = false;
-  return std::move(expr);
+  return expr;
 }
 
-maybe_stmt hx_reader::parse_assign()
+std::size_t hx_reader::parse_assign()
 {
   fixits_stack.emplace_back();
 
@@ -766,11 +748,16 @@ maybe_stmt hx_reader::parse_assign()
     return mk_error();
   auto arg = parse_expression();
 
-  global_scope.globals[one::get<identifier>(var)->symb()] = std::visit(ast_get_id, arg);
+  symbol var_symb = "";
+  global_scope.ast_storage.use_in(var, [&var_symb](auto& v){ var_symb = v.symb(); });
+
+  global_scope.globals[var_symb] = arg;
 
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
   {
-    auto loc = std::visit(ast_get_loc, arg);
+    source_range loc;
+    global_scope.ast_storage.use_in(arg, [&loc](auto& v){ loc = v.loc(); });
+
     auto proj = loc.snd_proj();
     // do not want to ignore this token
     loc.column_beg = loc.column_end;
@@ -783,10 +770,10 @@ maybe_stmt hx_reader::parse_assign()
   }
 
   fixits_stack.pop_back();
-  return ast_tags::assign.make_node(std::move(var), old, std::move(arg));
+  return ast_tags::assign.make_node(global_scope.ast_storage, var, old, arg);
 }
 
-maybe_stmt hx_reader::parse_expr_stmt()
+std::size_t hx_reader::parse_expr_stmt()
 {
   fixits_stack.emplace_back();
   auto current_source_loc = current.loc;
@@ -794,7 +781,8 @@ maybe_stmt hx_reader::parse_expr_stmt()
   auto expr = parse_expression();
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
   {
-    auto loc = std::visit(ast_get_loc, expr);
+    source_range loc;
+    global_scope.ast_storage.use_in(expr, [&loc](auto& v){ loc = v.loc(); });
     auto proj = loc.snd_proj();
     // do not want to ignore this token
     loc.column_beg = loc.column_end;
@@ -807,10 +795,10 @@ maybe_stmt hx_reader::parse_expr_stmt()
   }
 
   fixits_stack.pop_back();
-  return ast_tags::expr_stmt.make_node(std::move(expr));
+  return ast_tags::expr_stmt.make_node(global_scope.ast_storage, expr);
 }
 
-maybe_stmt hx_reader::parse_statement()
+std::size_t hx_reader::parse_statement()
 {
   if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("type").get_hash())
     return parse_type_assign();
@@ -819,7 +807,7 @@ maybe_stmt hx_reader::parse_statement()
   return parse_expr_stmt();
 }
 
-maybe_expr hx_reader::parse_keyword()
+std::size_t hx_reader::parse_keyword()
 {
   if(current.data == symbol("case"))
   {
@@ -838,7 +826,7 @@ maybe_expr hx_reader::parse_keyword()
 }
 
 // e := e1 +-* e2
-exp_type hx_reader::parse_binary(maybe_expr left)
+std::size_t hx_reader::parse_binary(std::size_t left)
 {
   assert(!parsing_pattern);
 
@@ -847,18 +835,18 @@ exp_type hx_reader::parse_binary(maybe_expr left)
   int precedence = token_precedence_map[op.kind];
   auto right = parse_expression(precedence);
 
-  return ast_tags::binary_exp.make_node(std::move(left), op, std::move(right));
+  return ast_tags::binary_exp.make_node(global_scope.ast_storage, left, op, right);
 }
 
 // e := `(` e `)` | `(` e1 `,` ... `,` en `)`
-maybe_expr hx_reader::parse_tuple()
+std::size_t hx_reader::parse_tuple()
 {
   expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen);
   auto open = old;
 
   // See if we have a unit
   if(accept(')'))
-    return ast_tags::unit.make_node(open);
+    return ast_tags::unit.make_node(global_scope.ast_storage, open);
   
   auto first_expr = parse_expression();
 
@@ -868,13 +856,13 @@ maybe_expr hx_reader::parse_tuple()
 
   if(current.kind != token_kind::Comma)
   {
-    if(is_syntactically_callable(first_expr))
+    if(is_syntactically_callable(global_scope, first_expr))
     {
-      auto to_ret = parse_app(std::move(first_expr));
+      auto to_ret = parse_app(first_expr);
 
       if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
         return mk_error();
-      return parse_app(std::move(first_expr));
+      return parse_app(first_expr);
     }
     else
     {
@@ -883,26 +871,23 @@ maybe_expr hx_reader::parse_tuple()
     }
   }
 
-  std::vector<maybe_expr> v;
-  v.emplace_back(std::move(first_expr));
+  std::vector<std::size_t> v;
+  v.emplace_back(first_expr);
   while(current.kind != token_kind::RParen && current.kind != token_kind::EndOfFile)
   {
     expect(',', diagnostic_db::parser::tuple_expects_comma);
 
     auto expr = parse_expression(0);
-    if(std::holds_alternative<exp_type>(expr))
-      v.emplace_back(std::move(std::get<exp_type>(expr)));
-    else 
-      v.emplace_back(std::move(std::get<error>(expr)));
+    v.emplace_back(expr);
   }
   // ensure that we see a closing brace
   if(!expect(')', diagnostic_db::parser::tuple_expects_closing_paranthesis))
     return mk_error();
-  return ast_tags::tuple.make_node(open, std::move(v));
+  return ast_tags::tuple.make_node(global_scope.ast_storage, open, v);
 }
 
 // e := identifier, number
-maybe_expr hx_reader::parse_prefix()
+std::size_t hx_reader::parse_prefix()
 {
   switch(current.kind)
   {
@@ -921,15 +906,15 @@ maybe_expr hx_reader::parse_prefix()
         diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
         return mk_error();
       }
-      return std::move(parse_literal());
+      return parse_literal();
     }
     case token_kind::Identifier:
     {
-      return std::move(parse_identifier());
+      return parse_identifier();
     }
     case token_kind::LParen:
     {
-      return std::move(parse_tuple());
+      return parse_tuple();
     }
     case token_kind::LBrace:
     {
@@ -938,7 +923,7 @@ maybe_expr hx_reader::parse_prefix()
         diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
         return mk_error();
       }
-      return std::move(parse_block());
+      return parse_block();
     }
     case token_kind::Keyword:
     {
@@ -947,7 +932,7 @@ maybe_expr hx_reader::parse_prefix()
         diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
         return mk_error();
       }
-      return std::move(parse_keyword());
+      return parse_keyword();
     }
     case token_kind::Backslash:
     {
@@ -956,17 +941,17 @@ maybe_expr hx_reader::parse_prefix()
         diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
         return mk_error();
       }
-      return std::move(parse_lambda());
+      return parse_lambda();
     }
   }
 }
 
 // e
-maybe_expr hx_reader::parse_expression(int precedence)
+std::size_t hx_reader::parse_expression(int precedence)
 {
   auto prefix = parse_prefix();
   
-  if(std::holds_alternative<error>(prefix))
+  if(std::holds_alternative<error>(global_scope.ast_storage[prefix]))
     return prefix;
 
   exp_type infix;
@@ -990,12 +975,12 @@ maybe_expr hx_reader::parse_expression(int precedence)
       default:
       {
         // ensure before that prefix is something callable
-        if(!is_syntactically_callable(prefix))
+        if(!is_syntactically_callable(global_scope, prefix))
         {
           // not callable
           return prefix;
         }
-        prefix = parse_app(std::move(prefix));
+        prefix = parse_app(prefix);
       } break;
 
       case token_kind::Dot:
@@ -1005,7 +990,7 @@ maybe_expr hx_reader::parse_expression(int precedence)
           diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
           return mk_error();
         }
-        prefix = parse_access(std::move(prefix));
+        prefix = parse_access(prefix);
       } break;
 
       case token_kind::Plus:
@@ -1017,10 +1002,10 @@ maybe_expr hx_reader::parse_expression(int precedence)
           diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
           return mk_error();
         }
-        prefix = parse_binary(std::move(prefix));
+        prefix = parse_binary(prefix);
       } break;
     }
-    if(std::holds_alternative<error>(prefix))
+    if(std::holds_alternative<error>(global_scope.ast_storage[prefix]))
     {
       return prefix;
     }
@@ -1030,24 +1015,24 @@ maybe_expr hx_reader::parse_expression(int precedence)
 }
 
 template<>
-std::vector<ast_type> hx_reader::read(std::string_view module)
+std::vector<scope> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
 
-  std::vector<ast_type> ast;
   while(r.current.kind != token_kind::EndOfFile)
   {
     auto stmt = r.parse_statement();
 
-    if(one::holds_alternative<error>(stmt))
-      ast.emplace_back(std::move(one::get<error>(stmt)));
-    else
-      ast.emplace_back(std::move(one::get<stmt_type>(stmt)));
+    r.global_scope.roots.push_back(stmt);
   }
 
-  if(ast.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+  if(r.global_scope.ast_storage.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
-  return ast;
+
+  std::vector<scope> v;
+  v.emplace_back(std::move(r.global_scope));
+
+  return v;
 }
 
 template<>

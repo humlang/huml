@@ -71,7 +71,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, rd->exp());
+    std::visit(rec, rec.state.w[rd->exp()]);
     rec.state.depth--;
 
     print("|expr_stmt>", rec.state.depth);
@@ -85,7 +85,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, rd->pattern());
+    std::visit(rec, rec.state.w[rd->pattern()]);
     rec.state.depth--;
 
     print("|pattern>", rec.state.depth);
@@ -98,8 +98,8 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, pt->pattern());
-    std::visit(rec, pt->expression());
+    std::visit(rec, rec.state.w[pt->pattern()]);
+    std::visit(rec, rec.state.w[pt->expression()]);
     rec.state.depth--;
 
     print("|match>", rec.state.depth);
@@ -112,8 +112,8 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, ass->var());
-    std::visit(rec, ass->exp());
+    std::visit(rec, rec.state.w[ass->var()]);
+    std::visit(rec, rec.state.w[ass->exp()]);
     rec.state.depth--;
 
     print("|assign>", rec.state.depth);
@@ -126,9 +126,9 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, ass->name());
+    std::visit(rec, rec.state.w[ass->name()]);
     for(auto& v : ass->constructors())
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
     rec.state.depth--;
 
     print("|assign_type>", rec.state.depth);
@@ -141,9 +141,9 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, l->to_be_matched());
+    std::visit(rec, rec.state.w[l->to_be_matched()]);
     for(auto& v : l->match_patterns())
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
     rec.state.depth--;
 
     print("|pattern_matcher>", rec.state.depth);
@@ -157,7 +157,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
 
     rec.state.depth++;
     for(auto& v : b->expressions())
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
     rec.state.depth--;
 
     print("|block>", rec.state.depth);
@@ -171,7 +171,7 @@ inline static constexpr auto ast_printer_helper = base_visitor {
 
     rec.state.depth++;
     for(auto& v : b->expressions())
-      std::visit(rec, v);
+      std::visit(rec, rec.state.w[v]);
     rec.state.depth--;
 
     print("|tuple>", rec.state.depth);
@@ -182,8 +182,8 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", location=\"" + a->loc().to_string() + "\"", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, a->tuple());
-    std::visit(rec, a->accessed_at());
+    std::visit(rec, rec.state.w[a->tuple()]);
+    std::visit(rec, rec.state.w[a->accessed_at()]);
     rec.state.depth--;
 
     print("|access>", rec.state.depth);
@@ -194,8 +194,8 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", location=\"" + a->loc().to_string() + "\"", rec.state.depth);
 
     rec.state.depth++;
-    rec(a->argument());
-    std::visit(rec, a->fbody());
+    std::visit(rec, rec.state.w[a->argument()]);
+    std::visit(rec, rec.state.w[a->fbody()]);
     rec.state.depth--;
 
     print("|lambda>", rec.state.depth);
@@ -206,8 +206,8 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", location=\"" + a->loc().to_string() + "\"", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, a->fun());
-    std::visit(rec, a->argument());
+    std::visit(rec, rec.state.w[a->fun()]);
+    std::visit(rec, rec.state.w[a->argument()]);
     rec.state.depth--;
 
     print("|app>", rec.state.depth);
@@ -220,8 +220,8 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ", ", rec.state.depth);
 
     rec.state.depth++;
-    std::visit(rec, bin->get_left_exp());
-    std::visit(rec, bin->get_right_exp());
+    std::visit(rec, rec.state.w[bin->get_left_exp()]);
+    std::visit(rec, rec.state.w[bin->get_right_exp()]);
     rec.state.depth--;
 
     print("|binary expression>", rec.state.depth);
@@ -233,12 +233,17 @@ std::mutex ast_printer_mutex;
 // The actual ast_printer now just needs to plug everything accordingly
 template<typename PrinterFn>
 inline static constexpr auto ast_printer = 
-			[](const auto& arg) -> void
+			[](auto& vec, const auto& arg) -> void
       {
         struct state
-        { std::size_t depth; };
+        { decltype(vec)& w; std::size_t depth; };
 
-        const std::lock_guard<std::mutex> lock(ast_printer_mutex);
-        return ast_printer_helper<PrinterFn>(stateful_recursor(state{0}, ast_printer_helper<PrinterFn>), arg);
+        auto lam = [&vec](const auto& arg)
+        {
+          const std::lock_guard<std::mutex> lock(ast_printer_mutex);
+          return ast_printer_helper<PrinterFn>(stateful_recursor(state{vec,0}, ast_printer_helper<PrinterFn>), arg);
+        };
+
+        return std::visit(lam, arg);
       };
 

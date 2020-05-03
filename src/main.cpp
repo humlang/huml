@@ -41,20 +41,24 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
   { emit_classes::help, [](auto){ assert(false); } },
   { emit_classes::ast, [](std::string_view t)
     {
-      auto w = hx_reader::read<ast_type>(t);
+      auto w = hx_reader::read<scope>(t);
 
-      for(auto& v : w)
+      for(auto& v : w[0].roots)
       {
-        std::visit(ast_printer<printer<true>>, v);
+        w[0].ast_storage.use_in(v, [&w](auto& store) {
+          ast_printer<printer<true>>(w[0].ast_storage, ast_type(&store));
+        });
       }
     } },
   { emit_classes::ast_pretty, [](std::string_view t)
     {
-      auto w = hx_reader::read<ast_type>(t);
+      auto w = hx_reader::read<scope>(t);
 
-      for(auto& v : w)
+      for(auto& v : w[0].roots)
       {
-        std::visit(ast_pretty_printer<printer<false>>, v);
+        w[0].ast_storage.use_in(v, [&w](auto& store) {
+          ast_pretty_printer<printer<false>>(w[0].ast_storage, ast_type(&store));
+        });
       }
     } },
   { emit_classes::tokens, [](std::string_view t)
