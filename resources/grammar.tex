@@ -1,0 +1,88 @@
+\documentclass{standalone}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{proof}
+
+\begin{document}
+$
+\begin{array}{lcll}
+\text{s} &:=& \text{id } \texttt{= } e \texttt{;} &\\
+&|& \texttt{type }\text{id } \texttt{= } cons_1 \texttt{|} \dots \texttt{|} cons_2 \texttt{;} &\\ 
+&|& e \texttt{;} &\\
+\text{e} &:=& \text{id} &\\
+&|& \text{literal} &\\
+&|& e_1 \circ e_2 &\\
+&|& e_1 \; e_2 &\\
+&|& e_1 . e_2 &\\
+&|& \texttt{case }e \texttt{ [ }pat_1 \Rightarrow e_1 \texttt{|} \dots \texttt{|} pat_n \Rightarrow e_n\texttt{ ]} &\\
+&|& (e_1, \cdots, e_n) &\\
+&|& \{e_1 ; \cdots ; e_n\} &\\
+&|& \backslash \text{ id }\texttt{.} e &\\
+&|& \texttt{TOP} &\\
+&|& \texttt{BOT} &\\
+\text{pat} &:=& \text{id } | \texttt{ \_ } | e_1 \; e_2 | \texttt{(}e_1,\cdots,e_n\texttt{)}&\\
+\end{array}
+$
+
+
+$
+\begin{array}{l}
+  \begin{array}{l}{\scriptsize\text{L-PrimOp}}\\\infer{e_1 \circ e_2 \succ e_1' \circ e_2}{e_1 \succ e_1'} \end{array}\\[1.5em]
+
+  \begin{array}{l}{\scriptsize\text{R-PrimOp}}\\\infer{\overline{v} \circ e_2 \succ \overline{v} \circ e_2'}{e_2 \succ e_2'} \end{array}\\[1.5em]
+
+  \begin{array}{l}{\scriptsize\text{PrimOp}}\\\overline{v_1} \circ \overline{v_2} \succ \overline{v_1 \circ v_2}\end{array}\\[1.5em]
+\end{array}
+$
+
+$
+\begin{array}{l}
+  \begin{array}{l}{\scriptsize\text{L-App}}\\\infer{e_1\; e_2 \succ e_1'\; e_2}{e_1 \succ e_1'} \end{array}\\[1.5em]
+
+  \begin{array}{l}{\scriptsize\text{R-App}}\\\infer{v\;e_2 \succ v\;e_2'}{e_2 \succ e_2'} \end{array} \\[1.5em]
+
+  \begin{array}{l}{\scriptsize\text{Beta}}\\(\backslash x\texttt{.} e) v \succ e[v/x]\end{array} \\[1.5em]
+\end{array}
+$
+
+$
+\begin{array}{l}
+  \begin{array}{l}{\scriptsize\text{L-Access}}\\\infer{e_1.e_2 \succ e_1'.e_2}{e_1 \succ e_1'} \end{array}\\[1.5em]
+
+  \begin{array}{l}{\scriptsize\text{R-Access}}\\\infer{v.e_2 \succ v.e_2'}{e_2 \succ e_2'} \end{array}\\[1.5em]
+
+  \begin{array}{l}{\scriptsize\text{Access}}\\(e_1,\cdots,\overline{v_m},\cdots,e_n)\texttt{.} \overline{m} \succ \overline{v_m} \end{array} \\[1.5em]
+
+  \begin{array}{l}{\scriptsize \text{n-Tup}} \\ \infer{(e_1,\cdots,e_m,\cdots,e_n) \succ (e_1,\cdots,e_m',\cdots,e_n)}{e_m \succ e_m'} \end{array} \\[1.5em]
+\end{array}
+$
+
+$
+\begin{array}{l}
+  \begin{array}{l}{\scriptsize\text{n-Block}} \\ \infer{\{e_1 ; \dots ; e_n\} \succ \{e_1' ; \dots ; e_n\}}{e_1 \succ e_1'} \end{array} \\[1.5em]
+
+  \begin{array}{l}{\scriptsize \text{Block-Kill}} \\ \{\overline{v} ; e_2 ; \dots ; e_n \} \succ \{ e_2 ; \dots ; e_n \} \end{array}\\[1.5em]
+
+\begin{array}{l}{\scriptsize \text{1-Block}} \\ \{\overline{v} \} \succ \overline{v} \end{array} \\[1.5em]
+\end{array}
+$
+
+$
+\begin{array}{l}
+  \begin{array}{l}{\scriptsize\text{case-pat}} \\ \infer{\begin{array}{r}
+      \texttt{case }e\texttt{ [ }p_1 \Rightarrow e_1 \texttt{|} \dots \texttt{|}p_m\Rightarrow e_m\texttt{|}\dots\texttt{|}p_n\Rightarrow e_n \texttt{ ]}\succ \\ 
+      \texttt{case }e\texttt{ [ } p_1\Rightarrow e_1 \texttt{|}\dots \texttt{|} p_m'\Rightarrow e_m\texttt{|}\dots\texttt{|}p_n\Rightarrow e_n \texttt{ ]}
+  \end{array}}{p_m \succ p_m'}\end{array}\\[1.5em]
+
+  \begin{array}{l}{\scriptsize\text{case-red}} \\ \infer{\begin{array}{r}
+      \texttt{case }e\texttt{ [ }p_1\Rightarrow e_1 \texttt{|}\dots \texttt{|} p_n \Rightarrow e_n \texttt{ ]}\succ \\
+      \texttt{case }e'\texttt{ [ }p_1\Rightarrow e_1 \texttt{|}\dots \texttt{|} p_n \Rightarrow e_n \texttt{ ]}\\
+  \end{array}}{e \succ e'}\end{array} \\[1.5em]
+
+  \text{TODO: Formalize case}
+\end{array}
+$
+
+\end{document}
