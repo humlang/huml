@@ -6,6 +6,7 @@
 #include <ast.hpp>
 
 #include <ast_printer.hpp>
+#include <ast_lowering.hpp>
 #include <ast_pretty_printer.hpp>
 
 #include <iostream>
@@ -58,6 +59,18 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
       {
         w[0].ast_storage.use_in(v, [&w](auto& store) {
           ast_pretty_printer<printer<false>>(w[0].ast_storage, ast_type(&store));
+        });
+      }
+    } },
+  { emit_classes::ir, [](std::string_view t)
+    {
+      auto w = hx_reader::read<scope>(t);
+
+      std::vector<hx_ir> irs;
+      for(auto& v : w[0].roots)
+      {
+        w[0].ast_storage.use_in(v, [&irs,&w](auto& store) {
+          irs.emplace_back(std::move(ast_lowering(w[0].ast_storage, ast_type(&store))));
         });
       }
     } },

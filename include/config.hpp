@@ -10,6 +10,7 @@ enum class emit_classes
   tokens,
   ast,
   ast_pretty,
+  ir
 };
 
 void print_emit_classes(std::FILE* f);
