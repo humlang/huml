@@ -31,6 +31,8 @@ enum class IRNodeKind : std::int_fast8_t
 struct IRData
 {
   token tok;
+
+  std::vector<std::int_fast32_t> additional_references; // Stores an explicit position in the vector
 };
 
 struct hx_ir
