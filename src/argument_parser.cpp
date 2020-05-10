@@ -14,7 +14,14 @@ using namespace std::string_view_literals;
 void print_emit_classes(std::FILE* f)
 {
   fmt::print(f, "emit classes: ");
-  fmt::print(f, "help, tokens, ast, pretty\n");
+
+  for(auto it = std::begin(emit_classes_list); it != std::end(emit_classes_list); ++it)
+  {
+    if(std::next(it) == std::end(emit_classes_list))
+      fmt::print(f, "{}\n", nlohmann::json(*it).get<std::string>());
+    else
+      fmt::print(f, "{}, ", nlohmann::json(*it).get<std::string>());
+  }
 }
 
 namespace arguments
@@ -32,10 +39,12 @@ void parse(int argc, const char** argv, std::FILE* out)
       {
         assert(x.size() == 1);
         auto& v = x.front();
-        if(v == "tokens") return emit_classes::tokens;
-        else if(v == "ast") return emit_classes::ast;
-        else if(v == "help") return emit_classes::help;
-        else if(v == "pretty") return emit_classes::ast_pretty;
+        
+        if(v.empty()) return emit_classes::help;
+
+        nlohmann::json easy_conversion = v;
+        if(easy_conversion.get<emit_classes>() != emit_classes::undef)
+          return easy_conversion.get<emit_classes>();
 
         diagnostic <<= diagnostic_db::args::emit_not_present(source_range { "args", 0, 0, 0, 0 });
         return emit_classes::help;

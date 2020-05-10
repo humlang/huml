@@ -95,3 +95,4 @@ private:
 
 inline diagnostics_manager& diagnostic = diagnostics_manager::make();
 
+

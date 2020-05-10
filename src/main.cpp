@@ -62,7 +62,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         });
       }
     } },
-  { emit_classes::ir, [](std::string_view t)
+  { emit_classes::ir_print, [](std::string_view t)
     {
       auto w = hx_reader::read<scope>(t);
 
@@ -72,6 +72,12 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         w[0].ast_storage.use_in(v, [&irs,&w](auto& store) {
           irs.emplace_back(std::move(ast_lowering(w[0].ast_storage, ast_type(&store))));
         });
+      }
+      std::size_t cntr = 1;
+      for(auto& i : irs)
+      {
+        std::cout << "// IR " << (cntr++) << "\n";
+        i.print(std::cout);
       }
     } },
   { emit_classes::tokens, [](std::string_view t)
