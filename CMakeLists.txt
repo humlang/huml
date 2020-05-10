@@ -11,6 +11,7 @@ set(hx-lang_files src/reader.cpp
   src/stream_lookup.cpp
   src/program.cpp
   src/fixit_info.cpp
+  src/compiler.cpp
   )
 
 set(hx-lang_vm_files src/vm.cpp

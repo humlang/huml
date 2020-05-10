@@ -36,7 +36,7 @@ struct IRData
   std::vector<std::int_fast32_t> additional_references; // Stores an explicit position in the vector
 };
 
-struct hx_ir
+struct hx_per_statement_ir
 {
   std::vector<IRNodeKind> kinds;
   std::vector<std::int_fast32_t> references; // stores the number of arguments per kind

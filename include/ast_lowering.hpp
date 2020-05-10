@@ -6,7 +6,7 @@
 
 #include <types.hpp>
 #include <ast.hpp>
-#include <ir.hpp>
+#include <per_statement_ir.hpp>
 
 
 /**
@@ -17,28 +17,28 @@
 
 inline static constexpr auto ast_lowering_helper = base_visitor {
   // always add the following four edge cases
-  [](auto&& rec, const std::monostate& t) -> hx_ir& { assert(false && "Should never be called.");
+  [](auto&& rec, const std::monostate& t) -> hx_per_statement_ir& { assert(false && "Should never be called.");
     return rec.state.ir;
   },
-  [](auto&& rec, auto& arg) -> hx_ir& {
+  [](auto&& rec, auto& arg) -> hx_per_statement_ir& {
     assert(false && "Cannot lower this.");
     return rec.state.ir;
   },
-  [](auto&& rec, const stmt_type& typ) -> hx_ir& {
+  [](auto&& rec, const stmt_type& typ) -> hx_per_statement_ir& {
     return std::visit(rec, typ);
   },
-  [](auto&& rec, const exp_type& typ) -> hx_ir& {
+  [](auto&& rec, const exp_type& typ) -> hx_per_statement_ir& {
     return std::visit(rec, typ);
   },
 
-  [](auto&& rec, const literal& lit) -> hx_ir& { 
+  [](auto&& rec, const literal& lit) -> hx_per_statement_ir& { 
     rec.state.ir.kinds.emplace_back(IRNodeKind::literal);
     rec.state.ir.references.emplace_back(0);
     rec.state.ir.data.emplace_back(IRData{ lit->symb() });
     return rec.state.ir;
   },
 
-  [](auto&& rec, const identifier& id) -> hx_ir& {
+  [](auto&& rec, const identifier& id) -> hx_per_statement_ir& {
     auto present = std::find_if(rec.state.binder_stack.rbegin(), rec.state.binder_stack.rend(),
         [&id](auto x) { return x.first == id->symb(); });
 
@@ -60,33 +60,33 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const unit& id) -> hx_ir& { 
+  [](auto&& rec, const unit& id) -> hx_per_statement_ir& { 
     rec.state.ir.kinds.push_back(IRNodeKind::unit);
     rec.state.ir.references.push_back(0);
     rec.state.ir.data.push_back(IRData{ "()", nullptr });
     return rec.state.ir;
   },
 
-  [](auto&& rec, const top& id) -> hx_ir& {
+  [](auto&& rec, const top& id) -> hx_per_statement_ir& {
     rec.state.ir.kinds.push_back(IRNodeKind::top);
     rec.state.ir.references.push_back(0);
     rec.state.ir.data.push_back(IRData{ "TOP", nullptr });
     return rec.state.ir;
   },
 
-  [](auto&& rec, const bot& id) -> hx_ir& {
+  [](auto&& rec, const bot& id) -> hx_per_statement_ir& {
     rec.state.ir.kinds.push_back(IRNodeKind::bot);
     rec.state.ir.references.push_back(0);
     rec.state.ir.data.push_back(IRData{ "BOT", nullptr });
     return rec.state.ir;
   },
 
-  [](auto&& rec, const error& err) -> hx_ir& {
+  [](auto&& rec, const error& err) -> hx_per_statement_ir& {
     assert(false && "Can't lower errornous asts.");
     return rec.state.ir;
   },
 
-  [](auto&& rec, const expr_stmt& rd) -> hx_ir& {
+  [](auto&& rec, const expr_stmt& rd) -> hx_per_statement_ir& {
     std::visit(rec, rec.state.w[rd->exp()]);
 
     rec.state.ir.kinds.push_back(IRNodeKind::expr_stmt);
@@ -96,7 +96,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
   },
 
 
-  [](auto&& rec, const pattern& rd) -> hx_ir& {
+  [](auto&& rec, const pattern& rd) -> hx_per_statement_ir& {
     std::visit(rec, rec.state.w[rd->pattern()]);
 
     rec.state.ir.kinds.push_back(IRNodeKind::pattern);
@@ -105,7 +105,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const match& pt) -> hx_ir& {
+  [](auto&& rec, const match& pt) -> hx_per_statement_ir& {
     std::visit(rec, rec.state.w[pt->expression()]);
     std::visit(rec, rec.state.w[pt->pattern()]);
 
@@ -115,7 +115,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const assign& ass) -> hx_ir& {
+  [](auto&& rec, const assign& ass) -> hx_per_statement_ir& {
     std::visit(rec, rec.state.w[ass->exp()]);
     std::visit(rec, rec.state.w[ass->var()]);
 
@@ -125,7 +125,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const assign_type& ass) -> hx_ir& {
+  [](auto&& rec, const assign_type& ass) -> hx_per_statement_ir& {
     auto name_id_variant = rec.state.w[ass->name()];
     identifier name_id = std::get<identifier>(name_id_variant);
 
@@ -184,7 +184,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const pattern_matcher& l) -> hx_ir& {
+  [](auto&& rec, const pattern_matcher& l) -> hx_per_statement_ir& {
     auto& v = l->match_patterns();
     for(auto it = v.rbegin(); it != v.rend(); ++it)
       std::visit(rec, rec.state.w[*it]);
@@ -197,7 +197,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const block& b) -> hx_ir& {
+  [](auto&& rec, const block& b) -> hx_per_statement_ir& {
     auto& v = b->expressions();
     for(auto it = v.rbegin(); it != v.rend(); ++it)
       std::visit(rec, rec.state.w[*it]);
@@ -208,7 +208,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const tuple& b) -> hx_ir& {
+  [](auto&& rec, const tuple& b) -> hx_per_statement_ir& {
     auto& v = b->expressions();
     for(auto it = v.rbegin(); it != v.rend(); ++it)
       std::visit(rec, rec.state.w[*it]);
@@ -219,7 +219,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const access& a) -> hx_ir& {
+  [](auto&& rec, const access& a) -> hx_per_statement_ir& {
     std::visit(rec, rec.state.w[a->accessed_at()]);
     std::visit(rec, rec.state.w[a->tuple()]);
 
@@ -229,7 +229,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const lambda& a) -> hx_ir& {
+  [](auto&& rec, const lambda& a) -> hx_per_statement_ir& {
     auto psymb = std::get<identifier>(rec.state.w[a->argument()])->symb();
     rec.state.binder_stack.emplace_back(psymb, rec.state.ir.kinds.size() + 1);
 
@@ -247,7 +247,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const app& a) -> hx_ir& {
+  [](auto&& rec, const app& a) -> hx_per_statement_ir& {
     std::visit(rec, rec.state.w[a->argument()]);
     std::visit(rec, rec.state.w[a->fun()]);
 
@@ -257,7 +257,7 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
-  [](auto&& rec, const binary_exp& bin) -> hx_ir& {
+  [](auto&& rec, const binary_exp& bin) -> hx_per_statement_ir& {
     std::visit(rec, rec.state.w[bin->get_right_exp()]);
     std::visit(rec, rec.state.w[bin->get_left_exp()]);
 
@@ -272,16 +272,16 @@ std::mutex ast_lowering_mutex;
 
 // The actual ast_printer now just needs to plug everything accordingly
 inline static constexpr auto ast_lowering = 
-			[](auto& v, const auto& arg) -> hx_ir
+			[](auto& v, const auto& arg) -> hx_per_statement_ir
       {
         struct state
         {
           decltype(v)& w;
-          hx_ir ir;
+          hx_per_statement_ir ir;
           std::vector<std::pair<symbol, std::int_fast32_t>> binder_stack;
         };
 
-        auto lam = [&v](const auto& arg) -> hx_ir
+        auto lam = [&v](const auto& arg) -> hx_per_statement_ir
         {
           const std::lock_guard<std::mutex> lock(ast_lowering_mutex);
           return ast_lowering_helper(stateful_recursor(state{v}, ast_lowering_helper), arg);
