@@ -69,8 +69,13 @@ private:
                                      os << ")"; } break;
       case IRNodeKind::tuple:      {
         os << "(";
-        for(std::int_fast32_t i = 1; i <= references[node]; ++i)
-          node = print_node(os, node - 1); //i);
+        auto cpy = node;
+        for(std::int_fast32_t i = 1; i <= references[cpy]; ++i)
+        {
+          node = print_node(os, node - 1);
+          if(i + 1 < references[cpy])
+            os << " , ";
+        }
         os << ")";
       } break;
       case IRNodeKind::lambda:     { os << "\\"; node = print_node(os, node - 1);
@@ -80,18 +85,28 @@ private:
                                      node = print_node(os, node - 1); } break;
       case IRNodeKind::pattern:    node = print_node(os, node - 1); break;
       case IRNodeKind::pattern_matcher: {
+        auto cpy = node;
         os << "case (";
         node = print_node(os, node - 1);
         os << ") [";
-        for(std::int_fast32_t i = 2; i <= references[node] + 1; ++i)
-          node = print_node(os, node - 1); //i);
+        for(std::int_fast32_t i = 1; i < references[cpy]; ++i)
+        {
+          node = print_node(os, node - 1);
+          if(i + 1 < references[cpy])
+            os << " | ";
+        }
         os << "]";
       } break;
       case IRNodeKind::identifier: os << data[node].symb; break;
       case IRNodeKind::block:      {
         os << "{";
-        for(std::int_fast32_t i = 1; i <= references[node]; ++i)
-          node = print_node(os, node - 1); //i);
+        auto cpy = node;
+        for(std::int_fast32_t i = 1; i <= references[cpy]; ++i)
+        {
+          node = print_node(os, node - 1);
+          if(i + 1 < references[cpy])
+            os << " ; ";
+        }
         os << "}";
       } break;
       case IRNodeKind::assign:     { node = print_node(os, node - 1); os << " = ";

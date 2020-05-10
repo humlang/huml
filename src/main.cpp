@@ -76,9 +76,11 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
       std::size_t cntr = 1;
       for(auto& i : irs)
       {
+        if(cntr > 1) std::cout << "\n";
         std::cout << "// IR " << (cntr++) << "\n";
         i.print(std::cout);
       }
+      std::cout << "\n";
     } },
   { emit_classes::tokens, [](std::string_view t)
     {
