@@ -1,7 +1,6 @@
 #pragma once
 
 #include <symbol.hpp>
-#include <ast_fwd.hpp>
 
 enum class type_kind
 {
@@ -16,11 +15,11 @@ struct type
     : kind(kind), readable_identifier(readable_identifier)
   {  }
 
-  type_kind kind;
-  symbol readable_identifier;
-
   virtual bool is_polymorphic() const { return false; }
   virtual bool is_inductive() const   { return false; }
+
+  type_kind kind;
+  symbol readable_identifier;
 };
 
 // forall alpha
@@ -29,16 +28,59 @@ struct polymorphic : type
   bool is_polymorphic() const override { return true; }
 };
 
+
 // type nat = Zero | Succ(n : nat)
+namespace constructors
+{
+  struct base
+  {
+    virtual bool is_identifier() const { return false; }   
+    virtual bool is_unit() const { return false; }
+    virtual bool is_app() const { return false; }
+    virtual bool is_tuple() const { return false; }
+  };
+  struct identifier : base
+  {
+    identifier(symbol symb)
+      : id(symb)
+    {  }
+
+    bool is_identifier() const override { return true; }
+
+    symbol id;
+  };
+  struct unit : base
+  { bool is_unit() const override { return true; } };
+  struct app : base
+  {
+    app(std::shared_ptr<base> caller, std::shared_ptr<base> param)
+      : caller(caller), param(param)
+    {  }
+
+    bool is_app() const override { return true; }
+
+    std::shared_ptr<base> caller;
+    std::shared_ptr<base> param;
+  };
+  struct tuple : base
+  {
+    tuple(std::vector<std::shared_ptr<base>> elems)
+      : elems(elems)
+    {  }
+
+    bool is_tuple() const override { return true; }
+
+    std::vector<std::shared_ptr<base>> elems;
+  };
+}
 struct inductive : type
 {
-  inductive(symbol readable_identifier, aligned_ast_vec&& ctrs_data, std::vector<std::int_fast32_t>&& ctrs)
-    : type(type_kind::monomorphic, readable_identifier), constructors_data(ctrs_data), constructors(ctrs)
+  inductive(symbol readable_identifier, std::vector<std::shared_ptr<constructors::base>>&& ctrs)
+    : type(type_kind::monomorphic, readable_identifier), constructors(std::move(ctrs))
   {  }
 
-  aligned_ast_vec constructors_data;
-  std::vector<std::int_fast32_t> constructors;
-
   bool is_inductive() const override { return true; }
+
+  std::vector<std::shared_ptr<constructors::base>> constructors;
 };
 

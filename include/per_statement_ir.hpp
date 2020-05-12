@@ -31,28 +31,31 @@ enum class IRNodeKind : std::int_fast8_t
 struct IRData
 {
   symbol symb;
-  const type* typ;
+  std::uint_fast32_t typ_ref { static_cast<std::uint_fast32_t>(-1) }; //<- to be inferred
 
-  std::vector<std::int_fast32_t> additional_references; // Stores an explicit position in the vector
+  std::vector<std::uint_fast32_t> additional_references; // Stores an explicit position in the vector
 };
 
 struct hx_per_statement_ir
 {
   std::vector<IRNodeKind> kinds;
-  std::vector<std::int_fast32_t> references; // stores the number of arguments per kind
+  std::vector<std::uint_fast32_t> references; // stores the number of arguments per kind
   std::vector<IRData> data;
 
-  symbol_map<std::int_fast32_t> free_variable_roots;
+  symbol_map<std::uint_fast32_t> free_variable_roots;
+
+  std::shared_ptr<symbol> node_name; // used for assign or type assign, otherwise it's the empty symbol
 
 
-  std::vector<type> types;
+  std::vector<std::shared_ptr<type>> types;
 
   void print(std::ostream& os) const
   {
+    assert(!kinds.empty() && "IR cannot be zero, there is never an empty module!");
     print_node(os, kinds.size() - 1);
   }
 private:
-  std::int_fast32_t print_node(std::ostream& os, std::int_fast32_t node) const
+  std::uint_fast32_t print_node(std::ostream& os, std::uint_fast32_t node) const
   {
     switch(kinds[node])
     {
@@ -70,10 +73,10 @@ private:
       case IRNodeKind::tuple:      {
         os << "(";
         auto cpy = node;
-        for(std::int_fast32_t i = 1; i <= references[cpy]; ++i)
+        for(std::uint_fast32_t i = 1; i <= references[cpy]; ++i)
         {
           node = print_node(os, node - 1);
-          if(i + 1 < references[cpy])
+          if(i < references[cpy])
             os << " , ";
         }
         os << ")";
@@ -89,10 +92,10 @@ private:
         os << "case (";
         node = print_node(os, node - 1);
         os << ") [";
-        for(std::int_fast32_t i = 1; i < references[cpy]; ++i)
+        for(std::uint_fast32_t i = 1; i < references[cpy]; ++i)
         {
           node = print_node(os, node - 1);
-          if(i + 1 < references[cpy])
+          if(i < references[cpy])
             os << " | ";
         }
         os << "]";
@@ -101,17 +104,60 @@ private:
       case IRNodeKind::block:      {
         os << "{";
         auto cpy = node;
-        for(std::int_fast32_t i = 1; i <= references[cpy]; ++i)
+        for(std::uint_fast32_t i = 1; i <= references[cpy]; ++i)
         {
           node = print_node(os, node - 1);
-          if(i + 1 < references[cpy])
+          if(i < references[cpy])
             os << " ; ";
         }
         os << "}";
       } break;
-      case IRNodeKind::assign:     { node = print_node(os, node - 1); os << " = ";
+      case IRNodeKind::assign:     { os << node_name->get_string() << " = ";
                                      node = print_node(os, node - 1); os << ";"; } break;
-      case IRNodeKind::assign_type: os << "[TODO] assign_type [TODO]"; break;
+      case IRNodeKind::assign_type: {
+        os << "type " << node_name->get_string() << " = ";
+        const auto& typ = *types[data[node].typ_ref];
+        auto cpy = node;
+        if(typ.is_inductive())
+        {
+          auto& ctyp = static_cast<const inductive&>(typ);
+
+          for(auto it = ctyp.constructors.begin(); it != ctyp.constructors.end(); ++it)
+          {
+            const auto* c = (*it).get();
+            if(c->is_identifier())
+            {
+              const auto* cc = static_cast<const constructors::identifier*>(c);
+
+              os << cc->id.get_string();
+            }
+            else if(c->is_app())
+            {
+              const auto& cc = static_cast<const constructors::app*>(c);
+              
+              const auto& ca = static_cast<const constructors::identifier*>(cc->caller.get());
+
+              // TODO: we need to visit the type here recursively!
+              const auto& cp = static_cast<const constructors::identifier*>(cc->param.get());
+
+              os << ca->id.get_string() << " " << cp->id.get_string();
+            }
+            else if(c->is_unit())
+            {
+              os << "()";
+            }
+            else
+              assert(false && "WIP. Operation currently unsupported.");
+
+            if(std::next(it) != ctyp.constructors.end())
+              os << " | ";
+          }
+        }
+        else
+          assert(false && "We don't support any other types besides inductive ones.");
+        node = node - references[cpy];
+        os << ";";
+      } break;
       case IRNodeKind::expr_stmt:  { node = print_node(os, node - 1); os << ";"; } break;
       case IRNodeKind::binary_exp: { auto cpy = node; os << "(("; node = print_node(os, node - 1); os << ") ";
                                      os << data[cpy].symb.get_string();

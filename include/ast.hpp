@@ -4,6 +4,9 @@
 
 #include <ast_fwd.hpp>
 
+using aligned_ast_vec = aligned_variant_vec<assign_, expr_stmt_, assign_type_, unit_, tuple_, literal_, identifier_,
+      binary_exp_, block_, top_, bot_, app_, access_, lambda_, pattern_matcher_, pattern_, match_, error_>;
+
 // Tags are needed to make variant construction unique
 namespace ast_tags
 {

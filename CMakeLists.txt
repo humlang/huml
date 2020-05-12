@@ -5,6 +5,7 @@ project(hx-lang LANGUAGES CXX VERSION 0.0.1)
 set(hx-lang_files src/reader.cpp
   src/token.cpp
   src/ast.cpp
+  src/ir.cpp
   src/symbol.cpp
   src/source_range.cpp
   src/diagnostic.cpp

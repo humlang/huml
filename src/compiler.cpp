@@ -2,6 +2,7 @@
 #include <reader.hpp>
 #include <token.hpp>
 #include <ast.hpp>
+#include <ir.hpp>
 
 #include <ast_printer.hpp>
 #include <ast_lowering.hpp>
@@ -77,6 +78,9 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         i.print(std::cout);
       }
       std::cout << "\n";
+
+      hx_ir global_ir(std::move(irs));
+
     } },
   { emit_classes::tokens, [](std::string_view t)
     {

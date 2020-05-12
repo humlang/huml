@@ -39,10 +39,6 @@ struct stateful_recursor
 private:
   F f;
 };
-template<typename S, typename F>
-F& stateful_recursor_friend_hack(stateful_recursor<S, F>& r)
-{ return r.f; }
-
 template<typename S, typename F> stateful_recursor(S&&, F&&) -> stateful_recursor<S, F>;
 // see sample for recursive visitor in ast_printer.hpp
 
@@ -104,8 +100,6 @@ using ast_type = std::variant<std::monostate,
       pattern, match,
       error
 >;
-using aligned_ast_vec = aligned_variant_vec<assign_, expr_stmt_, assign_type_, unit_, tuple_, literal_, identifier_,
-      binary_exp_, block_, top_, bot_, app_, access_, lambda_, pattern_matcher_, pattern_, match_, error_>;
 // The error node is special, as it can also be an expression or a statement.
 // To implement this in a somewhat clean way (visitors will do fine with this)
 // we introduce "optional" types, where the content is either a exp/stmt or an error
