@@ -53,10 +53,14 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
       if(!rec.state.ir.free_variable_roots.contains(id->symb()))
       {
         // add free variable to our list
-        rec.state.ir.free_variable_roots[id->symb()] = { rec.state.ir.kinds.size() - 1 };
+        rec.state.ir.free_variable_roots[id->symb()].refs.push_back(rec.state.ir.kinds.size() - 1);
+
+        auto& b = rec.state.ir.free_variable_roots[id->symb()].potentially_bounded_ref;
+        if(rec.state.is_binding)
+          b = rec.state.ir.kinds.size() - 1;
       }
       rec.state.ir.data.push_back(IRData{ id->symb(), static_cast<std::uint_fast32_t>(-1),
-          { static_cast<std::uint_fast32_t>(-rec.state.ir.free_variable_roots[id->symb()]) }});
+          { static_cast<std::uint_fast32_t>(-1) }}); // <- free variable
     }
     return rec.state.ir;
   },
@@ -88,11 +92,11 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
   },
 
   [](auto&& rec, const expr_stmt& rd) -> hx_per_statement_ir& {
-    std::visit(rec, rec.state.w[rd->exp()]);
-
     rec.state.ir.kinds.push_back(IRNodeKind::expr_stmt);
     rec.state.ir.references.push_back(1);
     rec.state.ir.data.emplace_back(IRData{ rd->symb() });
+
+    std::visit(rec, rec.state.w[rd->exp()]);
 
     rec.state.ir.node_name = nullptr;
 
@@ -101,32 +105,36 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
 
 
   [](auto&& rec, const pattern& rd) -> hx_per_statement_ir& {
-    std::visit(rec, rec.state.w[rd->pattern()]);
+    // A pattern is very similar to a lambda, as it can bind variables
 
     rec.state.ir.kinds.push_back(IRNodeKind::pattern);
     rec.state.ir.references.push_back(1);
     rec.state.ir.data.emplace_back(IRData{ rd->symb() });
+
+    rec.state.is_binding = true;
+    std::visit(rec, rec.state.w[rd->pattern()]);
+    rec.state.is_binding = false;
     return rec.state.ir;
   },
 
   [](auto&& rec, const match& pt) -> hx_per_statement_ir& {
-    std::visit(rec, rec.state.w[pt->expression()]);
-    std::visit(rec, rec.state.w[pt->pattern()]);
-
     rec.state.ir.kinds.push_back(IRNodeKind::match);
     rec.state.ir.references.push_back(2);
     rec.state.ir.data.emplace_back(IRData{ pt->symb() });
+
+    std::visit(rec, rec.state.w[pt->pattern()]);
+    std::visit(rec, rec.state.w[pt->expression()]);
     return rec.state.ir;
   },
 
   [](auto&& rec, const assign& ass) -> hx_per_statement_ir& {
-    std::visit(rec, rec.state.w[ass->exp()]);
-
     rec.state.ir.node_name = std::make_shared<symbol>(std::get<identifier>(rec.state.w[ass->var()])->symb());
 
     rec.state.ir.kinds.push_back(IRNodeKind::assign);
     rec.state.ir.references.push_back(1);
     rec.state.ir.data.emplace_back(IRData{ ass->symb() });
+
+    std::visit(rec, rec.state.w[ass->exp()]);
 
     return rec.state.ir;
   },
@@ -144,7 +152,6 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
       {
         constructors.emplace_back(std::make_shared<constructors::identifier>(
                                     std::get<identifier>(variant)->symb()));
-        std::visit(rec, variant);
       }
       else if(std::holds_alternative<app>(variant))
       {
@@ -152,7 +159,6 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
         
         auto caller_variant = rec.state.w[appl->fun()];
         assert(std::holds_alternative<identifier>(caller_variant) && "Constructors need a name.");
-        std::visit(rec, caller_variant);
 
         auto param_variant = rec.state.w[appl->argument()];
 
@@ -197,84 +203,92 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
 
   [](auto&& rec, const pattern_matcher& l) -> hx_per_statement_ir& {
     auto& v = l->match_patterns();
-    for(auto it = v.rbegin(); it != v.rend(); ++it)
-      std::visit(rec, rec.state.w[*it]);
 
-    std::visit(rec, rec.state.w[l->to_be_matched()]);
-    
     rec.state.ir.kinds.emplace_back(IRNodeKind::pattern_matcher);
     rec.state.ir.references.emplace_back(v.size() + 1);
-    rec.state.ir.data.emplace_back(IRData{ l->symb() }); // to be inferred
+    rec.state.ir.data.emplace_back(IRData{ l->symb() });
+
+    std::visit(rec, rec.state.w[l->to_be_matched()]);
+
+    for(auto it = v.begin(); it != v.end(); ++it)
+      std::visit(rec, rec.state.w[*it]);
+    
     return rec.state.ir;
   },
 
   [](auto&& rec, const block& b) -> hx_per_statement_ir& {
     auto& v = b->expressions();
-    for(auto it = v.rbegin(); it != v.rend(); ++it)
-      std::visit(rec, rec.state.w[*it]);
-    
+
     rec.state.ir.kinds.emplace_back(IRNodeKind::block);
     rec.state.ir.references.emplace_back(v.size());
-    rec.state.ir.data.emplace_back(IRData{ b->symb() }); // to be inferred
+    rec.state.ir.data.emplace_back(IRData{ b->symb() });
+
+    for(auto it = v.rbegin(); it != v.rend(); ++it)
+      std::visit(rec, rec.state.w[*it]);
     return rec.state.ir;
   },
 
   [](auto&& rec, const tuple& b) -> hx_per_statement_ir& {
     auto& v = b->expressions();
-    for(auto it = v.rbegin(); it != v.rend(); ++it)
-      std::visit(rec, rec.state.w[*it]);
-    
+
     rec.state.ir.kinds.emplace_back(IRNodeKind::tuple);
     rec.state.ir.references.emplace_back(v.size());
-    rec.state.ir.data.emplace_back(IRData{ b->symb() }); // to be inferred
+    rec.state.ir.data.emplace_back(IRData{ b->symb() });
+
+    for(auto it = v.begin(); it != v.end(); ++it)
+      std::visit(rec, rec.state.w[*it]);
     return rec.state.ir;
   },
 
   [](auto&& rec, const access& a) -> hx_per_statement_ir& {
-    std::visit(rec, rec.state.w[a->accessed_at()]);
-    std::visit(rec, rec.state.w[a->tuple()]);
-
     rec.state.ir.kinds.emplace_back(IRNodeKind::access);
     rec.state.ir.references.emplace_back(2);
-    rec.state.ir.data.emplace_back(IRData{ a->symb() }); // to be inferred
+    rec.state.ir.data.emplace_back(IRData{ a->symb() });
+
+    std::visit(rec, rec.state.w[a->tuple()]);
+    std::visit(rec, rec.state.w[a->accessed_at()]);
+
     return rec.state.ir;
   },
 
   [](auto&& rec, const lambda& a) -> hx_per_statement_ir& {
-    auto psymb = std::get<identifier>(rec.state.w[a->argument()])->symb();
-    rec.state.binder_stack.emplace_back(psymb, rec.state.ir.kinds.size() + 1);
-
-    std::visit(rec, rec.state.w[a->fbody()]);
-
-    rec.state.binder_stack.pop_back();
-
-    rec.state.ir.kinds.emplace_back(IRNodeKind::param);
-    rec.state.ir.references.emplace_back(0);
-    rec.state.ir.data.emplace_back(IRData{ psymb });
 
     rec.state.ir.kinds.emplace_back(IRNodeKind::lambda);
     rec.state.ir.references.emplace_back(2);
-    rec.state.ir.data.emplace_back(IRData{ a->symb() }); // to be inferred
+    rec.state.ir.data.emplace_back(IRData{ a->symb() });
+
+    rec.state.ir.kinds.emplace_back(IRNodeKind::param);
+    rec.state.ir.references.emplace_back(0);
+    auto psymb = std::get<identifier>(rec.state.w[a->argument()])->symb();
+    rec.state.ir.data.emplace_back(IRData{ psymb });
+
+    // Add binding occurence of identifier to stack
+    rec.state.binder_stack.emplace_back(psymb, rec.state.ir.kinds.size() - 1);
+    std::visit(rec, rec.state.w[a->fbody()]);
+    rec.state.binder_stack.pop_back();
+
     return rec.state.ir;
   },
 
   [](auto&& rec, const app& a) -> hx_per_statement_ir& {
-    std::visit(rec, rec.state.w[a->argument()]);
-    std::visit(rec, rec.state.w[a->fun()]);
-
     rec.state.ir.kinds.emplace_back(IRNodeKind::app);
     rec.state.ir.references.emplace_back(0);
-    rec.state.ir.data.emplace_back(IRData{ a->symb() }); // to be inferred
+    rec.state.ir.data.emplace_back(IRData{ a->symb() });
+
+    std::visit(rec, rec.state.w[a->fun()]);
+    std::visit(rec, rec.state.w[a->argument()]);
+
     return rec.state.ir;
   },
 
   [](auto&& rec, const binary_exp& bin) -> hx_per_statement_ir& {
-    std::visit(rec, rec.state.w[bin->get_right_exp()]);
-    std::visit(rec, rec.state.w[bin->get_left_exp()]);
-
     rec.state.ir.kinds.emplace_back(IRNodeKind::binary_exp);
     rec.state.ir.references.emplace_back(2);
-    rec.state.ir.data.emplace_back(IRData{ bin->symb() }); // to be inferred
+    rec.state.ir.data.emplace_back(IRData{ bin->symb() });
+
+    std::visit(rec, rec.state.w[bin->get_left_exp()]);
+    std::visit(rec, rec.state.w[bin->get_right_exp()]);
+
     return rec.state.ir;
   }
 };
@@ -290,6 +304,7 @@ inline static constexpr auto ast_lowering =
           decltype(v)& w;
           hx_per_statement_ir ir;
           std::vector<std::pair<symbol, std::uint_fast32_t>> binder_stack;
+          bool is_binding { false };
         };
 
         auto lam = [&v](const auto& arg) -> hx_per_statement_ir

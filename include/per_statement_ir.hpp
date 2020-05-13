@@ -42,7 +42,12 @@ struct hx_per_statement_ir
   std::vector<std::uint_fast32_t> references; // stores the number of arguments per kind
   std::vector<IRData> data;
 
-  symbol_map<std::uint_fast32_t> free_variable_roots;
+  struct free_variable
+  {
+    std::uint_fast32_t potentially_bounded_ref { static_cast<std::uint_fast32_t>(-1) };
+    std::vector<std::uint_fast32_t> refs;
+  };
+  symbol_map<free_variable> free_variable_roots;
 
   std::shared_ptr<symbol> node_name; // used for assign or type assign, otherwise it's the empty symbol
 
@@ -52,10 +57,9 @@ struct hx_per_statement_ir
   void print(std::ostream& os) const
   {
     assert(!kinds.empty() && "IR cannot be zero, there is never an empty module!");
-    print_node(os, kinds.size() - 1);
+    print_subnode(os, 0);
   }
-private:
-  std::uint_fast32_t print_node(std::ostream& os, std::uint_fast32_t node) const
+  std::uint_fast32_t print_subnode(std::ostream& os, std::uint_fast32_t node) const
   {
     switch(kinds[node])
     {
@@ -64,38 +68,38 @@ private:
       case IRNodeKind::unit:       os << "()"; break;
       case IRNodeKind::top:        os << "TOP"; break;
       case IRNodeKind::bot:        os << "BOT"; break;
-      case IRNodeKind::app:        { os << "("; node = print_node(os, node - 1);
-                                     os << ") ("; node = print_node(os, node - 1);
+      case IRNodeKind::app:        { os << "("; node = print_subnode(os, node + 1);
+                                     os << ") ("; node = print_subnode(os, node + 1);
                                      os << ")"; } break;
-      case IRNodeKind::access:     { os << "("; node = print_node(os, node - 1);
-                                     os << ").("; node = print_node(os, node - 1);
+      case IRNodeKind::access:     { os << "("; node = print_subnode(os, node + 1);
+                                     os << ").("; node = print_subnode(os, node + 1);
                                      os << ")"; } break;
       case IRNodeKind::tuple:      {
         os << "(";
         auto cpy = node;
         for(std::uint_fast32_t i = 1; i <= references[cpy]; ++i)
         {
-          node = print_node(os, node - 1);
+          node = print_subnode(os, node + 1);
           if(i < references[cpy])
             os << " , ";
         }
         os << ")";
       } break;
-      case IRNodeKind::lambda:     { os << "\\"; node = print_node(os, node - 1);
-                                     os << "."; node = print_node(os, node - 1); } break;
+      case IRNodeKind::lambda:     { os << "\\"; node = print_subnode(os, node + 1);
+                                     os << "."; node = print_subnode(os, node + 1); } break;
       case IRNodeKind::param:      os << data[node].symb; break;
-      case IRNodeKind::match:      { node = print_node(os, node - 1); os << " => ";
-                                     node = print_node(os, node - 1); } break;
-      case IRNodeKind::pattern:    node = print_node(os, node - 1); break;
+      case IRNodeKind::match:      { node = print_subnode(os, node + 1); os << " => ";
+                                     node = print_subnode(os, node + 1); } break;
+      case IRNodeKind::pattern:    node = print_subnode(os, node + 1); break;
       case IRNodeKind::pattern_matcher: {
         auto cpy = node;
         os << "case (";
-        node = print_node(os, node - 1);
+        node = print_subnode(os, node + 1);
         os << ") [";
         for(std::uint_fast32_t i = 1; i < references[cpy]; ++i)
         {
-          node = print_node(os, node - 1);
-          if(i < references[cpy])
+          node = print_subnode(os, node + 1);
+          if(i + 1 < references[cpy])
             os << " | ";
         }
         os << "]";
@@ -106,14 +110,14 @@ private:
         auto cpy = node;
         for(std::uint_fast32_t i = 1; i <= references[cpy]; ++i)
         {
-          node = print_node(os, node - 1);
+          node = print_subnode(os, node + 1);
           if(i < references[cpy])
             os << " ; ";
         }
         os << "}";
       } break;
       case IRNodeKind::assign:     { os << node_name->get_string() << " = ";
-                                     node = print_node(os, node - 1); os << ";"; } break;
+                                     node = print_subnode(os, node + 1); os << ";"; } break;
       case IRNodeKind::assign_type: {
         os << "type " << node_name->get_string() << " = ";
         const auto& typ = *types[data[node].typ_ref];
@@ -158,10 +162,10 @@ private:
         node = node - references[cpy];
         os << ";";
       } break;
-      case IRNodeKind::expr_stmt:  { node = print_node(os, node - 1); os << ";"; } break;
-      case IRNodeKind::binary_exp: { auto cpy = node; os << "(("; node = print_node(os, node - 1); os << ") ";
+      case IRNodeKind::expr_stmt:  { node = print_subnode(os, node + 1); os << ";"; } break;
+      case IRNodeKind::binary_exp: { auto cpy = node; os << "(("; node = print_subnode(os, node + 1); os << ") ";
                                      os << data[cpy].symb.get_string();
-                                     os << " ("; node = print_node(os, node - 1); os << "))"; } break;
+                                     os << " ("; node = print_subnode(os, node + 1); os << "))"; } break;
     }
     return node;
   }

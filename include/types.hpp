@@ -38,6 +38,8 @@ namespace constructors
     virtual bool is_unit() const { return false; }
     virtual bool is_app() const { return false; }
     virtual bool is_tuple() const { return false; }
+
+    virtual symbol name() const = 0;
   };
   struct identifier : base
   {
@@ -47,10 +49,15 @@ namespace constructors
 
     bool is_identifier() const override { return true; }
 
+    symbol name() const override { return id; }
+
     symbol id;
   };
   struct unit : base
-  { bool is_unit() const override { return true; } };
+  {
+    bool is_unit() const override { return true; }
+    symbol name() const override { assert(false && "ctor arg has no name"); return ""; }
+  };
   struct app : base
   {
     app(std::shared_ptr<base> caller, std::shared_ptr<base> param)
@@ -58,6 +65,8 @@ namespace constructors
     {  }
 
     bool is_app() const override { return true; }
+
+    symbol name() const override { return caller->name(); }
 
     std::shared_ptr<base> caller;
     std::shared_ptr<base> param;
@@ -69,6 +78,8 @@ namespace constructors
     {  }
 
     bool is_tuple() const override { return true; }
+
+    symbol name() const override { assert(false && "ctor arg has no name"); return ""; }
 
     std::vector<std::shared_ptr<base>> elems;
   };

@@ -70,14 +70,11 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
           irs.emplace_back(std::move(ast_lowering(w[0].ast_storage, ast_type(&store))));
         });
       }
-      std::size_t cntr = 1;
       for(auto& i : irs)
       {
-        if(cntr > 1) std::cout << "\n";
-        std::cout << "// IR " << (cntr++) << "\n";
         i.print(std::cout);
+        std::cout << "\n";
       }
-      std::cout << "\n";
 
       hx_ir global_ir(std::move(irs));
 
