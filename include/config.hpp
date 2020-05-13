@@ -13,7 +13,8 @@ enum class emit_classes
   tokens,
   ast,
   ast_pretty,
-  ir_print
+  ir_print,
+  ir_graph
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM( emit_classes, {
@@ -23,12 +24,14 @@ NLOHMANN_JSON_SERIALIZE_ENUM( emit_classes, {
   { emit_classes::ast, "ast" },
   { emit_classes::ast_pretty, "ast-pretty" },
   { emit_classes::ir_print, "ir-print" },
+  { emit_classes::ir_graph, "ir-graph" },
 })
 
 const static auto emit_classes_list = {
   emit_classes::help, emit_classes::tokens,
   emit_classes::tokens, emit_classes::ast,
-  emit_classes::ast_pretty, emit_classes::ir_print
+  emit_classes::ast_pretty, emit_classes::ir_print,
+  emit_classes::ir_graph
 };
 
 void print_emit_classes(std::FILE* f);

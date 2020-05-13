@@ -1,6 +1,6 @@
 #include <ir.hpp>
 
-#include <iostream>
+#include <iterator>
 
 hx_ir::hx_ir(std::vector<hx_per_statement_ir>&& nodes)
   : nodes(std::move(nodes))
@@ -23,17 +23,9 @@ hx_ir::hx_ir(std::vector<hx_per_statement_ir>&& nodes)
         data_constructors.insert(c->name());
     }
   }
+  std::uint_fast32_t node_index = 0;
   for(auto& n : this->nodes)
   {
-    if(!n.node_name)
-    {
-      std::cout << "FV("; n.print(std::cout); std::cout << ") = { ";
-    }
-    else
-    {
-      std::cout << "FV(" << n.node_name->get_string() << ") = { ";
-    }
-
     for(auto fv_p_it = n.free_variable_roots.begin();
         fv_p_it != n.free_variable_roots.end();
         ++fv_p_it)
@@ -43,14 +35,24 @@ hx_ir::hx_ir(std::vector<hx_per_statement_ir>&& nodes)
       /// 2. Only print if it is not a data constructor
       if(!data_constructors.contains(fv_p.first) && fv_p.second.potentially_bounded_ref == static_cast<std::uint_fast32_t>(-1))
       {
-        std::cout << fv_p.first.get_string();
+        // Check if we know this IR       TODO: Improve performance by not doing linear searches!
+        auto fit = std::find_if(this->nodes.begin(), this->nodes.end(), [&fv_p](hx_per_statement_ir& hir)
+            {
+              if(!hir.node_name)   // <- may happen for expression statements
+                return false;
+              return (!hir.node_name->get_string().empty() && *hir.node_name == fv_p.first);
+            });
 
-        if(std::next(fv_p_it) != n.free_variable_roots.end())
-          std::cout << ", ";
+        if(fit != this->nodes.end())
+        {
+          edges.push_back(edge { node_index, static_cast<std::uint_fast32_t>(fit - this->nodes.begin()) });
+        }
+        else
+          globally_free_variables.push_back(fv_p.first);
+        // TODO: make sure this thing is unique for the symbol in fv_p
       }
     }
-
-    std::cout << " };\n\n";
+    ++node_index;
   }
 }
 

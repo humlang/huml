@@ -79,6 +79,51 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
       hx_ir global_ir(std::move(irs));
 
     } },
+  { emit_classes::ir_graph, [](std::string_view t)
+    {
+      auto w = hx_reader::read<scope>(t);
+
+      std::vector<hx_per_statement_ir> irs;
+      for(auto& v : w[0].roots)
+      {
+        w[0].ast_storage.use_in(v, [&irs,&w](auto& store) {
+          irs.emplace_back(std::move(ast_lowering(w[0].ast_storage, ast_type(&store))));
+        });
+      }
+      hx_ir global_ir(std::move(irs));
+
+      std::cout << "digraph {\n";
+      for(auto& n : global_ir.nodes)
+      {
+        std::cout << "  ";
+        if(n.node_name)
+          std::cout << n.node_name->get_string() << "\n";
+        else
+        {
+          std::cout << "\""; n.print(std::cout); std::cout << "\"\n";
+        }
+      }
+
+      for(auto& e : global_ir.edges)
+      {
+        std::cout << "  ";
+        if(global_ir.nodes[e.from].node_name)
+          std::cout << global_ir.nodes[e.from].node_name->get_string();
+        else
+        {
+          std::cout << "\""; global_ir.nodes[e.from].print(std::cout); std::cout << "\"";
+        }
+        std::cout << " -> ";
+        if(global_ir.nodes[e.to].node_name)
+          std::cout << global_ir.nodes[e.to].node_name->get_string();
+        else
+        {
+          std::cout << "\""; global_ir.nodes[e.to].print(std::cout); std::cout << "\"";
+        }
+        std::cout << "\n";
+      }
+      std::cout << "}\n";
+    } },
   { emit_classes::tokens, [](std::string_view t)
     {
       auto w = hx_reader::read<token>(t);
