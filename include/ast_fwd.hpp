@@ -57,6 +57,8 @@ struct expr_stmt_;         using expr_stmt = rec_wrap_t<expr_stmt_>;
 struct lambda_;            using lambda = rec_wrap_t<lambda_>;
 // types
 struct pi_;                using pi = rec_wrap_t<pi_>;
+struct Type_;              using Type = rec_wrap_t<Type_>;
+struct Kind_;              using Kind = rec_wrap_t<Kind_>;
 // expressions + types
 struct binary_exp_;        using binary_exp = rec_wrap_t<binary_exp_>;
 struct identifier_;        using identifier = rec_wrap_t<identifier_>;
@@ -110,7 +112,9 @@ using type_type = std::variant<std::monostate,
         bot,
         app,
         access,
-        pi, // <- only difference to exp_type
+        pi, 
+        Kind,
+        Type,
         pattern_matcher,
         type_check
 >;
@@ -119,6 +123,8 @@ using ast_type = std::variant<std::monostate,
       stmt_type,
       exp_type,
       pi, // <- due to technical reasons, this is explicitly listed here instead of type_type
+      Kind,
+      Type,
       pattern, match,
       error
 >;

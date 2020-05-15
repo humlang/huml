@@ -12,6 +12,14 @@ unit_::unit_(unit_::tag, token tok)
   : base({}, tok)
 {  }
 
+Kind_::Kind_(Kind_::tag, token tok)
+  : base({}, tok)
+{  }
+
+Type_::Type_(Type_::tag, token tok)
+  : base({}, tok)
+{  }
+
 top_::top_(top_::tag, token tok)
   : base({}, tok)
 {  }

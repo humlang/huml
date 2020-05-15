@@ -45,6 +45,18 @@ inline static constexpr auto ast_printer_helper = base_visitor {
         + ">", rec.state.depth);
   },
 
+  [](auto&& rec, const Kind& id) -> void { PrinterFn print;
+    print("< Kind, id=\"" + std::to_string(id->id()) + "\""
+        + ", location=\"" + id->loc().to_string() + "\""
+        + ">", rec.state.depth);
+  },
+
+  [](auto&& rec, const Type& id) -> void { PrinterFn print;
+    print("< Type, id=\"" + std::to_string(id->id()) + "\""
+        + ", location=\"" + id->loc().to_string() + "\""
+        + ">", rec.state.depth);
+  },
+
   [](auto&& rec, const top& id) -> void { PrinterFn print;
     print("< TOP, id=\"" + std::to_string(id->id()) + "\""
         + ", location=\"" + id->loc().to_string() + "\""

@@ -75,6 +75,8 @@ private:
   std::size_t parse_case();
   std::size_t parse_top();
   std::size_t parse_bot();
+  std::size_t parse_Type();
+  std::size_t parse_Kind();
   std::size_t parse_app(std::size_t lhs);
   std::size_t parse_access(std::size_t lhs);
   std::size_t parse_lambda_or_pi();

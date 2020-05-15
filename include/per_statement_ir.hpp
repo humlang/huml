@@ -28,7 +28,9 @@ enum class IRNodeKind : std::int_fast8_t
   expr_stmt,
   binary_exp,
   type_check,
-  pi
+  pi,
+  Kind,
+  Type,
 };
 
 struct IRData

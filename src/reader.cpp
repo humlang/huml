@@ -52,7 +52,9 @@ auto keyword_set = tsl::robin_set<std::string_view>({
   "case"sv,
   "TOP"sv,
   "BOT"sv,
-  "type"sv
+  "type"sv,
+  "Type"sv,
+  "Kind"sv
 });
 
 auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
@@ -665,6 +667,22 @@ std::size_t hx_reader::parse_match()
   auto expr = parse_expression();
 
   return ast_tags::match.make_node(global_scope.ast_storage, arrow, pat, expr);
+}
+
+// e := Kind
+std::size_t hx_reader::parse_Kind()
+{
+  if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Kind))
+    return mk_error();
+  return ast_tags::Kind.make_node(global_scope.ast_storage, old);
+}
+
+// e := Type
+std::size_t hx_reader::parse_Type()
+{
+  if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Type))
+    return mk_error();
+  return ast_tags::Type.make_node(global_scope.ast_storage, old);
 }
 
 // e := top

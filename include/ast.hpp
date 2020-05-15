@@ -5,7 +5,7 @@
 #include <ast_fwd.hpp>
 
 using aligned_ast_vec = aligned_variant_vec<assign_, expr_stmt_, assign_type_, unit_, tuple_, literal_, identifier_,
-      binary_exp_, block_, top_, bot_, app_, access_, lambda_, pi_, type_check_,
+      binary_exp_, block_, top_, bot_, app_, access_, lambda_, pi_, type_check_, Type_, Kind_,
       pattern_matcher_, pattern_, match_, error_>;
 
 // Tags are needed to make variant construction unique
@@ -68,6 +68,18 @@ struct unit_ : base<unit_>
 {
 public:
   unit_(tag, token tok);
+};
+
+struct Kind_ : base<Kind_>
+{
+public:
+  Kind_(tag, token tok);
+};
+
+struct Type_ : base<Type_>
+{
+public:
+  Type_(tag, token tok);
 };
 
 struct top_ : base<top_>
@@ -279,6 +291,8 @@ namespace ast_tags
   static constexpr inline tag<assign_type_> assign_type = {  };
   static constexpr inline tag<type_check_> type_check = {  };
   static constexpr inline tag<pi_> pi = {  };
+  static constexpr inline tag<Kind_> Kind = {  };
+  static constexpr inline tag<Type_> Type = {  };
 }
 
 

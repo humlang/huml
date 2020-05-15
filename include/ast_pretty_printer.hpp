@@ -37,6 +37,14 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     print("()");
   },
 
+  [](auto&& rec, const Kind& id) -> void { PrinterFn print;
+    print("Kind");
+  },
+
+  [](auto&& rec, const Type& id) -> void { PrinterFn print;
+    print("Type");
+  },
+
   [](auto&& rec, const top& id) -> void { PrinterFn print;
     print("TOP");
   },

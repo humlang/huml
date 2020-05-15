@@ -34,6 +34,8 @@ db_entry_arg(error, unknown_token, "Can not tokenize \"{}\".");
 db_entry_arg(error, not_a_prefix, "Token \"{}\" is not a prefix.");
 db_entry_arg(error, leading_zeros, "Leading zeros for literal number \"{}\".");
 db_entry_arg(error, no_number, "\"{}\" is not a number.");
+db_entry_arg(error, expected_keyword_Kind, "Keyword \"Kind\" expected, instead got \"{}\".");
+db_entry_arg(error, expected_keyword_Type, "Keyword \"Type\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_top, "Keyword \"TOP\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_bot, "Keyword \"BOT\" expected, instead got \"{}\".");
 db_entry_arg(error, tuple_or_unit_expr_expect_lparen, "Tuple or unit expression expected a '(', instead got \"{}\".");
