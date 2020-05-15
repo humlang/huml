@@ -60,6 +60,10 @@ db_entry_arg(error, type_keyword_expected, "\"type\" keyword expected here.");
 db_entry_arg(error, type_assign_expects_equal, "Type-assign statment expects an equal here, instead got \"{}\".");
 db_entry_arg(error, type_expects_pipe, "Type declaration expects pipe to define multiple constructors, instead got \"{}\".");
 db_entry_arg(error, constructor_expected, "Constructor expected, instead got \"{}\".");
+db_entry(error, type_check_inside_type_check, "Type checking inside a type check is forbidden.");
+db_entry_arg(error, pi_expects_lparen, "Pi type expects a `(` here, instead got \"{}\".");
+db_entry_arg(error, pi_expects_rparen, "Pi type expects a `)` here, instead got \"{}\".");
+db_entry_arg(error, pi_requires_explicit_domain, "Pi type requires a domain introduced with a `:` type check, instead got \"{}\".");
 
 }
 

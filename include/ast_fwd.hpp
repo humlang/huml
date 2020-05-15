@@ -54,6 +54,10 @@ struct assign_type_;       using assign_type = rec_wrap_t<assign_type_>;
 struct expr_stmt_;         using expr_stmt = rec_wrap_t<expr_stmt_>;
 
 // expressions
+struct lambda_;            using lambda = rec_wrap_t<lambda_>;
+// types
+struct pi_;                using pi = rec_wrap_t<pi_>;
+// expressions + types
 struct binary_exp_;        using binary_exp = rec_wrap_t<binary_exp_>;
 struct identifier_;        using identifier = rec_wrap_t<identifier_>;
 struct literal_;           using literal = rec_wrap_t<literal_>;
@@ -64,7 +68,7 @@ struct bot_;               using bot = rec_wrap_t<bot_>;
 struct top_;               using top = rec_wrap_t<top_>;
 struct app_;               using app = rec_wrap_t<app_>;
 struct access_;            using access = rec_wrap_t<access_>;
-struct lambda_;            using lambda = rec_wrap_t<lambda_>;
+struct type_check_;        using type_check = rec_wrap_t<type_check_>;
 struct pattern_matcher_;   using pattern_matcher = rec_wrap_t<pattern_matcher_>;
 
 // pattern match arm
@@ -91,12 +95,30 @@ using exp_type = std::variant<std::monostate,
         app,
         access,
         lambda,
-        pattern_matcher
+        pattern_matcher,
+        type_check
+>;
+
+using type_type = std::variant<std::monostate,
+        unit,
+        tuple,
+        literal,
+        identifier,
+        binary_exp,
+        block,
+        top,
+        bot,
+        app,
+        access,
+        pi, // <- only difference to exp_type
+        pattern_matcher,
+        type_check
 >;
 
 using ast_type = std::variant<std::monostate,
       stmt_type,
       exp_type,
+      pi, // <- due to technical reasons, this is explicitly listed here instead of type_type
       pattern, match,
       error
 >;

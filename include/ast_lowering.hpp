@@ -270,6 +270,22 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
+  [](auto&& rec, const pi& p) -> hx_per_statement_ir& {
+    identifier id = std::get<identifier>(rec.state.w[p->argument()]);
+
+    // TODO: somehow determine A and B
+
+    rec.state.ir.types.emplace_back(std::make_shared<pi_type>(id->symb(), nullptr, nullptr));
+    return rec.state.ir;
+  },
+
+  [](auto&& rec, const type_check& t) -> hx_per_statement_ir& {
+    // TODO: add type to type check thingy
+
+    std::visit(rec, rec.state.w[t->rhs()]);
+    return rec.state.ir;
+  },
+
   [](auto&& rec, const app& a) -> hx_per_statement_ir& {
     rec.state.ir.kinds.emplace_back(IRNodeKind::app);
     rec.state.ir.references.emplace_back(0);

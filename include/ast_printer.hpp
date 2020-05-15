@@ -201,6 +201,32 @@ inline static constexpr auto ast_printer_helper = base_visitor {
     print("|lambda>", rec.state.depth);
   },
 
+  [](auto&& rec, const pi& p) -> void { PrinterFn print;
+    print("<|pi id=\"" + std::to_string(p->id()) + "\""
+        + ", location=\"" + p->loc().to_string() + "\"", rec.state.depth);
+
+    rec.state.depth++;
+    std::visit(rec, rec.state.w[p->argument()]);
+    std::visit(rec, rec.state.w[p->domain()]);
+    std::visit(rec, rec.state.w[p->codomain()]);
+    rec.state.depth--;
+
+    print("|pi>", rec.state.depth);
+  },
+
+
+  [](auto&& rec, const type_check& p) -> void { PrinterFn print;
+    print("<|type_check id=\"" + std::to_string(p->id()) + "\""
+        + ", location=\"" + p->loc().to_string() + "\"", rec.state.depth);
+
+    rec.state.depth++;
+    std::visit(rec, rec.state.w[p->lhs()]);
+    std::visit(rec, rec.state.w[p->rhs()]);
+    rec.state.depth--;
+
+    print("|type_check>", rec.state.depth);
+  },
+
   [](auto&& rec, const app& a) -> void { PrinterFn print;
     print("<|app id=\"" + std::to_string(a->id()) + "\""
         + ", location=\"" + a->loc().to_string() + "\"", rec.state.depth);

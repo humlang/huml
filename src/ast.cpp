@@ -40,6 +40,14 @@ lambda_::lambda_(lambda_::tag, token tok, std::size_t arg, std::size_t body)
   : base({}, tok), arg(arg), body(body)
 {  }
 
+pi_::pi_(pi_::tag, token tok, std::size_t arg, std::size_t domain, std::size_t body)
+  : base({}, tok), arg(arg), typ(domain), body(body)
+{  }
+
+type_check_::type_check_(type_check_::tag, token tok, std::size_t lhs, std::size_t rhs)
+  : base({}, tok), expr(lhs), typ(rhs)
+{  }
+
 pattern_::pattern_(pattern_::tag, token tok, std::size_t patt)
   : base({}, tok), patt(patt)
 {  }

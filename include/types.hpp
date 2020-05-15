@@ -1,33 +1,32 @@
 #pragma once
 
+#include <per_statement_ir.hpp>
 #include <symbol.hpp>
-
-enum class type_kind
-{
-  polymorphic,
-  existential,
-  monomorphic
-};
 
 struct type
 {
-  type(type_kind kind, symbol readable_identifier)
-    : kind(kind), readable_identifier(readable_identifier)
+  virtual bool is_inductive() const { return false; }
+};
+
+// we have dependend types, so we need a way to specify arbitrary expressions
+// such as "\x. x /\ ~x" or "int 32"
+struct ir_based_type
+{
+  hx_per_statement_ir type;
+};
+
+// Π(x : A). B       where B might use x. Example: Π(n : nat). Vec n
+struct pi_type : type
+{
+  pi_type(symbol binder, std::shared_ptr<type> A, std::shared_ptr<type> B)
+    : type(), binder(binder), A(A), B(B)
   {  }
 
-  virtual bool is_polymorphic() const { return false; }
-  virtual bool is_inductive() const   { return false; }
+  symbol binder;
 
-  type_kind kind;
-  symbol readable_identifier;
+  std::shared_ptr<type> A;
+  std::shared_ptr<type> B;
 };
-
-// forall alpha
-struct polymorphic : type
-{
-  bool is_polymorphic() const override { return true; }
-};
-
 
 // type nat = Zero | Succ(n : nat)
 namespace constructors
@@ -87,11 +86,12 @@ namespace constructors
 struct inductive : type
 {
   inductive(symbol readable_identifier, std::vector<std::shared_ptr<constructors::base>>&& ctrs)
-    : type(type_kind::monomorphic, readable_identifier), constructors(std::move(ctrs))
+    : name(readable_identifier), constructors(std::move(ctrs))
   {  }
 
-  bool is_inductive() const override { return true; }
+  bool is_inductive() const { return true; }
 
+  symbol name;
   std::vector<std::shared_ptr<constructors::base>> constructors;
 };
 

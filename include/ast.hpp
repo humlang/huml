@@ -5,7 +5,8 @@
 #include <ast_fwd.hpp>
 
 using aligned_ast_vec = aligned_variant_vec<assign_, expr_stmt_, assign_type_, unit_, tuple_, literal_, identifier_,
-      binary_exp_, block_, top_, bot_, app_, access_, lambda_, pattern_matcher_, pattern_, match_, error_>;
+      binary_exp_, block_, top_, bot_, app_, access_, lambda_, pi_, type_check_,
+      pattern_matcher_, pattern_, match_, error_>;
 
 // Tags are needed to make variant construction unique
 namespace ast_tags
@@ -125,6 +126,32 @@ public:
 private:
   std::size_t arg;
   std::size_t body;
+};
+
+struct pi_ : base<pi_>
+{
+public:
+  pi_(tag, token tok, std::size_t arg, std::size_t domain, std::size_t body);
+
+  std::size_t argument() const { return arg; }
+  std::size_t domain() const { return typ; }
+  std::size_t codomain() const { return body; }
+private:
+  std::size_t arg;
+  std::size_t typ;
+  std::size_t body;
+};
+
+struct type_check_ : base<type_check_>
+{
+public:
+  type_check_(tag, token tok, std::size_t lhs, std::size_t rhs);
+
+  std::size_t lhs() const { return expr; }
+  std::size_t rhs() const { return typ; }
+private:
+  std::size_t expr;
+  std::size_t typ;
 };
 
 struct pattern_ : base<pattern_>
@@ -250,6 +277,8 @@ namespace ast_tags
   static constexpr inline tag<access_> access = {  };
   static constexpr inline tag<lambda_> lambda = {  };
   static constexpr inline tag<assign_type_> assign_type = {  };
+  static constexpr inline tag<type_check_> type_check = {  };
+  static constexpr inline tag<pi_> pi = {  };
 }
 
 

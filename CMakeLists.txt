@@ -13,6 +13,7 @@ set(hx-lang_files src/reader.cpp
   src/program.cpp
   src/fixit_info.cpp
   src/compiler.cpp
+  src/per_statement_ir.cpp
   )
 
 set(hx-lang_vm_files src/vm.cpp

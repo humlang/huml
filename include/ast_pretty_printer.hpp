@@ -182,6 +182,28 @@ inline static constexpr auto ast_pretty_printer_helper = base_visitor {
     rec.state.depth--;
   },
 
+  [](auto&& rec, const pi& a) -> void { PrinterFn print;
+    rec.state.depth++;
+    print("(\\(");
+    std::visit(rec, rec.state.w[a->argument()]);
+    print(":");
+    std::visit(rec, rec.state.w[a->domain()]);
+    print("). ");
+    std::visit(rec, rec.state.w[a->codomain()]);
+    print(")");
+    rec.state.depth--;
+  },
+
+  [](auto&& rec, const type_check& a) -> void { PrinterFn print;
+    rec.state.depth++;
+    print("(");
+    std::visit(rec, rec.state.w[a->lhs()]);
+    print(" : ");
+    std::visit(rec, rec.state.w[a->rhs()]);
+    print(")");
+    rec.state.depth--;
+  },
+
   [](auto&& rec, const app& a) -> void { PrinterFn print;
     rec.state.depth++;
     print("((");

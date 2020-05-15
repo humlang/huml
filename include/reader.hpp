@@ -67,6 +67,7 @@ private:
 
   std::size_t parse_constructor();
 
+  std::size_t parse_type_check(std::size_t left);
   std::size_t parse_literal();
   std::size_t parse_identifier();
   std::size_t parse_block();
@@ -76,12 +77,12 @@ private:
   std::size_t parse_bot();
   std::size_t parse_app(std::size_t lhs);
   std::size_t parse_access(std::size_t lhs);
-  std::size_t parse_lambda();
+  std::size_t parse_lambda_or_pi();
   std::size_t parse_keyword();
   std::size_t parse_match();
   std::size_t parse_statement();
   std::size_t parse_prefix();
-  std::size_t  parse_pattern();
+  std::size_t parse_pattern();
   std::size_t parse_binary(std::size_t left);
   std::size_t parse_expression(int precedence = 0);
   int precedence();
@@ -95,6 +96,8 @@ private:
 
   bool parsing_pattern { false };
   bool parsing_constructor { false };
+  bool parsing_type_checking { false };
+
   std::vector<fixit_info> fixits_stack;
 };
 

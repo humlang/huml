@@ -558,23 +558,46 @@ std::size_t hx_reader::parse_access(std::size_t lhs)
   return ast_tags::access.make_node(global_scope.ast_storage, old, lhs, parse_expression());
 }
 
-// e := `\\` id `.` e       id can be _ to simply ignore the argument
-std::size_t hx_reader::parse_lambda()
+// e := `\\` id `.` e       id can be _ to simply ignore the argument. Note that `\\` is a single backslash
+//   For types we have a Pi type
+// e := `\\` `(` x `:` A  `)` `.` B        where both A,B are types.
+//                                         parantheses are needed to distinguish between pi and tuple access
+std::size_t hx_reader::parse_lambda_or_pi()
 {
   auto lam_tok = current;
   if(!expect('\\', diagnostic_db::parser::lambda_expects_lambda))
     return mk_error();
+  
+  if(parsing_type_checking && !expect('(', diagnostic_db::parser::pi_expects_lparen))
+    return mk_error();
   parsing_pattern = true;
-
   auto param = parse_identifier();
-
   parsing_pattern = false;
+
+  std::size_t domain = static_cast<std::size_t>(-1);
+  if(parsing_type_checking)
+  {
+    if(!expect(':', diagnostic_db::parser::pi_requires_explicit_domain))
+      return mk_error();
+
+    // parse the domain type
+    domain = parse_expression();
+
+    if(!expect(')', diagnostic_db::parser::pi_expects_rparen))
+      return mk_error();
+  }
   
   if(!expect('.', diagnostic_db::parser::lambda_expects_dot))
     return mk_error();
   auto expr = parse_expression();
 
   lam_tok.loc += old.loc;
+
+  if(parsing_type_checking)
+  {
+    assert(domain != static_cast<std::size_t>(-1) && "Domain must be valid here!");
+    return ast_tags::pi.make_node(global_scope.ast_storage, lam_tok, param, domain, expr);
+  }
   return ast_tags::lambda.make_node(global_scope.ast_storage, lam_tok, param, expr);
 }
 
@@ -941,9 +964,30 @@ std::size_t hx_reader::parse_prefix()
         diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
         return mk_error();
       }
-      return parse_lambda();
+      return parse_lambda_or_pi();
     }
   }
+}
+
+// e `:` t
+std::size_t hx_reader::parse_type_check(std::size_t left)
+{
+  if(parsing_type_checking) // can't type check inside a type check
+  {
+    diagnostic <<= diagnostic_db::parser::type_check_inside_type_check(current.loc);
+    return mk_error();
+  }
+  // We only call this function if we have seen the colon before!
+  assert(expect(':', diagnostic_db::parser::unknown_token));
+  auto colon = old;
+
+  // We have dependent types, so the type is arbitrary
+  // However, any lambda becomes a Pi.
+  parsing_type_checking = true;
+  std::size_t right = parse_expression();
+  parsing_type_checking = false;
+
+  return ast_tags::type_check.make_node(global_scope.ast_storage, colon, left, right);
 }
 
 // e
@@ -954,7 +998,6 @@ std::size_t hx_reader::parse_expression(int precedence)
   if(std::holds_alternative<error>(global_scope.ast_storage[prefix]))
     return prefix;
 
-  exp_type infix;
   while(precedence < this->precedence())
   {
     switch(current.kind)
@@ -970,6 +1013,11 @@ std::size_t hx_reader::parse_expression(int precedence)
       case token_kind::Doublearrow:
       {
         return prefix;
+      } break;
+
+      case token_kind::Colon:
+      {
+        return parse_type_check(prefix);
       } break;
 
       default:
@@ -1007,6 +1055,7 @@ std::size_t hx_reader::parse_expression(int precedence)
     }
     if(std::holds_alternative<error>(global_scope.ast_storage[prefix]))
     {
+      // TODO
       return prefix;
     }
   }
