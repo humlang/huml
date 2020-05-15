@@ -72,6 +72,20 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     return rec.state.ir;
   },
 
+  [](auto&& rec, const Type& id) -> hx_per_statement_ir& {
+    rec.state.ir.kinds.push_back(IRNodeKind::Type);
+    rec.state.ir.references.push_back(0);
+    rec.state.ir.data.push_back(IRData{ "Type" });
+    return rec.state.ir;
+  },
+
+  [](auto&& rec, const Kind& id) -> hx_per_statement_ir& {
+    rec.state.ir.kinds.push_back(IRNodeKind::Kind);
+    rec.state.ir.references.push_back(0);
+    rec.state.ir.data.push_back(IRData{ "Kind" });
+    return rec.state.ir;
+  },
+
   [](auto&& rec, const top& id) -> hx_per_statement_ir& {
     rec.state.ir.kinds.push_back(IRNodeKind::top);
     rec.state.ir.references.push_back(0);
@@ -266,22 +280,30 @@ inline static constexpr auto ast_lowering_helper = base_visitor {
     rec.state.binder_stack.emplace_back(psymb, rec.state.ir.kinds.size() - 1);
     std::visit(rec, rec.state.w[a->fbody()]);
     rec.state.binder_stack.pop_back();
-
     return rec.state.ir;
   },
 
   [](auto&& rec, const pi& p) -> hx_per_statement_ir& {
-    identifier id = std::get<identifier>(rec.state.w[p->argument()]);
+    // TODO: somehow add type pi, A and B to thingy?
 
-    // TODO: somehow determine A and B
+    rec.state.ir.kinds.emplace_back(IRNodeKind::pi);
+    rec.state.ir.references.emplace_back(3);
+    rec.state.ir.data.emplace_back(IRData{ p->symb() });
 
-    rec.state.ir.types.emplace_back(std::make_shared<pi_type>(id->symb(), nullptr, nullptr));
+    std::visit(rec, rec.state.w[p->argument()]);
+    std::visit(rec, rec.state.w[p->domain()]);
+    std::visit(rec, rec.state.w[p->codomain()]);
     return rec.state.ir;
   },
 
   [](auto&& rec, const type_check& t) -> hx_per_statement_ir& {
-    // TODO: add type to type check thingy
+    // TODO: add type to type check thingy?
 
+    rec.state.ir.kinds.emplace_back(IRNodeKind::type_check);
+    rec.state.ir.references.emplace_back(2);
+    rec.state.ir.data.emplace_back(IRData{ t->symb() });
+
+    std::visit(rec, rec.state.w[t->lhs()]);
     std::visit(rec, rec.state.w[t->rhs()]);
     return rec.state.ir;
   },

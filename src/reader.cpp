@@ -77,6 +77,7 @@ auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
 });
 
 auto token_precedence_map = tsl::robin_map<token_kind, int>( {
+  {token_kind::Colon, 1},
   {token_kind::Dot, 7},
   {token_kind::Plus, 5},
   {token_kind::Minus, 5},
@@ -850,17 +851,13 @@ std::size_t hx_reader::parse_statement()
 
 std::size_t hx_reader::parse_keyword()
 {
-  if(current.data == symbol("case"))
+  switch(current.data.get_hash())
   {
-    return parse_case();
-  }
-  else if(current.data == symbol("TOP"))
-  {
-    return parse_top();
-  }
-  else if(current.data == symbol("BOT"))
-  {
-    return parse_bot();
+  case hash_string("case"): return parse_case();
+  case hash_string("TOP"):  return parse_top();
+  case hash_string("BOT"):  return parse_bot();
+  case hash_string("Type"): return parse_Type();
+  case hash_string("Kind"): return parse_Kind();
   }
   assert(false && "bug in lexer, we would not see a keyword token otherwise");
   return mk_error();
