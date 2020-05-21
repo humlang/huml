@@ -34,7 +34,7 @@ void parse(int argc, const char** argv, std::FILE* out)
     ("h,?,-help", "Prints this text.", std::make_any<bool>(false), "false", [](auto x){ return std::make_any<bool>(true); })
     (",f,-files", "Accepts arbitrary list of files.", std::make_any<std::vector<std::string_view>>(), "STDIN",
       [out](auto x){ std::vector<std::string_view> w; for(auto v : x) w.push_back(v); return w; })
-    ("-emit=", "Choose what to emit. Set to \"help\" to get a list.", std::make_any<emit_classes>(emit_classes::ast), "ast",
+    ("-emit=", "Choose what to emit. Set to \"help\" to get a list.", std::make_any<emit_classes>(emit_classes::help), "help",
       [](auto x)
       {
         assert(x.size() == 1);

@@ -3,95 +3,112 @@
 #include <per_statement_ir.hpp>
 #include <symbol.hpp>
 
-struct type
+struct type_base
 {
-  virtual bool is_inductive() const { return false; }
+  virtual void print(std::ostream&) = 0;
 };
 
-// we have dependend types, so we need a way to specify arbitrary expressions
-// such as "\x. x /\ ~x" or "int 32"
-struct ir_based_type
+struct type_table
 {
-  hx_per_statement_ir type;
+  type_table();
+
+  static constexpr std::size_t Kind_sort_idx = 0;
+  static constexpr std::size_t Type_sort_idx = 1;
+  static constexpr std::size_t Prop_sort_idx = 2;
+  static constexpr std::size_t Unit_idx = 3;
+
+  std::shared_ptr<type_base> operator[](std::size_t idx) { return types[idx]; }
+
+  std::vector<std::shared_ptr<type_base>> types;
 };
 
-// Π(x : A). B       where B might use x. Example: Π(n : nat). Vec n
-struct pi_type : type
+struct Kind_sort : type_base
+{ void print(std::ostream& os) override { os << "Kind"; } };
+
+struct Type_sort : type_base
+{ void print(std::ostream& os) override { os << "Type"; } };
+
+struct Prop_sort : type_base
+{ void print(std::ostream& os) override { os << "Prop"; } };
+
+// This is for values such as `n` in `Vec n Nat`
+struct IdTypeBox : type_base
 {
-  pi_type(symbol binder, std::shared_ptr<type> A, std::shared_ptr<type> B)
-    : type(), binder(binder), A(A), B(B)
+  IdTypeBox(symbol id, std::shared_ptr<type_base> type)
+    : id(id), type(type)
   {  }
 
-  symbol binder;
+  void print(std::ostream& os) override { os << id.get_string() << " : "; type->print(os); }
 
-  std::shared_ptr<type> A;
-  std::shared_ptr<type> B;
+  symbol id;
+  std::shared_ptr<type_base> type;
 };
 
-// type nat = Zero | Succ(n : nat)
-namespace constructors
+// This is interesting. Types and values could have similar references.
+struct type_or_value_ref : type_base
 {
-  struct base
-  {
-    virtual bool is_identifier() const { return false; }   
-    virtual bool is_unit() const { return false; }
-    virtual bool is_app() const { return false; }
-    virtual bool is_tuple() const { return false; }
-
-    virtual symbol name() const = 0;
-  };
-  struct identifier : base
-  {
-    identifier(symbol symb)
-      : id(symb)
-    {  }
-
-    bool is_identifier() const override { return true; }
-
-    symbol name() const override { return id; }
-
-    symbol id;
-  };
-  struct unit : base
-  {
-    bool is_unit() const override { return true; }
-    symbol name() const override { assert(false && "ctor arg has no name"); return ""; }
-  };
-  struct app : base
-  {
-    app(std::shared_ptr<base> caller, std::shared_ptr<base> param)
-      : caller(caller), param(param)
-    {  }
-
-    bool is_app() const override { return true; }
-
-    symbol name() const override { return caller->name(); }
-
-    std::shared_ptr<base> caller;
-    std::shared_ptr<base> param;
-  };
-  struct tuple : base
-  {
-    tuple(std::vector<std::shared_ptr<base>> elems)
-      : elems(elems)
-    {  }
-
-    bool is_tuple() const override { return true; }
-
-    symbol name() const override { assert(false && "ctor arg has no name"); return ""; }
-
-    std::vector<std::shared_ptr<base>> elems;
-  };
-}
-struct inductive : type
-{
-  inductive(symbol readable_identifier, std::vector<std::shared_ptr<constructors::base>>&& ctrs)
-    : name(readable_identifier), constructors(std::move(ctrs))
+  type_or_value_ref(symbol name)
+    : name(name)
   {  }
 
-  bool is_inductive() const { return true; }
+  void print(std::ostream& os) override { os << name.get_string(); }
 
   symbol name;
-  std::vector<std::shared_ptr<constructors::base>> constructors;
 };
+
+// Sample type_base constructor for equality: eq : Pi (A : Type). Pi (_ : A). Pi (_ : A). Prop
+struct type_constructor : IdTypeBox 
+{
+  type_constructor(symbol id, std::shared_ptr<type_base> type)
+    : IdTypeBox(id, type)
+  {  }
+};
+
+/////////// NON TYPE BEGIN
+
+// These are data constructors such as `Zero : nat` and `Succ : nat -> nat`
+struct data_constructor : IdTypeBox
+{
+  data_constructor(symbol id, std::shared_ptr<type_base> type)
+    : IdTypeBox(id, type)
+  {  }
+};
+struct data_constructors
+{
+  data_constructors(std::shared_ptr<type_base> constructs)
+    : constructs(constructs)
+  {  }
+
+  std::shared_ptr<type_base> constructs;
+  std::vector<data_constructor> data;
+};
+
+/////////// NON TYPE END
+
+// Π(x : A). B       where B might use x. Example: Π(n : nat). Vec n
+struct pi_type : type_base
+{
+  pi_type(std::shared_ptr<IdTypeBox> binder, std::shared_ptr<type_base> body)
+    : type_base(), binder(binder), body(body)
+  {  }
+
+  void print(std::ostream& os) override { os << "\\ ("; binder->print(os); os << "). "; body->print(os); }
+
+  std::shared_ptr<type_base> binder;
+  std::shared_ptr<type_base> body; // allowed to use argument
+};
+
+// A B
+struct application : type_base
+{
+  application(std::shared_ptr<type_base> A, std::shared_ptr<type_base> B)
+    : A(A), B(B)
+  {  }
+
+  void print(std::ostream& os) override { A->print(os); os << " "; B->print(os); }
+
+  std::shared_ptr<type_base> A;
+  std::shared_ptr<type_base> B;
+};
+
 

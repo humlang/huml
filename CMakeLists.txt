@@ -4,7 +4,6 @@ project(hx-lang LANGUAGES CXX VERSION 0.0.1)
 
 set(hx-lang_files src/reader.cpp
   src/token.cpp
-  src/ast.cpp
   src/ir.cpp
   src/symbol.cpp
   src/source_range.cpp
@@ -14,16 +13,19 @@ set(hx-lang_files src/reader.cpp
   src/fixit_info.cpp
   src/compiler.cpp
   src/per_statement_ir.cpp
+  src/types.cpp
+  src/type_checking.cpp
   )
 
 set(hx-lang_vm_files src/vm.cpp
   src/repl.cpp
+  src/ir.cpp
+  src/types.cpp
   src/assembler.cpp
   src/program.cpp
   src/symbol.cpp
   src/reader.cpp
   src/token.cpp
-  src/ast.cpp
   src/diagnostic.cpp
   src/stream_lookup.cpp
   src/source_range.cpp
@@ -37,8 +39,13 @@ find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Threads REQUIRED)
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -ggdb")
+option(USE_WERROR_DBG "Treat warnings as errors when compiling hx-lang." ON)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -ggdb -Wpedantic -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -Wno-implicit-fallthrough")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
+
+if(USE_WERROR_DBG)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Werror")
+endif()
 
 # tests
 find_package(Catch2 REQUIRED)

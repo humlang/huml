@@ -3,8 +3,8 @@
 #include <source_range.hpp>
 #include <fixit_info.hpp>
 #include <symbol.hpp>
-#include <scope.hpp>
-#include <ast.hpp>
+#include <token.hpp>
+#include <ir.hpp>
 
 #include <unordered_map>
 #include <cassert>
@@ -41,6 +41,7 @@ class hx_reader : base_reader
 {
 public:
   static constexpr std::size_t lookahead_size = 1;
+  static constexpr std::size_t error_ref = static_cast<std::size_t>(-1);
 
   template<typename T>
   static std::vector<T> read(std::string_view module) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
@@ -61,9 +62,18 @@ private:
   // always uses old for the error
   std::size_t mk_error();
 
+  std::shared_ptr<type_base> parse_type_prefix();
+  std::shared_ptr<type_base> parse_type(int precedence = 0);
+  std::shared_ptr<type_base> parse_pi();
+  std::shared_ptr<type_base> parse_kind();
+  std::shared_ptr<type_base> parse_type_identifier();
+  std::shared_ptr<type_base> parse_type_app(std::shared_ptr<type_base> lhs);
+  std::shared_ptr<type_base> parse_parenthesized_type();
+
   std::size_t parse_assign();
   std::size_t parse_expr_stmt();
-  std::size_t parse_type_assign();
+  std::size_t parse_type_ctor();
+  std::size_t parse_data_ctor();
 
   std::size_t parse_constructor();
 
@@ -75,11 +85,12 @@ private:
   std::size_t parse_case();
   std::size_t parse_top();
   std::size_t parse_bot();
+  std::size_t parse_Prop();
   std::size_t parse_Type();
   std::size_t parse_Kind();
   std::size_t parse_app(std::size_t lhs);
   std::size_t parse_access(std::size_t lhs);
-  std::size_t parse_lambda_or_pi();
+  std::size_t parse_lambda();
   std::size_t parse_keyword();
   std::size_t parse_match();
   std::size_t parse_statement();
@@ -94,7 +105,13 @@ private:
   token current;
   std::array<token, lookahead_size> next_toks;
 
-  scope global_scope;
+  hx_ir global_scope;
+  struct scoping_context
+  {
+    bool is_binding { false };
+    std::vector<std::pair<symbol, std::uint_fast32_t>> binder_stack;
+  };
+  scoping_context scoping_ctx;
 
   bool parsing_pattern { false };
   bool parsing_constructor { false };

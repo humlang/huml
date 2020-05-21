@@ -1,6 +1,9 @@
 #pragma once
 
 #include <per_statement_ir.hpp>
+#include <types.hpp>
+
+struct type_base;
 
 struct hx_ir
 {
@@ -13,11 +16,17 @@ struct hx_ir
     { return from < other.from && to < other.to; }
   };
 
-  hx_ir(std::vector<hx_per_statement_ir>&& nodes); 
+  hx_ir(); 
+
+  void build_graph();
 
   std::vector<hx_per_statement_ir> nodes;
   std::vector<edge> edges;
 
+  std::vector<data_constructors> constructors;
+
   std::vector<symbol> globally_free_variables;
+
+  type_table types;
 };
 

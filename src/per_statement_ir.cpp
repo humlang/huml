@@ -1,6 +1,8 @@
 #include <per_statement_ir.hpp>
 #include <types.hpp>
 
+void print_type(std::ostream& os, std::shared_ptr<type_base> type);
+
 std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, std::uint_fast32_t node) const
 {
   switch(kinds[node])
@@ -12,8 +14,8 @@ std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, std::uin
     case IRNodeKind::bot:        os << "BOT"; break;
     case IRNodeKind::Kind:       os << "Kind"; break;
     case IRNodeKind::Type:       os << "Type"; break;
-    case IRNodeKind::type_check: { os << "(("; node = print_subnode(os, node + 1);
-                                   os << ") : "; node = print_subnode(os, node + 1); os << ")"; } break;
+    case IRNodeKind::type_check: { auto cpy = node; os << "(("; node = print_subnode(os, node + 1);
+                                   os << ") : "; data[cpy].type_annot->print(os); os << ")"; } break;
     case IRNodeKind::app:        { os << "("; node = print_subnode(os, node + 1);
                                    os << ") ("; node = print_subnode(os, node + 1);
                                    os << ")"; } break;
@@ -65,50 +67,16 @@ std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, std::uin
       }
       os << "}";
     } break;
-    case IRNodeKind::assign:     { os << node_name->get_string() << " = ";
+    case IRNodeKind::assign:     { node = print_subnode(os, node + 1); os << " = ";
                                    node = print_subnode(os, node + 1); os << ";"; } break;
     case IRNodeKind::assign_type: {
-      os << "type " << node_name->get_string() << " = ";
-      const auto& typ = *types[data[node].typ_ref];
-      auto cpy = node;
-      if(typ.is_inductive())
-      {
-        auto& ctyp = static_cast<const inductive&>(typ);
-
-        for(auto it = ctyp.constructors.begin(); it != ctyp.constructors.end(); ++it)
-        {
-          const auto* c = (*it).get();
-          if(c->is_identifier())
-          {
-            const auto* cc = static_cast<const constructors::identifier*>(c);
-
-            os << cc->id.get_string();
-          }
-          else if(c->is_app())
-          {
-            const auto& cc = static_cast<const constructors::app*>(c);
-            
-            const auto& ca = static_cast<const constructors::identifier*>(cc->caller.get());
-
-            // TODO: we need to visit the type here recursively!
-            const auto& cp = static_cast<const constructors::identifier*>(cc->param.get());
-
-            os << ca->id.get_string() << " " << cp->id.get_string();
-          }
-          else if(c->is_unit())
-          {
-            os << "()";
-          }
-          else
-            assert(false && "WIP. Operation currently unsupported.");
-
-          if(std::next(it) != ctyp.constructors.end())
-            os << " | ";
-        }
-      }
-      else
-        assert(false && "We don't support any other types besides inductive ones.");
-      node = node - references[cpy];
+      os << "type " << data[node].symb << " : ";
+      print_type(os, data[node].type_annot);
+      os << ";";
+    } break;
+    case IRNodeKind::assign_data: {
+      os << "data " << data[node].symb << " : ";
+      print_type(os, data[node].type_annot);
       os << ";";
     } break;
     case IRNodeKind::expr_stmt:  { node = print_subnode(os, node + 1); os << ";"; } break;
@@ -117,5 +85,10 @@ std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, std::uin
                                    os << " ("; node = print_subnode(os, node + 1); os << "))"; } break;
   }
   return node;
+}
+
+void print_type(std::ostream& os, std::shared_ptr<type_base> type)
+{
+  type->print(os);
 }
 

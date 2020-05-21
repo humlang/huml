@@ -3,25 +3,21 @@
 
 #include <iterator>
 
-hx_ir::hx_ir(std::vector<hx_per_statement_ir>&& nodes)
-  : nodes(std::move(nodes))
+hx_ir::hx_ir()
+  : nodes()
+{  }
+
+void hx_ir::build_graph()
 {
   // create edges
 
   /// 1. Collect all free variables of the type declarations.
   symbol_set data_constructors;
-  for(auto& n : this->nodes)
+  for(auto& ctors_for_type : constructors)
   {
-    assert(!n.kinds.empty() && "IR cannot contain zero sized node, empty modules are disallowed!");
-
-    if(n.kinds.back() == IRNodeKind::assign_type)
+    for(auto& n : ctors_for_type.data)
     {
-      assert(n.types.size() == 1 && "Assign type must yield exactly one type.");
-      assert(n.types.back()->is_inductive() && "Assign type must be inductive.");
-      
-      auto& ityp = *static_cast<inductive*>(n.types.back().get());
-      for(auto& c : ityp.constructors)
-        data_constructors.insert(c->name());
+      data_constructors.insert(n.id);
     }
   }
   std::uint_fast32_t node_index = 0;
@@ -49,7 +45,9 @@ hx_ir::hx_ir(std::vector<hx_per_statement_ir>&& nodes)
           edges.push_back(edge { node_index, static_cast<std::uint_fast32_t>(fit - this->nodes.begin()) });
         }
         else
+        {
           globally_free_variables.push_back(fv_p.first);
+        }
         // TODO: make sure this thing is unique for the symbol in fv_p
       }
     }

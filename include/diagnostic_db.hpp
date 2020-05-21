@@ -32,8 +32,10 @@ db_entry(error, empty_module, "Module must not be empty.");
 db_entry_arg(error, assign_expects_equal, "Assign statment expects an equal here, instead got \"{}\".");
 db_entry_arg(error, unknown_token, "Can not tokenize \"{}\".");
 db_entry_arg(error, not_a_prefix, "Token \"{}\" is not a prefix.");
+db_entry_arg(error, not_a_sort, "Token \"{}\" is not a sort.");
 db_entry_arg(error, leading_zeros, "Leading zeros for literal number \"{}\".");
 db_entry_arg(error, no_number, "\"{}\" is not a number.");
+db_entry_arg(error, expected_keyword_Prop, "Keyword \"Prop\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_Kind, "Keyword \"Kind\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_Type, "Keyword \"Type\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_top, "Keyword \"TOP\" expected, instead got \"{}\".");
@@ -41,6 +43,8 @@ db_entry_arg(error, expected_keyword_bot, "Keyword \"BOT\" expected, instead got
 db_entry_arg(error, tuple_or_unit_expr_expect_lparen, "Tuple or unit expression expected a '(', instead got \"{}\".");
 db_entry_arg(error, tuple_expects_comma, "Tuple expects a comma here, instead got \"{}\".");
 db_entry_arg(error, tuple_expects_closing_paranthesis, "Tuple expected a closing parenthesis, instead got \"{}\".");
+db_entry_arg(error, type_ctor_param_expects_closing_paranthesis, "Parameter of type constructor expects a closing parenthesis, instead got \"{}\".");
+db_entry_arg(error, type_ctor_param_expects_colon, "Parameter of type constructor expects a \":\", instead got \"{}\".");
 db_entry_arg(error, case_expects_lbracket, "Case expects an \"[\" here, instead got \"{}\".");
 db_entry_arg(error, case_expects_rbracket, "Case expects an \"]\" here, instead got \"{}\".");
 db_entry_arg(error, case_expects_keyword, "Keyword expected for case expression, instead got \"{}\".");
@@ -63,6 +67,7 @@ db_entry_arg(error, type_assign_expects_equal, "Type-assign statment expects an 
 db_entry_arg(error, type_expects_pipe, "Type declaration expects pipe to define multiple constructors, instead got \"{}\".");
 db_entry_arg(error, constructor_expected, "Constructor expected, instead got \"{}\".");
 db_entry(error, type_check_inside_type_check, "Type checking inside a type check is forbidden.");
+db_entry_arg(error, type_expects_lparen, "Type expects a `(` here, instead got \"{}\".");
 db_entry_arg(error, pi_expects_lparen, "Pi type expects a `(` here, instead got \"{}\".");
 db_entry_arg(error, pi_expects_rparen, "Pi type expects a `)` here, instead got \"{}\".");
 db_entry_arg(error, pi_requires_explicit_domain, "Pi type requires a domain introduced with a `:` type check, instead got \"{}\".");
