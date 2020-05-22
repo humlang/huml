@@ -3,8 +3,6 @@
 #include <per_statement_ir.hpp>
 #include <types.hpp>
 
-struct type_base;
-
 struct hx_ir
 {
   struct edge
@@ -24,8 +22,6 @@ struct hx_ir
 
   std::vector<hx_per_statement_ir> nodes;
   std::vector<edge> edges;
-
-  std::vector<data_constructors> constructors;
 
   std::vector<symbol> globally_free_variables;
 

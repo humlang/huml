@@ -566,7 +566,7 @@ std::size_t hx_reader::parse_identifier()
     else
     {
       return IRTags::identifier.make_node(global_scope.nodes.back(),
-                                          IRData { old.data, nullptr, present->second },
+                                          IRData { old.data, static_cast<std::uint_fast32_t>(-1), present->second },
                                           IRDebugData { old.loc });
     }
   }
@@ -790,87 +790,86 @@ std::size_t hx_reader::parse_block()
   return to_ret;
 }
 
-std::shared_ptr<type_base> hx_reader::parse_kind()
+std::size_t hx_reader::parse_kind()
 {
   switch(current.data.get_hash())
   {
   default: {
     diagnostic <<= diagnostic_db::parser::not_a_sort(current.loc, current.data.get_string());
-    return nullptr;
+    return mk_error();
   }
 
   case hash_string("Type"): {
     if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Type))
-      return nullptr;
-    return global_scope.types[global_scope.types.Type_sort_idx];
+      return mk_error();
+    return global_scope.types.Type_sort_idx;
   }
   case hash_string("Kind"): {
     if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Kind))
-      return nullptr;
-    return global_scope.types[global_scope.types.Kind_sort_idx];
+      return mk_error();
+    return global_scope.types.Kind_sort_idx;
   }
   case hash_string("Prop"): {
     if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Prop))
-      return nullptr;
-    return global_scope.types[global_scope.types.Prop_sort_idx];
+      return mk_error();
+    return global_scope.types.Prop_sort_idx;
   }
   }
   assert(false && "unreachable");
-  return nullptr;
+  return mk_error();
 }
 
 // type := `\` `(` id `:` type `)` `.` type
-std::shared_ptr<type_base> hx_reader::parse_pi()
+std::size_t hx_reader::parse_pi()
 {
   auto lam_tok = current;
   if(!expect('\\', diagnostic_db::parser::lambda_expects_lambda))
-    return nullptr;
+    return mk_error();
   
   if(!expect('(', diagnostic_db::parser::pi_expects_lparen))
-    return nullptr;
+    return mk_error();
 
   if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
   {
     fixits_stack.back().changes.emplace_back(old.loc.snd_proj(), nlohmann::json { {"what", old.loc},
                                                                        {"how", "id"} });
-    return nullptr;
+    return mk_error();
   }
   symbol arg_name = old.data;
   parsing_pattern = false;
 
   if(!expect(':', diagnostic_db::parser::pi_requires_explicit_domain))
-    return nullptr;
+    return mk_error();
 
   // parse the domain type
   auto domain_type = parse_type();
 
-  auto domain = std::make_shared<IdTypeBox>(arg_name, domain_type);
+  auto domain = type_tags::id.make_node(global_scope.types, TypeData { arg_name, { domain_type } });
 
   if(!expect(')', diagnostic_db::parser::pi_expects_rparen))
-    return nullptr;
+    return mk_error();
   
   if(!expect('.', diagnostic_db::parser::lambda_expects_dot))
-    return nullptr;
+    return mk_error();
   auto body = parse_type();
 
   lam_tok.loc += old.loc;
-  assert(domain != nullptr && "Domain must be valid here!");
-  return std::make_shared<pi_type>(domain, body);
+  return type_tags::pi.make_node(global_scope.types, TypeData { "", { domain, body } });
 }
 
-std::shared_ptr<type_base> hx_reader::parse_parenthesized_type()
+std::size_t hx_reader::parse_parenthesized_type()
 {
   if(!expect('(', diagnostic_db::parser::type_expects_lparen))
-    return nullptr;
+    return mk_error();
 
   auto typ = parse_type();
 
   if(!expect(')', diagnostic_db::parser::type_expects_lparen))
-    return nullptr;
+    return mk_error();
   return typ;
 }
 
-std::shared_ptr<type_base> hx_reader::parse_type_prefix()
+std::size_t hx_reader::parse_type_prefix()
 {
   switch(current.kind)
   {
@@ -878,20 +877,20 @@ std::shared_ptr<type_base> hx_reader::parse_type_prefix()
   case token_kind::Backslash:  return parse_pi();
   case token_kind::Identifier: return parse_type_identifier();
   case token_kind::LParen:     return parse_parenthesized_type();
-      //TODO
+      //TODO: Allow richer types: aRbItRaRy expressions!
   default: ;
   }
   assert(false && "Case not handled.");
-  return nullptr;
+  return mk_error();
 }
 
-std::shared_ptr<type_base> hx_reader::parse_type_identifier()
+std::size_t hx_reader::parse_type_identifier()
 {
   if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
   {
     fixits_stack.back().changes.emplace_back(old.loc.snd_proj(), nlohmann::json { {"what", old.loc},
                                                                        {"how", "id"} });
-    return nullptr;
+    return mk_error();
   }
   if(!parsing_pattern && old.data == symbol("_"))
   {
@@ -899,22 +898,24 @@ std::shared_ptr<type_base> hx_reader::parse_type_identifier()
 
     fixits_stack.back().changes.emplace_back(old.loc.snd_proj(), nlohmann::json { {"what", old.loc},
                                                                        {"how", "id"} });
-    return nullptr;
+    return mk_error();
   }
-  return std::make_shared<type_or_value_ref>(old.data);
+  return type_tags::id.make_node(global_scope.types, TypeData { old.data });
 }
 
-std::shared_ptr<type_base> hx_reader::parse_type_app(std::shared_ptr<type_base> lhs)
+std::size_t hx_reader::parse_type_app(std::size_t lhs)
 {
-  return std::make_shared<application>(lhs, parse_type());
+  auto rhs = parse_type();
+
+  return type_tags::application.make_node(global_scope.types, TypeData { "", { lhs, rhs } });
 }
 
-std::shared_ptr<type_base> hx_reader::parse_type(int precedence)
+std::size_t hx_reader::parse_type(int precedence)
 {
   auto pref = parse_type_prefix();
 
-  if(pref == nullptr)
-    return nullptr;
+  if(pref == static_cast<std::uint_fast32_t>(-1))
+    return mk_error();
 
   while(precedence < this->precedence())
   {
@@ -959,7 +960,7 @@ std::size_t hx_reader::parse_data_ctor()
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  std::vector<IdTypeBox> params; params.reserve(32);
+  std::vector<TypeData> params; params.reserve(32);
   while(accept('('))
   {
     if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
@@ -979,25 +980,29 @@ std::size_t hx_reader::parse_data_ctor()
     if(!type || !expect(')', diagnostic_db::parser::type_ctor_param_expects_closing_paranthesis))
       return mk_error();
 
-    params.emplace_back(id, type);
+    params.emplace_back(TypeData { id, std::vector<std::uint_fast32_t>{ }, type });
   }
   if(!expect(':', diagnostic_db::parser::type_assign_expects_equal))
     return mk_error();
 
   auto tail = parse_type();
 
-  if(!tail || !expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
-    return mk_error();
-
   // build new type
+  std::size_t typ_begin = tail;
   for(auto it = params.rbegin(); it != params.rend(); ++it)
   {
-    tail = std::make_shared<pi_type>(std::make_shared<IdTypeBox>(std::move(*it)), tail);
+    std::size_t old_pi = typ_begin;
+
+    typ_begin = type_tags::id.make_node(global_scope.types, std::move(*it));
+    typ_begin = type_tags::pi.make_node(global_scope.types, TypeData { "", { typ_begin, tail } });
   }
+
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+    return mk_error();
 
   fixits_stack.pop_back();
   global_scope.nodes.back().data[to_ret] = IRData { type_name_id, tail };
-  global_scope.constructors.back().data.emplace_back(type_name_id, tail);
+  global_scope.types.constructors[tail].data.emplace_back(TypeData { type_name_id, { tail } });
 
   global_scope.nodes.back().node_name = std::make_shared<symbol>(type_name_id);
 
@@ -1018,7 +1023,7 @@ std::size_t hx_reader::parse_type_ctor()
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  std::vector<IdTypeBox> params; params.reserve(32);
+  std::vector<TypeData> params; params.reserve(32);
   while(accept('('))
   {
     if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
@@ -1038,31 +1043,34 @@ std::size_t hx_reader::parse_type_ctor()
     if(!type || !expect(')', diagnostic_db::parser::type_ctor_param_expects_closing_paranthesis))
       return mk_error();
 
-    params.emplace_back(id, type);
+    params.emplace_back(TypeData { id, {}, type });
   }
   if(!expect(':', diagnostic_db::parser::type_assign_expects_equal))
     return mk_error();
 
   auto tail = parse_type();
 
-  if(!tail || !expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
-    return mk_error();
-
   // build new type
+  std::size_t typ_begin = tail;
   for(auto it = params.rbegin(); it != params.rend(); ++it)
   {
-    tail = std::make_shared<pi_type>(std::make_shared<IdTypeBox>(std::move(*it)), tail);
+    std::size_t old_pi = typ_begin;
+
+    typ_begin = type_tags::id.make_node(global_scope.types, std::move(*it));
+    typ_begin = type_tags::pi.make_node(global_scope.types, TypeData { "", { typ_begin, tail } });
   }
 
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+    return mk_error();
+
   fixits_stack.pop_back();
+
+  tail = type_tags::type_constructor.make_node(global_scope.types, TypeData { type_name_id, {}, tail });
   
   global_scope.nodes.back().data[to_ret] = IRData { type_name_id, tail };
-
-  auto p = std::make_shared<type_constructor>(type_name_id, tail);
-  global_scope.types.types.emplace_back(p);
-  global_scope.constructors.emplace_back(p);
-
   global_scope.nodes.back().node_name = std::make_shared<symbol>(type_name_id);
+
+  global_scope.types.constructors[tail]; // <- ensure it exists
 
   return to_ret;
 }
@@ -1311,8 +1319,8 @@ std::size_t hx_reader::parse_type_check(std::size_t left)
   auto right = parse_type();
   parsing_type_checking = false;
 
-  if(right == nullptr)
-    return -1;
+  if(right == static_cast<std::uint_fast32_t>(-1))
+    return mk_error();
 
   auto& b = global_scope.nodes.back();
 

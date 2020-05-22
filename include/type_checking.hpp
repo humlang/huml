@@ -4,7 +4,6 @@
 #include <symbol.hpp>
 
 struct type_table;
-struct type_base;
 
 struct hx_ir_type_checking
 {
@@ -12,10 +11,10 @@ struct hx_ir_type_checking
     : typtab(typtab)
   {  }
 
-  bool check(symbol_map<std::shared_ptr<type_base>>& ctx,
-      hx_per_statement_ir& term, std::size_t at, const type_base* to_check);
+  bool check(symbol_map<std::uint_fast32_t>& ctx,
+      hx_per_statement_ir& term, std::size_t at, std::uint_fast32_t to_check);
 
-  std::shared_ptr<type_base> synthesize(symbol_map<std::shared_ptr<type_base>>& ctx,
+  std::uint_fast32_t synthesize(symbol_map<std::uint_fast32_t>& ctx,
       hx_per_statement_ir& term, std::size_t at);
 
 

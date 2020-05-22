@@ -1,9 +1,7 @@
 #include <per_statement_ir.hpp>
 #include <types.hpp>
 
-void print_type(std::ostream& os, std::shared_ptr<type_base> type);
-
-std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, std::uint_fast32_t node) const
+std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, type_table& typtab, std::uint_fast32_t node) const
 {
   switch(kinds[node])
   {
@@ -14,42 +12,43 @@ std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, std::uin
     case IRNodeKind::bot:        os << "BOT"; break;
     case IRNodeKind::Kind:       os << "Kind"; break;
     case IRNodeKind::Type:       os << "Type"; break;
-    case IRNodeKind::type_check: { auto cpy = node; os << "(("; node = print_subnode(os, node + 1);
-                                   os << ") : "; data[cpy].type_annot->print(os); os << ")"; } break;
-    case IRNodeKind::app:        { os << "("; node = print_subnode(os, node + 1);
-                                   os << ") ("; node = print_subnode(os, node + 1);
+    case IRNodeKind::Prop:       os << "Prop"; break;
+    case IRNodeKind::type_check: { auto cpy = node; os << "(("; node = print_subnode(os, typtab, node + 1);
+                                   os << ") : "; typtab.print_type(os, data[cpy].type_annot); os << ")"; } break;
+    case IRNodeKind::app:        { os << "("; node = print_subnode(os, typtab, node + 1);
+                                   os << ") ("; node = print_subnode(os, typtab, node + 1);
                                    os << ")"; } break;
-    case IRNodeKind::access:     { os << "("; node = print_subnode(os, node + 1);
-                                   os << ").("; node = print_subnode(os, node + 1);
+    case IRNodeKind::access:     { os << "("; node = print_subnode(os, typtab, node + 1);
+                                   os << ").("; node = print_subnode(os, typtab, node + 1);
                                    os << ")"; } break;
     case IRNodeKind::tuple:      {
       os << "(";
       auto cpy = node;
       for(std::uint_fast32_t i = 1; i <= references[cpy]; ++i)
       {
-        node = print_subnode(os, node + 1);
+        node = print_subnode(os, typtab, node + 1);
         if(i < references[cpy])
           os << " , ";
       }
       os << ")";
     } break;
-    case IRNodeKind::lambda:     { os << "\\"; node = print_subnode(os, node + 1);
-                                   os << "."; node = print_subnode(os, node + 1); } break;
-    case IRNodeKind::pi:         { os << "\\("; node = print_subnode(os, node + 1);
-                                   os << " : "; node = print_subnode(os, node + 1);
-                                   os << "). "; node = print_subnode(os, node + 1); } break;
+    case IRNodeKind::lambda:     { os << "\\"; node = print_subnode(os, typtab, node + 1);
+                                   os << "."; node = print_subnode(os, typtab, node + 1); } break;
+    case IRNodeKind::pi:         { os << "\\("; node = print_subnode(os, typtab, node + 1);
+                                   os << " : "; node = print_subnode(os, typtab, node + 1);
+                                   os << "). "; node = print_subnode(os, typtab, node + 1); } break;
     case IRNodeKind::param:      os << data[node].symb; break;
-    case IRNodeKind::match:      { node = print_subnode(os, node + 1); os << " => ";
-                                   node = print_subnode(os, node + 1); } break;
-    case IRNodeKind::pattern:    node = print_subnode(os, node + 1); break;
+    case IRNodeKind::match:      { node = print_subnode(os, typtab, node + 1); os << " => ";
+                                   node = print_subnode(os, typtab, node + 1); } break;
+    case IRNodeKind::pattern:    node = print_subnode(os, typtab, node + 1); break;
     case IRNodeKind::pattern_matcher: {
       auto cpy = node;
       os << "case (";
-      node = print_subnode(os, node + 1);
+      node = print_subnode(os, typtab, node + 1);
       os << ") [";
       for(std::uint_fast32_t i = 1; i < references[cpy]; ++i)
       {
-        node = print_subnode(os, node + 1);
+        node = print_subnode(os, typtab, node + 1);
         if(i + 1 < references[cpy])
           os << " | ";
       }
@@ -61,34 +60,29 @@ std::uint_fast32_t hx_per_statement_ir::print_subnode(std::ostream& os, std::uin
       auto cpy = node;
       for(std::uint_fast32_t i = 1; i <= references[cpy]; ++i)
       {
-        node = print_subnode(os, node + 1);
+        node = print_subnode(os, typtab, node + 1);
         if(i < references[cpy])
           os << " ; ";
       }
       os << "}";
     } break;
-    case IRNodeKind::assign:     { node = print_subnode(os, node + 1); os << " = ";
-                                   node = print_subnode(os, node + 1); os << ";"; } break;
+    case IRNodeKind::assign:     { node = print_subnode(os, typtab, node + 1); os << " = ";
+                                   node = print_subnode(os, typtab, node + 1); os << ";"; } break;
     case IRNodeKind::assign_type: {
-      os << "type " << data[node].symb << " : ";
-      print_type(os, data[node].type_annot);
+      os << "type ";
+      typtab.print_type(os, data[node].type_annot);
       os << ";";
     } break;
     case IRNodeKind::assign_data: {
       os << "data " << data[node].symb << " : ";
-      print_type(os, data[node].type_annot);
+      typtab.print_type(os, data[node].type_annot);
       os << ";";
     } break;
-    case IRNodeKind::expr_stmt:  { node = print_subnode(os, node + 1); os << ";"; } break;
-    case IRNodeKind::binary_exp: { auto cpy = node; os << "(("; node = print_subnode(os, node + 1); os << ") ";
+    case IRNodeKind::expr_stmt:  { node = print_subnode(os, typtab, node + 1); os << ";"; } break;
+    case IRNodeKind::binary_exp: { auto cpy = node; os << "(("; node = print_subnode(os, typtab, node + 1); os << ") ";
                                    os << data[cpy].symb.get_string();
-                                   os << " ("; node = print_subnode(os, node + 1); os << "))"; } break;
+                                   os << " ("; node = print_subnode(os, typtab, node + 1); os << "))"; } break;
   }
   return node;
-}
-
-void print_type(std::ostream& os, std::shared_ptr<type_base> type)
-{
-  type->print(os);
 }
 

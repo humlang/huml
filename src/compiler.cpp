@@ -42,7 +42,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
 
       for(auto& i : w[0].nodes)
       {
-        i.print(std::cout);
+        i.print(std::cout, w[0].types);
         std::cout << "\n";
       }
 
@@ -67,7 +67,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
           std::cout << n.node_name->get_string() << "\n";
         else
         {
-          std::cout << "\""; n.print(std::cout); std::cout << "\"\n";
+          std::cout << "\""; n.print(std::cout, global_ir.types); std::cout << "\"\n";
         }
       }
 
@@ -78,14 +78,14 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
           std::cout << global_ir.nodes[e.from].node_name->get_string();
         else
         {
-          std::cout << "\""; global_ir.nodes[e.from].print(std::cout); std::cout << "\"";
+          std::cout << "\""; global_ir.nodes[e.from].print(std::cout, global_ir.types); std::cout << "\"";
         }
         std::cout << " -> ";
         if(global_ir.nodes[e.to].node_name)
           std::cout << global_ir.nodes[e.to].node_name->get_string();
         else
         {
-          std::cout << "\""; global_ir.nodes[e.to].print(std::cout); std::cout << "\"";
+          std::cout << "\""; global_ir.nodes[e.to].print(std::cout, global_ir.types); std::cout << "\"";
         }
         std::cout << "\n";
       }

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-struct type_base;
+struct type_table;
 
 enum class IRNodeKind : std::int_fast8_t
 {
@@ -32,13 +32,14 @@ enum class IRNodeKind : std::int_fast8_t
   pi,
   Kind,
   Type,
+  Prop
 };
 
 struct IRData
 {
   symbol symb;
-  std::shared_ptr<type_base> type_annot { nullptr };
-  std::uint_fast32_t other_ref { static_cast<std::uint_fast32_t>(-1) };
+  std::uint_fast32_t type_annot { static_cast<std::uint_fast32_t>(-1) };
+  std::uint_fast32_t other_ref  { static_cast<std::uint_fast32_t>(-1) };
 };
 
 struct IRDebugData
@@ -63,12 +64,12 @@ struct hx_per_statement_ir
   std::shared_ptr<symbol> node_name; // used for assign or type assign, otherwise it's the empty symbol
 
 
-  void print(std::ostream& os) const
+  void print(std::ostream& os, type_table& typtab) const
   {
     assert(!kinds.empty() && "IR cannot be zero, there is never an empty module!");
-    print_subnode(os, 0);
+    print_subnode(os, typtab, 0);
   }
-  std::uint_fast32_t print_subnode(std::ostream& os, std::uint_fast32_t node) const;
+  std::uint_fast32_t print_subnode(std::ostream& os, type_table& typtab, std::uint_fast32_t node) const;
 };
 
 template<IRNodeKind kind>

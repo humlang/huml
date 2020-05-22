@@ -1,21 +1,25 @@
 #include <types.hpp>
 
 type_table::type_table()
-  : types()
 {
   // Kind
-  types.emplace_back(std::make_shared<Kind_sort>());
+  type_tags::kind.make_node(*this, TypeData { "Kind" });
 
   // Type
-  types.emplace_back(std::make_shared<Type_sort>());
+  type_tags::type.make_node(*this, TypeData { "Type" });
 
   // Prop
-  types.emplace_back(std::make_shared<Prop_sort>());
+  type_tags::prop.make_node(*this, TypeData { "Prop" });
 
 
   // Unit    is inhabited by  \\(A : Type). \\(a : A). a
-  std::shared_ptr<type_base> A = std::make_shared<IdTypeBox>("A", types[Type_sort_idx]);
-  types.emplace_back(std::make_shared<pi_type>(std::static_pointer_cast<IdTypeBox>(A),
-                      std::make_shared<pi_type>(std::make_shared<IdTypeBox>("_", A),
-                                                A)));
+  auto A = type_tags::id.make_node(*this, TypeData { "A", { }, Type_sort_idx });
+
+  type_tags::pi.make_node(*this, TypeData { "1",
+      { A,
+      type_tags::pi.make_node(*this, TypeData { "", {
+        type_tags::id.make_node(*this, TypeData { "_", { }, A }),
+        A
+        }}
+      )} });
 }

@@ -62,13 +62,13 @@ private:
   // always uses old for the error
   std::size_t mk_error();
 
-  std::shared_ptr<type_base> parse_type_prefix();
-  std::shared_ptr<type_base> parse_type(int precedence = 0);
-  std::shared_ptr<type_base> parse_pi();
-  std::shared_ptr<type_base> parse_kind();
-  std::shared_ptr<type_base> parse_type_identifier();
-  std::shared_ptr<type_base> parse_type_app(std::shared_ptr<type_base> lhs);
-  std::shared_ptr<type_base> parse_parenthesized_type();
+  std::size_t parse_type_prefix();
+  std::size_t parse_type(int precedence = 0);
+  std::size_t parse_pi();
+  std::size_t parse_kind();
+  std::size_t parse_type_identifier();
+  std::size_t parse_type_app(std::size_t lhs);
+  std::size_t parse_parenthesized_type();
 
   std::size_t parse_assign();
   std::size_t parse_expr_stmt();

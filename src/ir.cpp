@@ -12,7 +12,7 @@ bool hx_ir::type_checks()
 {
   hx_ir_type_checking typch(types);
 
-  symbol_map<std::shared_ptr<type_base>> ctx;
+  symbol_map<std::uint_fast32_t> ctx;
 
   bool success = true;
   for(auto& n : this->nodes)
@@ -30,11 +30,11 @@ void hx_ir::build_graph()
 
   /// 1. Collect all free variables of the type declarations.
   symbol_set data_constructors;
-  for(auto& ctors_for_type : constructors)
+  for(auto& ctors_for_type : types.constructors)
   {
-    for(auto& n : ctors_for_type.data)
+    for(auto& n : ctors_for_type.second.data)
     {
-      data_constructors.insert(n.id);
+      data_constructors.insert(n.name);
     }
   }
   std::uint_fast32_t node_index = 0;
