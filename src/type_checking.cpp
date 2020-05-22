@@ -1,14 +1,20 @@
 #include <type_checking.hpp>
 #include <types.hpp>
 
-/*
-bool hx_ir_type_checking::check(symbol_map<const type_base*>& ctx,
+bool hx_ir_type_checking::check(symbol_map<std::shared_ptr<type_base>>& ctx,
     hx_per_statement_ir& term, std::size_t at, const type_base* to_check)
 {
+  switch(term.kinds[at])
+  {
+  case IRNodeKind::Type:       return typtab[typtab.Kind_sort_idx];
+  case IRNodeKind::Prop:       return typtab[typtab.Type_sort_idx];
+  }
 
+  assert(false && "Unhandled type in synthesize.");
+  return nullptr;
 }
 
-const type_base* hx_ir_type_checking::synthesize(symbol_map<const type_base*>& ctx,
+std::shared_ptr<type_base> hx_ir_type_checking::synthesize(symbol_map<std::shared_ptr<type_base>>& ctx,
       hx_per_statement_ir& term, std::size_t at)
 {
   switch(term.kinds[at])
@@ -29,4 +35,3 @@ const type_base* hx_ir_type_checking::synthesize(symbol_map<const type_base*>& c
   return nullptr;
 }
 
-*/

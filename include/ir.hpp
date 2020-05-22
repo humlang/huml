@@ -18,6 +18,8 @@ struct hx_ir
 
   hx_ir(); 
 
+  bool type_checks();
+
   void build_graph();
 
   std::vector<hx_per_statement_ir> nodes;

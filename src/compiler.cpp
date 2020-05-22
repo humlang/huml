@@ -45,6 +45,11 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         i.print(std::cout);
         std::cout << "\n";
       }
+
+      if(global_ir.type_checks())
+        std::cout << "### Does type check." << std::endl;
+      else
+        std::cout << "!!! Does not type check." << std::endl;
     } },
   { emit_classes::ir_graph, [](std::string_view t)
     {

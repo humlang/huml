@@ -30,6 +30,7 @@ set(hx-lang_vm_files src/vm.cpp
   src/stream_lookup.cpp
   src/source_range.cpp
   src/fixit_info.cpp
+  src/type_checking.cpp
   )
 
 # Dependencies

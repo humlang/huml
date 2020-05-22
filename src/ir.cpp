@@ -1,11 +1,28 @@
 #include <ir.hpp>
 #include <types.hpp>
+#include <type_checking.hpp>
 
 #include <iterator>
 
 hx_ir::hx_ir()
   : nodes()
 {  }
+
+bool hx_ir::type_checks()
+{
+  hx_ir_type_checking typch(types);
+
+  symbol_map<std::shared_ptr<type_base>> ctx;
+
+  bool success = true;
+  for(auto& n : this->nodes)
+  {
+    auto t = typch.synthesize(ctx, n, 0);
+
+    success = success && t;
+  }
+  return success;
+}
 
 void hx_ir::build_graph()
 {
