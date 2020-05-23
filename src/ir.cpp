@@ -12,7 +12,7 @@ bool hx_ir::type_checks()
 {
   hx_ir_type_checking typch(types);
 
-  symbol_map<std::uint_fast32_t> ctx;
+  typing_context ctx;
 
   bool success = true;
   for(auto& n : this->nodes)
