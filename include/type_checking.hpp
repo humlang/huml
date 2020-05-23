@@ -20,9 +20,22 @@ struct marker
   pseudo_existential& ref;
 };
 
+struct id_ref
+{
+  static constexpr std::uint_fast32_t no_ref = static_cast<std::uint_fast32_t>(-1);
+
+  bool references_type() const        { return types_ref != no_ref; }
+  bool references_existential() const { return existentials_ref != no_ref; }
+
+  std::uint_fast32_t id;
+
+  std::uint_fast32_t types_ref { no_ref };
+  std::uint_fast32_t existentials_ref { no_ref };
+};
+
 struct CTXElement
 {
-  std::variant<std::uint_fast32_t, pseudo_existential, marker> data;
+  std::variant<id_ref, pseudo_existential*, marker> data;
 };
 
 std::vector<CTXElement> typedef typing_context;
@@ -39,8 +52,10 @@ struct hx_ir_type_checking
   std::uint_fast32_t synthesize(typing_context& ctx,
       hx_per_statement_ir& term, std::size_t at);
 
-
   bool is_well_formed(typing_context& ctx, const CTXElement& type);
+
+
+  std::vector<pseudo_existential> existentials;
 
   type_table& typtab;
 };
