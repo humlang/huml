@@ -13,7 +13,9 @@ enum class type_kind
   TypeConstructor,
   Application,
   Id,
-  Pi
+  Pi,
+
+  TypeCheckExistential
 };
 
 struct TypeData
@@ -55,6 +57,9 @@ struct type_table
     assert(type_ref > Unit_idx);
     switch(kinds[type_ref])
     {
+      case type_kind::TypeCheckExistential: {
+        os << data[type_ref].name.get_string();
+      } break;
       case type_kind::TypeConstructor:
       case type_kind::Id: {
         os << data[type_ref].name.get_string();
