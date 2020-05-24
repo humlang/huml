@@ -37,11 +37,13 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
   } break;
   // T-1=>
   case IRNodeKind::unit:       return typtab.Unit_idx;
-                               /*
+  // T-App=>
   case IRNodeKind::app:        {
-      auto C = synthesize(ctx, term, at + 1);
+      auto A = synthesize(ctx, term, at + 1);
+      auto C = eta_synthesis(ctx, term, at + 2, subst(ctx, A));
+
+      return C;
     } break;
-    */
   // T-I=>
   case IRNodeKind::lambda:     {
       // alpha
@@ -90,10 +92,137 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
     } break;
   }
 
+  // TODO: Make a diagnostic instead of an hard error!
   assert(false && "Unhandled type in synthesize.");
   return static_cast<std::uint_fast32_t>(-1);
 }
 
+std::uint_fast32_t hx_ir_type_checking::eta_synthesis(typing_context& ctx, hx_per_statement_ir& term, std::size_t at, std::uint_fast32_t type)
+{
+  switch(typtab.kinds[type])
+  {
+  case type_kind::TypeCheckExistential:
+    {
+      auto ctx_it = std::find_if(ctx.begin(), ctx.end(),
+        [ex = type](auto& elem)
+        {
+          if(!std::holds_alternative<id_or_type_ref>(elem.data))
+            return false;
+          auto& e = std::get<id_or_type_ref>(elem.data);
+          return e.references() && e.type == ex;
+        });
+      assert(ctx_it != ctx.end() && "Inconsistent state!");
+
+
+      // alpha_2
+      std::uint_fast32_t alpha2 = typtab.kinds.size();
+      typtab.kinds.emplace_back(type_kind::TypeCheckExistential);
+      typtab.data.emplace_back(TypeData { symbol("alpha_" + std::to_string(alpha2)) });
+
+      ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha2 } });
+      // alpha_1
+      std::uint_fast32_t alpha1 = typtab.kinds.size();
+      typtab.kinds.emplace_back(type_kind::TypeCheckExistential);
+      typtab.data.emplace_back(TypeData { symbol("alpha_" + std::to_string(alpha1)) });
+
+      ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha1 } });
+      // alpha
+      std::uint_fast32_t alpha = typtab.kinds.size();
+      typtab.kinds.emplace_back(type_kind::TypeCheckExistential);
+      typtab.data.emplace_back(TypeData { symbol("alpha_" + std::to_string(alpha)),
+                                          { type_tags::pi.make_node(typtab,
+                                              TypeData { "", { alpha1, alpha2 } })
+                                              }
+                                        });
+      ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha } });
+
+      if(check(ctx, term, at, alpha1))
+        return alpha2;
+
+      // TODO: emit diagnostic, does not typecheck
+      return static_cast<std::uint_fast32_t>(-1);
+    } break;
+
+  case type_kind::Pi:
+    {
+      // alpha
+      std::uint_fast32_t alpha = typtab.kinds.size();
+      typtab.kinds.emplace_back(type_kind::TypeCheckExistential);
+      typtab.data.emplace_back(TypeData { symbol("alpha_" + std::to_string(alpha)) });
+
+      ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha } });
+      // [alpha / A]C
+      std::uint_fast32_t substituted = typtab.subst(typtab.data[type].args.back(),
+                                                    typtab.data[type].args.front(), alpha);
+      return eta_synthesis(ctx, term, at, substituted);
+    } break;
+
+  default: ;
+  }
+
+  assert(false && "Unhandled type in eta_synthesis.");
+  return static_cast<std::uint_fast32_t>(-1);
+}
+
+std::uint_fast32_t hx_ir_type_checking::subst(typing_context& ctx, std::uint_fast32_t type)
+{
+  if(type <= type_table::Unit_idx)
+    return type;
+  switch(typtab.kinds[type])
+  {
+  case type_kind::TypeCheckExistential:
+    {
+      auto& dat = typtab.data[type].args;
+
+      auto ctx_it = std::find_if(ctx.begin(), ctx.end(),
+        [ex = type](auto& elem)
+        {
+          if(!std::holds_alternative<id_or_type_ref>(elem.data))
+            return false;
+          auto& e = std::get<id_or_type_ref>(elem.data);
+          return e.references() && e.type == ex;
+        });
+      if(dat.empty())
+      {
+        // TODO: emit error if ctx_it == ctx.end()
+        return ctx_it != ctx.end();
+      }
+      if(ctx_it != ctx.end())
+        return dat.front();    // <- alpha = tau
+
+      // TODO: Emit error!
+      return static_cast<std::uint_fast32_t>(-1);
+    } break;
+
+  case type_kind::TypeConstructor:
+  case type_kind::Id:              return type;
+
+  case type_kind::Application:
+    {
+      std::uint_fast32_t A = subst(ctx, typtab.data[type].args.front());
+      std::uint_fast32_t B = subst(ctx, typtab.data[type].args.back());
+
+      typtab.data[type].args.front() = A;
+      typtab.data[type].args.back() = B;
+
+      return type;
+    } break;
+
+  case type_kind::Pi:
+    {
+      std::uint_fast32_t A = subst(ctx, typtab.data[type].args.front());
+      std::uint_fast32_t B = subst(ctx, typtab.data[type].args.back());
+
+      typtab.data[type].args.front() = A;
+      typtab.data[type].args.back() = B;
+
+      return type;
+    } break;
+  }
+
+  assert(false && "Unhandled case in subst.");
+  return static_cast<std::uint_fast32_t>(-1);
+}
 
 // Types are not well formed if they contain free variables
 bool hx_ir_type_checking::is_well_formed(typing_context& ctx, const CTXElement& ctx_type)

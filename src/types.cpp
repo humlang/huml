@@ -23,3 +23,9 @@ type_table::type_table()
         }}
       )} });
 }
+
+std::uint_fast32_t type_table::subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with)
+{
+
+}
+

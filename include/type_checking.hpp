@@ -41,9 +41,14 @@ struct hx_ir_type_checking
   std::uint_fast32_t synthesize(typing_context& ctx,
       hx_per_statement_ir& term, std::size_t at);
 
+
+  std::uint_fast32_t eta_synthesis(typing_context& ctx,
+      hx_per_statement_ir& term, std::size_t at, std::uint_fast32_t type);
+
+  std::uint_fast32_t subst(typing_context& ctx, std::uint_fast32_t type);
   bool is_well_formed(typing_context& ctx, const CTXElement& type);
 
-
+  tsl::robin_set<std::uint_fast32_t> existentials;
   type_table& typtab;
 };
 

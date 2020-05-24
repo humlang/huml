@@ -45,6 +45,9 @@ struct type_table
   std::vector<TypeData> data;
   tsl::robin_map<std::uint_fast32_t, data_constructors> constructors;
 
+
+  std::uint_fast32_t subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with);
+
   void print_type(std::ostream& os, std::uint_fast32_t type_ref)
   {
     switch(type_ref)
