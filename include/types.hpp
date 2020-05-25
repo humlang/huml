@@ -45,6 +45,8 @@ struct type_table
   std::vector<TypeData> data;
   tsl::robin_map<std::uint_fast32_t, data_constructors> constructors;
 
+  std::vector<std::size_t> hashes;
+
 
   std::uint_fast32_t subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with);
 
@@ -94,8 +96,25 @@ struct type_tag
 {
   std::uint_fast32_t make_node(type_table& typtab, TypeData&& dat) const
   {
+    std::size_t hash = static_cast<std::size_t>(kind);
+
+    hash ^= dat.name.get_hash() + 0x9e3779b9 + (hash<<6) + (hash>>2);
+
+    for(auto& x : dat.args)
+    {
+      assert(x < typtab.hashes.size() && "Type wasn't hashed in before!");
+
+      hash ^= typtab.hashes[x] + 0x9e3779b9 + (hash<<6) + (hash>>2);
+    }
+    // TODO: use set?
+    if(auto it = std::find(typtab.hashes.begin(), typtab.hashes.end(), hash);
+        it != typtab.hashes.end())
+    {
+      return it - typtab.hashes.begin();
+    }
     typtab.kinds.emplace_back(kind);
     typtab.data.emplace_back(dat);
+    typtab.hashes.emplace_back(hash);
 
     return typtab.kinds.size() - 1;
   }
