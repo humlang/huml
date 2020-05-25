@@ -11,7 +11,7 @@ bool hx_ir_type_checking::check(typing_context& ctx,
   // T-Prop<=
   case IRNodeKind::Prop:       return to_check == typtab.Type_sort_idx;
   }
-  assert(false && "Unhandled type in synthesize.");
+  assert(false && "Unhandled type in checking.");
   return false;
 }
 
