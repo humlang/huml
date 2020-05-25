@@ -42,6 +42,7 @@ struct hx_ir_type_checking
       hx_per_statement_ir& term, std::size_t at);
 
 
+  bool is_subtype(typing_context& ctx, std::uint_fast32_t A, std::uint_fast32_t B);
   std::uint_fast32_t eta_synthesis(typing_context& ctx,
       hx_per_statement_ir& term, std::size_t at, std::uint_fast32_t type);
 

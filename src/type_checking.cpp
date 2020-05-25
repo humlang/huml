@@ -10,8 +10,114 @@ bool hx_ir_type_checking::check(typing_context& ctx,
   case IRNodeKind::Type:       return to_check == typtab.Kind_sort_idx;
   // T-Prop<=
   case IRNodeKind::Prop:       return to_check == typtab.Type_sort_idx;
+  // T-I<=
+  case IRNodeKind::lambda:     {
+      if(typtab.kinds[to_check] != type_kind::Pi)
+        return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic
+
+      ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, typtab.data[to_check].args.front() } });
+      std::size_t ctx_position = ctx.size();
+
+      bool result = check(ctx, term, at + 2, typtab.data[to_check].args.back());
+
+      // Delta, x:A, Theta should become just Delta
+      ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
+
+      return result;
+    } break;
+  // T-ForallI   /    T-Sub
+  default:                    {
+      if(typtab.kinds[to_check] == type_kind::Pi)
+      { // T-ForallI
+        ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref,
+                                                       typtab.data[to_check].args.front() } });
+        std::size_t ctx_position = ctx.size();
+
+        bool result = check(ctx, term, at, typtab.data[to_check].args.back());
+
+        // Delta, alpha, Theta should become just Delta
+        ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
+
+        return result;
+      }
+      else
+      { // T-Sub
+        auto A = synthesize(ctx, term, at);
+
+        // e : B if [Theta]A <: [Theta]B
+        return is_subtype(ctx, subst(ctx, A), subst(ctx, to_check));
+      }
+    } break;
   }
   assert(false && "Unhandled type in checking.");
+  return false;
+}
+
+bool hx_ir_type_checking::is_subtype(typing_context& ctx, std::uint_fast32_t A, std::uint_fast32_t B)
+{
+  // <:ForallR
+  if(typtab.kinds[A] != type_kind::Pi && typtab.kinds[B] == type_kind::Pi)
+  {
+    ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, typtab.data[B].args.front() } });
+    std::size_t ctx_position = ctx.size();
+
+    bool result = is_subtype(ctx, A, typtab.data[B].args.back());
+
+    ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
+    return result;
+  }
+
+  switch(typtab.kinds[A])
+  {
+  case type_kind::Kind:
+  case type_kind::Type:
+  case type_kind::Prop: return A == B;
+
+  case type_kind::TypeCheckExistential:
+  case type_kind::TypeConstructor:
+  case type_kind::Id: {
+      if(typtab.kinds[A] != type_kind::TypeCheckExistential && typtab.kinds[B] == type_kind::TypeCheckExistential)
+      {
+        // instatiateR
+      }
+      else if(typtab.kinds[A] == type_kind::TypeCheckExistential && typtab.kinds[B] != type_kind::TypeCheckExistential)
+      {
+        // instatiateL
+      }
+      return A == B;  // <- TODO: This needs a more clever way of saying "those are equal"
+                      //          won't work as it is currently written, since we might create
+                      //          identical copies of a type with simply a different index
+    } break;
+  case type_kind::Pi: {
+      if(typtab.kinds[B] != type_kind::Pi)
+      { // <:ForallL
+        ctx.emplace_back(CTXElement { marker { typtab.kinds.size() } });
+        std::size_t ctx_position = ctx.size();
+
+        std::uint_fast32_t alpha = typtab.kinds.size();
+        typtab.kinds.emplace_back(type_kind::TypeCheckExistential);
+        typtab.data.emplace_back(TypeData { symbol("alpha_" + std::to_string(alpha)) });
+        ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha } });
+
+        bool result = is_subtype(ctx, typtab.subst(typtab.data[A].args.back(),
+                                                   typtab.data[A].args.front(), alpha),
+                                      B);
+        ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
+        return result;
+      }
+      else
+      { // <:->
+        auto A1 = typtab.data[A].args.front();
+        auto A2 = typtab.data[A].args.back();
+
+        auto B1 = typtab.data[B].args.front();
+        auto B2 = typtab.data[B].args.back();
+
+        return is_subtype(ctx, B1, A1) && is_subtype(ctx, subst(ctx, A2), subst(ctx, B2));
+      }
+    } break;
+  }
+  assert(false && "Unhandled type in subtyping.");
   return false;
 }
 
