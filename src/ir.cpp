@@ -4,6 +4,8 @@
 
 #include <iterator>
 
+#include <iostream>
+
 hx_ir::hx_ir()
   : nodes()
 {  }
@@ -19,7 +21,16 @@ bool hx_ir::type_checks()
   {
     auto t = typch.synthesize(ctx, n, 0);
 
-    success = success && t;
+    if(t == static_cast<std::uint_fast32_t>(-1))
+    {
+      n.print(std::cout, this->types); std::cout << " # Does not typecheck.\n";
+    }
+    else
+    {
+      n.print(std::cout, this->types); std::cout << " # Has type "; this->types.print_type(std::cout, t);
+      std::cout << "\n";
+    }
+    success = success && (t != static_cast<std::uint_fast32_t>(-1));
   }
   return success;
 }
