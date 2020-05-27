@@ -154,7 +154,7 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
   case IRNodeKind::type_check: {
       if(!is_well_formed(ctx, CTXElement { id_or_type_ref { at, term.data[at].type_annot } }))
         return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic
-      if(!check(ctx, term, at, term.data[at].type_annot))
+      if(!check(ctx, term, at + 1, term.data[at].type_annot))
         return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic
       return term.data[at].type_annot;
     } break;
@@ -578,7 +578,8 @@ bool hx_ir_type_checking::is_well_formed(typing_context& ctx, const CTXElement& 
                             auto& e = std::get<id_or_type_ref>(elem.data);
 
                             return e.id == id && e.references() && e.type == type;
-                      }) != ctx.end();
+                      }) != ctx.end()
+                  || typtab.constructors.contains(type); // also ok if the id is a previously declared type
 
   case type_kind::Application: {
     bool first  = is_well_formed(ctx, CTXElement { id_or_type_ref { id_with_type.id,
