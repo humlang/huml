@@ -6,6 +6,32 @@ namespace type_tags
 constexpr static type_tag<type_kind::TypeCheckExistential> exist = {};
 }
 
+std::uint_fast32_t hx_ir_type_checking::cleanup(std::uint_fast32_t at)
+{
+  switch(typtab.kinds[at])
+  {
+  default:                              {
+      if(!typtab.data[at].args.empty())
+      {
+        for(auto& x : typtab.data[at].args)
+          x = cleanup(x);
+      }
+      return at;
+    } break;
+
+  case type_kind::TypeCheckExistential: {
+      if(!typtab.data[at].args.empty())
+        return cleanup(typtab.data[at].args.front());
+
+      // make it an identifier
+      typtab.kinds[at] = type_kind::Id;
+      typtab.data[at].has_type = typtab.Type_sort_idx; // <- default is type
+
+      return at;
+    } break;
+  }
+}
+
 bool is_free_variable(type_table& tab, std::uint_fast32_t type, std::uint_fast32_t free)
 {
   assert(tab.kinds[free] == type_kind::TypeCheckExistential && "Free variable check only works for existentials a.t.m.");
@@ -14,7 +40,7 @@ bool is_free_variable(type_table& tab, std::uint_fast32_t type, std::uint_fast32
     return true; // free occurs in type, i.e. it IS type
 
   for(auto& x : tab.data[type].args)
-    if(is_free_variable(tab, type, x))
+    if(is_free_variable(tab, x, free))
       return true;
   return false;
 }
@@ -34,41 +60,31 @@ bool hx_ir_type_checking::check(typing_context& ctx,
       if(typtab.kinds[to_check] == type_kind::Pi)
       {
         ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, typtab.data[to_check].args.front() } });
-        std::size_t ctx_position = ctx.size();
 
         bool result = check(ctx, term, at + 2, typtab.data[to_check].args.back());
 
         // Delta, x:A, Theta should become just Delta
-        ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
+        auto it = std::find_if(ctx.begin(), ctx.end(),
+                  [it = at + 1](auto& elem) {
+                    if(!std::holds_alternative<id_or_type_ref>(elem.data))
+                      return false;
+                  return std::get<id_or_type_ref>(elem.data).id == it; });
+        // it is pointing to x:A
+        assert(it != ctx.end() && "We have added this before to our context!");
+        ctx.erase(it, ctx.end());
 
         return result;
       }
     } // fallthrough, if the type is not a Pi, we need to use T-Sub
-  // T-ForallI   /    T-Sub
+  // T-Sub
   default:                    {
-      if(typtab.kinds[to_check] == type_kind::Pi)
-      { // T-ForallI
-        ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref,
-                                                       typtab.data[to_check].args.front() } });
-        std::size_t ctx_position = ctx.size();
+      auto A = synthesize(ctx, term, at);
 
-        bool result = check(ctx, term, at, typtab.data[to_check].args.back());
+      if(A == static_cast<std::uint_fast32_t>(-1))
+        return false;
 
-        // Delta, alpha, Theta should become just Delta
-        ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
-
-        return result;
-      }
-      else
-      { // T-Sub
-        auto A = synthesize(ctx, term, at);
-
-        if(A == static_cast<std::uint_fast32_t>(-1))
-          return false;
-
-        // e : B if [Theta]A <: [Theta]B
-        return is_subtype(ctx, subst(ctx, A), subst(ctx, to_check));
-      }
+      // e : B if [Theta]A <: [Theta]B
+      return is_subtype(ctx, subst(ctx, A), subst(ctx, to_check));
     } break;
   }
   assert(false && "Unhandled type in checking.");
@@ -111,10 +127,10 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
   case IRNodeKind::lambda:     {
       // alpha
       std::uint_fast32_t alpha = type_tags::exist.make_node(typtab,
-                                      TypeData { symbol("#alpha_" + std::to_string(typtab.kinds.size())) });
+                                      TypeData { symbol("alpha_" + std::to_string(typtab.kinds.size())) });
       // beta
       std::uint_fast32_t beta  = type_tags::exist.make_node(typtab,
-                                      TypeData { symbol("#beta_" + std::to_string(typtab.kinds.size())) });
+                                      TypeData { symbol("beta_" + std::to_string(typtab.kinds.size())) });
 
       ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha } });
       ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, beta  } });
@@ -123,7 +139,14 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
       if(!check(ctx, term, at + 2, beta))
         return static_cast<std::uint_fast32_t>(-1);
       
-      ctx.pop_back();
+      auto it = std::find_if(ctx.begin(), ctx.end(),
+                  [it = at + 1](auto& elem) {
+                    if(!std::holds_alternative<id_or_type_ref>(elem.data))
+                      return false;
+                  return std::get<id_or_type_ref>(elem.data).id == it; });
+      // it is now pointing to x : alpha
+      assert(it != ctx.end() && "We have added this to our context before.");
+      ctx.erase(it, ctx.end());
       // `alpha -> beta`
       return type_tags::pi.make_node(typtab, TypeData { "", { subst(ctx, alpha), subst(ctx, beta) } });
     } break;
@@ -137,7 +160,9 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
     } break;
   
   case IRNodeKind::expr_stmt:  {
-      return term.data[at].type_annot = synthesize(ctx, term, at + 1);
+      auto typ = term.data[at].type_annot = cleanup(synthesize(ctx, term, at + 1));
+      ctx.clear();
+      return typ;
     } break;
 
   case IRNodeKind::assign_type:{
@@ -151,7 +176,9 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
     } break;
 
   case IRNodeKind::assign:     {
-      return term.data[at].type_annot = synthesize(ctx, term, at + 2);
+      auto typ = cleanup(term.data[at].type_annot = synthesize(ctx, term, at + 2));
+      ctx.clear();
+      return typ;
     } break;
   }
 
@@ -179,8 +206,11 @@ bool hx_ir_type_checking::is_instantiation_L(typing_context& ctx, std::uint_fast
       // alpha2
       std::uint_fast32_t alpha2 = type_tags::exist.make_node(typtab,
                                 TypeData { symbol("alpha_" + std::to_string(typtab.kinds.size())) });
-      ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha2 } });
-      ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha1 } });
+
+      // pushes them in reverse order, since we insert *before* it
+      it = ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha1 } });
+      it = ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha2 } });
+      it = it + 2; // <- it now points to alpha2....
 
       auto id = std::get<id_or_type_ref>(it->data);
       typtab.data[id.type].args.emplace_back(type_tags::pi.make_node(typtab, TypeData { "", { alpha1, alpha2 } }));
@@ -249,10 +279,11 @@ bool hx_ir_type_checking::is_instantiation_R(typing_context& ctx, std::uint_fast
       // alpha2
       std::uint_fast32_t alpha2 = type_tags::exist.make_node(typtab,
                           TypeData { symbol("alpha_" + std::to_string(typtab.kinds.size())) });
-      typtab.data.emplace_back(TypeData { symbol("alpha_" + std::to_string(alpha2)) });
 
-      ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha2 } });
-      ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha1 } });
+      // pushes them in reverse order, since we insert *before* it
+      it = ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha1 } });
+      it = ctx.emplace(it, CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha2 } });
+      it = it + 2; // it now points to alpha2...
 
       auto id = std::get<id_or_type_ref>(it->data);
       typtab.data[id.type].args.emplace_back(type_tags::pi.make_node(typtab, TypeData { "", { alpha1, alpha2 } }));
@@ -304,18 +335,6 @@ bool hx_ir_type_checking::is_instantiation_R(typing_context& ctx, std::uint_fast
 
 bool hx_ir_type_checking::is_subtype(typing_context& ctx, std::uint_fast32_t A, std::uint_fast32_t B)
 {
-  // <:ForallR
-  if(typtab.kinds[A] != type_kind::Pi && typtab.kinds[B] == type_kind::Pi)
-  {
-    ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, typtab.data[B].args.front() } });
-    std::size_t ctx_position = ctx.size();
-
-    bool result = is_subtype(ctx, A, typtab.data[B].args.back());
-
-    ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
-    return result;
-  }
-
   switch(typtab.kinds[A])
   {
   case type_kind::Kind:
@@ -324,6 +343,7 @@ bool hx_ir_type_checking::is_subtype(typing_context& ctx, std::uint_fast32_t A, 
 
   case type_kind::TypeCheckExistential:
   case type_kind::TypeConstructor:
+  case type_kind::Pi:
   case type_kind::Id: {
       if((typtab.kinds[A] != type_kind::TypeCheckExistential && typtab.kinds[B] == type_kind::TypeCheckExistential)
       || (typtab.kinds[A] == type_kind::TypeCheckExistential && typtab.kinds[B] == type_kind::TypeCheckExistential))
@@ -356,25 +376,7 @@ bool hx_ir_type_checking::is_subtype(typing_context& ctx, std::uint_fast32_t A, 
           return false;
         return is_instantiation_L(ctx, A, B); // <- TODO: add diagnostic if not an instantiation
       }
-      return A == B;  
-    } break;
-  case type_kind::Pi: {
-      if(typtab.kinds[B] != type_kind::Pi)
-      { // <:ForallL
-        ctx.emplace_back(CTXElement { marker { typtab.kinds.size() } });
-        std::size_t ctx_position = ctx.size();
-
-        std::uint_fast32_t alpha = type_tags::exist.make_node(typtab,
-                            TypeData { symbol("alpha_" + std::to_string(typtab.kinds.size())) });
-        ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha } });
-
-        bool result = is_subtype(ctx, typtab.subst(typtab.data[A].args.back(),
-                                                   typtab.data[A].args.front(), alpha),
-                                      B);
-        ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
-        return result;
-      }
-      else
+      else if(typtab.kinds[B] == type_kind::Pi)
       { // <:->
         auto A1 = typtab.data[A].args.front();
         auto A2 = typtab.data[A].args.back();
@@ -384,6 +386,7 @@ bool hx_ir_type_checking::is_subtype(typing_context& ctx, std::uint_fast32_t A, 
 
         return is_subtype(ctx, B1, A1) && is_subtype(ctx, subst(ctx, A2), subst(ctx, B2));
       }
+      return A == B;  
     } break;
   case type_kind::Application: {
       // TODO: correctness? :trollface:
@@ -406,6 +409,7 @@ std::uint_fast32_t hx_ir_type_checking::eta_synthesis(typing_context& ctx, hx_pe
 {
   switch(typtab.kinds[type])
   {
+  // existentialApp
   case type_kind::TypeCheckExistential:
     {
       auto ctx_it = std::find_if(ctx.begin(), ctx.end(),
@@ -443,16 +447,10 @@ std::uint_fast32_t hx_ir_type_checking::eta_synthesis(typing_context& ctx, hx_pe
       return static_cast<std::uint_fast32_t>(-1);
     } break;
 
+  // ->App
   case type_kind::Pi:
     {
-      // alpha
-      std::uint_fast32_t alpha = type_tags::exist.make_node(typtab,
-                          TypeData { symbol("alpha_" + std::to_string(typtab.kinds.size())) });
-      ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, alpha } });
-      // [alpha / A]C
-      std::uint_fast32_t substituted = typtab.subst(typtab.data[type].args.back(),
-                                                    typtab.data[type].args.front(), alpha);
-      return eta_synthesis(ctx, term, at, substituted);
+      return check(ctx, term, at, typtab.data[type].args.front());
     } break;
 
   default: ;

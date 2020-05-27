@@ -13,7 +13,6 @@ hx_ir::hx_ir()
 bool hx_ir::type_checks()
 {
   hx_ir_type_checking typch(types);
-
   typing_context ctx;
 
   bool success = true;

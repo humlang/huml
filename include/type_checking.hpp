@@ -35,6 +35,8 @@ struct hx_ir_type_checking
     : typtab(typtab)
   {  }
 
+  std::uint_fast32_t cleanup(std::uint_fast32_t typ);
+
   bool check(typing_context& ctx,
       hx_per_statement_ir& term, std::size_t at, std::uint_fast32_t to_check);
 
