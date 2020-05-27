@@ -31,19 +31,19 @@ bool hx_ir_type_checking::check(typing_context& ctx,
   case IRNodeKind::Prop:       return to_check == typtab.Type_sort_idx;
   // T-I<=
   case IRNodeKind::lambda:     {
-      if(typtab.kinds[to_check] != type_kind::Pi)
-        return false; // <- TODO: emit diagnostic
+      if(typtab.kinds[to_check] == type_kind::Pi)
+      {
+        ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, typtab.data[to_check].args.front() } });
+        std::size_t ctx_position = ctx.size();
 
-      ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, typtab.data[to_check].args.front() } });
-      std::size_t ctx_position = ctx.size();
+        bool result = check(ctx, term, at + 2, typtab.data[to_check].args.back());
 
-      bool result = check(ctx, term, at + 2, typtab.data[to_check].args.back());
+        // Delta, x:A, Theta should become just Delta
+        ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
 
-      // Delta, x:A, Theta should become just Delta
-      ctx.erase(ctx.begin() + ctx_position - 1, ctx.end());
-
-      return result;
-    } break;
+        return result;
+      }
+    } // fallthrough, if the type is not a Pi, we need to use T-Sub
   // T-ForallI   /    T-Sub
   default:                    {
       if(typtab.kinds[to_check] == type_kind::Pi)
@@ -137,7 +137,7 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
     } break;
   
   case IRNodeKind::expr_stmt:  {
-      return synthesize(ctx, term, at + 1);
+      return term.data[at].type_annot = synthesize(ctx, term, at + 1);
     } break;
 
   case IRNodeKind::assign_type:{
@@ -148,6 +148,10 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
   case IRNodeKind::assign_data:{
       assert(term.data[at].type_annot != static_cast<std::uint_fast32_t>(-1));
       return term.data[at].type_annot;
+    } break;
+
+  case IRNodeKind::assign:     {
+      return term.data[at].type_annot = synthesize(ctx, term, at + 2);
     } break;
   }
 
