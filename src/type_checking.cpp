@@ -25,7 +25,6 @@ std::uint_fast32_t hx_ir_type_checking::cleanup(std::uint_fast32_t at)
 
       // make it an identifier
       typtab.kinds[at] = type_kind::Id;
-      typtab.data[at].has_type = typtab.Type_sort_idx; // <- default is type
 
       return at;
     } break;
@@ -47,21 +46,28 @@ bool is_free_variable(type_table& tab, std::uint_fast32_t type, std::uint_fast32
 
 
 bool hx_ir_type_checking::check(typing_context& ctx,
-    hx_per_statement_ir& term, std::size_t at, std::uint_fast32_t to_check)
+    std::size_t stmt, std::size_t at, std::uint_fast32_t to_check)
 {
+  auto& term = ir.nodes[stmt];
   switch(term.kinds[at])
   {
   // T-Type<=
-  case IRNodeKind::Type:       return to_check == typtab.Kind_sort_idx;
+  case IRNodeKind::Type:       if(to_check == typtab.Kind_sort_idx) {
+                                 term.data[at].type_annot = typtab.Kind_sort_idx;
+                                 return true;
+                               } else return false;
   // T-Prop<=
-  case IRNodeKind::Prop:       return to_check == typtab.Type_sort_idx;
+  case IRNodeKind::Prop:       if(to_check == typtab.Type_sort_idx) {
+                                 term.data[at].type_annot = typtab.Type_sort_idx;
+                                 return true;
+                               } else return false;
   // T-I<=
   case IRNodeKind::lambda:     {
       if(typtab.kinds[to_check] == type_kind::Pi)
       {
-        ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, typtab.data[to_check].args.front() } });
+        ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, subst(ctx, typtab.data[to_check].args.front()) } });
 
-        bool result = check(ctx, term, at + 2, typtab.data[to_check].args.back());
+        bool result = check(ctx, stmt, at + 2, subst(ctx, typtab.data[to_check].args.back()));
 
         // Delta, x:A, Theta should become just Delta
         auto it = std::find_if(ctx.begin(), ctx.end(),
@@ -73,18 +79,27 @@ bool hx_ir_type_checking::check(typing_context& ctx,
         assert(it != ctx.end() && "We have added this before to our context!");
         ctx.erase(it, ctx.end());
 
+        term.data[at].type_annot = type_tags::pi.make_node(typtab, TypeData { "", {
+            subst(ctx, typtab.data[to_check].args.front()),
+            subst(ctx, typtab.data[to_check].args.back()) } });
+
         return result;
       }
     } // fallthrough, if the type is not a Pi, we need to use T-Sub
   // T-Sub
   default:                    {
-      auto A = synthesize(ctx, term, at);
+      auto A = synthesize(ctx, stmt, at);
 
       if(A == static_cast<std::uint_fast32_t>(-1))
         return false;
 
       // e : B if [Theta]A <: [Theta]B
-      return is_subtype(ctx, subst(ctx, A), subst(ctx, to_check));
+      if(is_subtype(ctx, subst(ctx, A), subst(ctx, to_check)))
+      {
+        term.data[at].type_annot = subst(ctx, to_check);
+        return true;
+      }
+      return false;
     } break;
   }
   assert(false && "Unhandled type in checking.");
@@ -92,14 +107,15 @@ bool hx_ir_type_checking::check(typing_context& ctx,
 }
 
 std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
-      hx_per_statement_ir& term, std::size_t at)
+      std::size_t stmt, std::size_t at)
 {
+  auto& term = ir.nodes[stmt];
   switch(term.kinds[at])
   {
   // T-Type=>
-  case IRNodeKind::Type:       return typtab.Kind_sort_idx; 
+  case IRNodeKind::Type:       return term.data[at].type_annot = typtab.Kind_sort_idx; 
   // T-Prop=>
-  case IRNodeKind::Prop:       return typtab.Type_sort_idx;
+  case IRNodeKind::Prop:       return term.data[at].type_annot = typtab.Type_sort_idx;
   // T-Var=>
   case IRNodeKind::identifier: {
     if(auto it = std::find_if(ctx.begin(), ctx.end(),
@@ -109,19 +125,17 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
                       return false;
                   return std::get<id_or_type_ref>(elem.data).id == it; });
         it != ctx.end())
-      return std::get<id_or_type_ref>(it->data).type;
+      return term.data[at].type_annot = std::get<id_or_type_ref>(it->data).type;
     return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic
   } break;
   // T-1=>
-  case IRNodeKind::unit:       return typtab.Unit_idx;
+  case IRNodeKind::unit:       return term.data[at].type_annot = typtab.Unit_idx;
   // T-App=>
   case IRNodeKind::app:        {
-      auto A = synthesize(ctx, term, at + 1);
+      auto A = synthesize(ctx, stmt, at + 1);
       if(A == static_cast<std::uint_fast32_t>(-1))
         return static_cast<std::uint_fast32_t>(-1);
-      auto C = eta_synthesis(ctx, term, at + 2, subst(ctx, A));
-
-      return C;
+      return term.data[at].type_annot = eta_synthesis(ctx, stmt, at + 2, subst(ctx, A));
     } break;
   // T-I=>
   case IRNodeKind::lambda:     {
@@ -136,7 +150,7 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
       ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, beta  } });
       ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, alpha } });
 
-      if(!check(ctx, term, at + 2, beta))
+      if(!check(ctx, stmt, at + 2, beta))
         return static_cast<std::uint_fast32_t>(-1);
       
       auto it = std::find_if(ctx.begin(), ctx.end(),
@@ -148,42 +162,90 @@ std::uint_fast32_t hx_ir_type_checking::synthesize(typing_context& ctx,
       assert(it != ctx.end() && "We have added this to our context before.");
       ctx.erase(it, ctx.end());
       // `alpha -> beta`
-      return type_tags::pi.make_node(typtab, TypeData { "", { subst(ctx, alpha), subst(ctx, beta) } });
+      return term.data[at].type_annot =
+        type_tags::pi.make_node(typtab, TypeData { "", { subst(ctx, alpha), subst(ctx, beta) } });
     } break;
-  // T-Anno
+  // T-Anno   / T-ExistsAnno
   case IRNodeKind::type_check: {
       if(!is_well_formed(ctx, CTXElement { id_or_type_ref { at, term.data[at].type_annot } }))
         return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic
-      if(!check(ctx, term, at + 1, term.data[at].type_annot))
+      
+      // see if we have something like [ealpha][A : ealpha] in our context
+      auto it = std::find_if(ctx.begin(), ctx.end(),
+                  [it = term.data[at].type_annot](auto& elem) {
+                    if(!std::holds_alternative<id_or_type_ref>(elem.data))
+                      return false;
+                      // something like `A : ealpha`
+                  return std::get<id_or_type_ref>(elem.data).id == it
+                      // something like `A`
+                      || std::get<id_or_type_ref>(elem.data).type == it; });
+      if(it == ctx.end())
+        return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic    type not found
+      auto& id = std::get<id_or_type_ref>(it->data);
+      if(id.id == term.data[at].type_annot)
+      {
+        assert(id.type != id_or_type_ref::no_ref && "Type cannot appear in context as id without a type.");
+        
+        if(typtab.kinds[id.type] == type_kind::TypeCheckExistential)
+        {
+          // ExistsAnno
+
+          it = std::find_if(ctx.begin(), it,
+              [it = id.type](auto& elem) {
+                if(!std::holds_alternative<id_or_type_ref>(elem.data))
+                  return false;
+                return std::get<id_or_type_ref>(elem.data).type == it; });
+          if(it == ctx.end())
+            return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic
+          auto& idd = std::get<id_or_type_ref>(it->data);
+          assert(typtab.kinds[idd.type] == type_kind::TypeCheckExistential);
+
+          // TODO: think about universe hierarchy
+          typtab.data[idd.type].args.push_back(typtab.Type_sort_idx);
+        }
+      }
+      else if(id.type == term.data[at].type_annot)
+        ; // Anno
+      else
+        assert(false && "Unreachable!");
+
+      if(!check(ctx, stmt, at + 1, term.data[at].type_annot))
         return static_cast<std::uint_fast32_t>(-1); // <- TODO: emit diagnostic
       return term.data[at].type_annot;
     } break;
   
   case IRNodeKind::expr_stmt:  {
-      auto typ = term.data[at].type_annot = synthesize(ctx, term, at + 1);
-      ctx.clear();
+      std::size_t current_size = ctx.size();
+      auto typ = term.data[at].type_annot = synthesize(ctx, stmt, at + 1);
 
       if(typ != static_cast<std::uint_fast32_t>(-1))
         cleanup(typ);
+      ctx.erase(ctx.begin() + current_size, ctx.end());
       return typ;
     } break;
 
   case IRNodeKind::assign_type:{
       assert(term.data[at].type_annot != static_cast<std::uint_fast32_t>(-1));
+
+      // add type constructors to context
+      ctx.emplace_back(CTXElement { id_or_type_ref { id_or_type_ref::no_ref, term.data[at].type_annot } });
       return term.data[at].type_annot;
     } break;
 
   case IRNodeKind::assign_data:{
       assert(term.data[at].type_annot != static_cast<std::uint_fast32_t>(-1));
+
+      ctx.emplace_back(CTXElement { id_or_type_ref { at + 1, term.data[at].type_annot } });
       return term.data[at].type_annot;
     } break;
 
   case IRNodeKind::assign:     {
-      auto typ = term.data[at].type_annot = synthesize(ctx, term, at + 2);
-      ctx.clear();
+      std::size_t current_size = ctx.size();
+      auto typ = term.data[at].type_annot = synthesize(ctx, stmt, at + 2);
 
       if(typ != static_cast<std::uint_fast32_t>(-1))
         cleanup(typ);
+      ctx.erase(ctx.begin() + current_size - 1, ctx.end());
       return typ;
     } break;
   }
@@ -221,8 +283,12 @@ bool hx_ir_type_checking::is_instantiation_L(typing_context& ctx, std::uint_fast
       auto id = std::get<id_or_type_ref>(it->data);
       typtab.data[id.type].args.emplace_back(type_tags::pi.make_node(typtab, TypeData { "", { alpha1, alpha2 } }));
 
+      /*
       bool first  = is_instantiation_R(ctx, typtab.data[A].args.front(), alpha1);
       bool second = is_instantiation_L(ctx, alpha2, subst(ctx, typtab.data[A].args.back()));
+      */
+      bool first = is_subtype(ctx, subst(ctx, typtab.data[A].args.front()), alpha1);
+      bool second = is_subtype(ctx, alpha2, subst(ctx, typtab.data[A].args.back()));
       
       return first && second;
     } break;
@@ -294,8 +360,12 @@ bool hx_ir_type_checking::is_instantiation_R(typing_context& ctx, std::uint_fast
       auto id = std::get<id_or_type_ref>(it->data);
       typtab.data[id.type].args.emplace_back(type_tags::pi.make_node(typtab, TypeData { "", { alpha1, alpha2 } }));
 
+      /*
       bool first  = is_instantiation_L(ctx, alpha1, typtab.data[A].args.front());
       bool second = is_instantiation_R(ctx, subst(ctx, typtab.data[A].args.back()), alpha2);
+      */
+      bool first = is_subtype(ctx, alpha1, subst(ctx, typtab.data[A].args.front()));
+      bool second = is_subtype(ctx, subst(ctx, typtab.data[A].args.back()), alpha2);
       
       return first && second;
     } break;
@@ -434,7 +504,7 @@ instL:
 }
 
 
-std::uint_fast32_t hx_ir_type_checking::eta_synthesis(typing_context& ctx, hx_per_statement_ir& term, std::size_t at, std::uint_fast32_t type)
+std::uint_fast32_t hx_ir_type_checking::eta_synthesis(typing_context& ctx, std::size_t stmt, std::size_t at, std::uint_fast32_t type)
 {
   switch(typtab.kinds[type])
   {
@@ -467,7 +537,7 @@ std::uint_fast32_t hx_ir_type_checking::eta_synthesis(typing_context& ctx, hx_pe
       auto id = std::get<id_or_type_ref>(ctx_it->data);
       typtab.data[id.type].args.emplace_back(type_tags::pi.make_node(typtab, TypeData { "", { alpha1, alpha2 } }));
 
-      if(check(ctx, term, at, alpha1))
+      if(check(ctx, stmt, at, alpha1))
         return alpha2;
 
       // TODO: emit diagnostic, does not typecheck
@@ -477,7 +547,7 @@ std::uint_fast32_t hx_ir_type_checking::eta_synthesis(typing_context& ctx, hx_pe
   // ->App
   case type_kind::Pi:
     {
-      return check(ctx, term, at, typtab.data[type].args.front());
+      return check(ctx, stmt, at, typtab.data[type].args.front());
     } break;
 
   default: ;

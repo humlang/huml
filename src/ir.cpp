@@ -12,14 +12,16 @@ hx_ir::hx_ir()
 
 bool hx_ir::type_checks()
 {
-  hx_ir_type_checking typch(types);
+  hx_ir_type_checking typch(types, *this);
   typing_context ctx;
+  ctx.reserve(1024);
 
   bool success = true;
-  for(auto& n : this->nodes)
+  for(std::size_t stmt = 0; stmt < this->nodes.size(); ++stmt)
   {
-    auto t = typch.synthesize(ctx, n, 0);
+    auto t = typch.synthesize(ctx, stmt, 0);
 
+    auto& n = this->nodes[stmt];
     if(t == static_cast<std::uint_fast32_t>(-1))
     {
       n.print(std::cout, this->types); std::cout << " # Does not typecheck.\n";

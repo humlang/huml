@@ -900,6 +900,12 @@ std::size_t hx_reader::parse_type_identifier()
                                                                        {"how", "id"} });
     return mk_error();
   }
+  auto typhash = type_tags::type_constructor.hash(global_scope.types, TypeData { old.data, {  } });
+  if(auto it = std::find(global_scope.types.hashes.begin(), global_scope.types.hashes.end(), typhash);
+      it != global_scope.types.hashes.end())
+  {
+    return it - global_scope.types.hashes.begin();
+  }
   return type_tags::id.make_node(global_scope.types, TypeData { old.data });
 }
 

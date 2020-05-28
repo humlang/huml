@@ -76,6 +76,7 @@ struct type_table
       } break;
       case type_kind::Pi: { // TODO: Check if body is independent of arg, print `->` instead
         os << "\\ (";
+        assert(kinds[data[type_ref].args.front()] == type_kind::Id);
         print_type(os, data[type_ref].args.front());
         os << "). ";
         print_type(os, data[type_ref].args.back());
@@ -94,6 +95,22 @@ struct type_table
 template<type_kind kind>
 struct type_tag
 {
+  std::size_t hash(type_table& typtab, TypeData&& dat) const
+  {
+    std::size_t hash = static_cast<std::size_t>(kind);
+
+    hash ^= dat.name.get_hash() + 0x9e3779b9 + (hash<<6) + (hash>>2);
+
+    for(auto& x : dat.args)
+    {
+      assert(x < typtab.hashes.size() && "Type wasn't hashed in before!");
+
+      hash ^= typtab.hashes[x] + 0x9e3779b9 + (hash<<6) + (hash>>2);
+    }
+
+    return hash;
+  }
+
   std::uint_fast32_t make_node(type_table& typtab, TypeData&& dat) const
   {
     std::size_t hash = static_cast<std::size_t>(kind);
