@@ -1,33 +1,14 @@
 #pragma once
 
-#include <per_statement_ir.hpp>
+#include <ir_nodes.hpp>
 #include <symbol.hpp>
 
 #include <cassert>
 
-enum class type_kind
-{
-  Kind,
-  Type,
-  Prop,
-  TypeConstructor,
-  Application,
-  Id,
-  Pi,
-
-  TypeCheckExistential
-};
-
-struct TypeData
-{
-  symbol name;
-  std::vector<std::uint_fast32_t> args {};
-  std::uint_fast32_t has_type { static_cast<std::uint_fast32_t>(-1) };
-};
 
 struct data_constructors
 {
-  std::vector<TypeData> data;
+  std::vector<IRData> data;
 };
 
 // CANNOT ASSUME THAT TYPES ARE LINEAR IN MEMORY!!
@@ -41,110 +22,45 @@ struct type_table
   static constexpr std::size_t Prop_sort_idx = 2;
   static constexpr std::size_t Unit_idx = 3;
 
-  std::vector<type_kind> kinds;
-  std::vector<TypeData> data;
-  tsl::robin_map<std::uint_fast32_t, data_constructors> constructors;
+  std::size_t hash(IRNodeKind kind, const IRData& dat) const
+  {
+    std::size_t hash = static_cast<std::size_t>(kind);
 
-  std::vector<std::size_t> hashes;
+    hash ^= dat.name.get_hash() + 0x9e3779b9 + (hash<<6) + (hash>>2);
 
+    for(auto& x : dat.args)
+    {
+      assert(x < hashes.size() && "Type wasn't hashed in before!");
+
+      hash ^= hashes[x] + 0x9e3779b9 + (hash<<6) + (hash>>2);
+    }
+    return hash;
+  }
+  std::size_t add(IRNodeKind kind, IRData&& dat, IRDebugData&& debug)
+  {
+    auto hs = hash(kind, dat);
+
+    if(auto it = std::find(hashes.begin(), hashes.end(), hs);
+        it != hashes.end())
+    {
+      return it - hashes.begin();
+    }
+
+    kinds.insert(kinds.end(), kind);
+    data.emplace(data.end(), std::move(dat));
+    dbg_data.emplace(dbg_data.end(), std::move(debug));
+    hashes.emplace(hashes.end(), hs);
+
+    return kinds.size() - 1;
+  }
 
   std::uint_fast32_t subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with);
 
-  void print_type(std::ostream& os, std::uint_fast32_t type_ref)
-  {
-    switch(type_ref)
-    {
-    case Kind_sort_idx: os << "Kind"; break;
-    case Type_sort_idx: os << "Type"; break;
-    case Prop_sort_idx: os << "Prop"; break;
-    case Unit_idx:      os << "1"; break; 
-    }
-    assert(type_ref > Unit_idx);
-    switch(kinds[type_ref])
-    {
-      case type_kind::TypeCheckExistential: {
-        os << data[type_ref].name.get_string();
-      } break;
-      case type_kind::TypeConstructor:
-      case type_kind::Id: {
-        os << data[type_ref].name.get_string();
+  std::vector<IRNodeKind> kinds;
+  std::vector<IRData> data;
+  std::vector<IRDebugData> dbg_data;
+  tsl::robin_map<std::uint_fast32_t, data_constructors> constructors;
 
-        if(data[type_ref].has_type != static_cast<std::uint_fast32_t>(-1))
-        {
-          os << " : " << data[data[type_ref].has_type].name.get_string();
-        }
-      } break;
-      case type_kind::Pi: { // TODO: Check if body is independent of arg, print `->` instead
-        os << "\\ (";
-        assert(kinds[data[type_ref].args.front()] == type_kind::Id);
-        print_type(os, data[type_ref].args.front());
-        os << "). ";
-        print_type(os, data[type_ref].args.back());
-      } break;
-      case type_kind::Application: {
-        os << "((";
-        print_type(os, data[type_ref].args.front());
-        os << ") (";
-        print_type(os, data[type_ref].args.back());
-        os << "))";
-      }
-    }
-  }
+  std::vector<std::size_t> hashes;
 };
-
-template<type_kind kind>
-struct type_tag
-{
-  std::size_t hash(type_table& typtab, TypeData&& dat) const
-  {
-    std::size_t hash = static_cast<std::size_t>(kind);
-
-    hash ^= dat.name.get_hash() + 0x9e3779b9 + (hash<<6) + (hash>>2);
-
-    for(auto& x : dat.args)
-    {
-      assert(x < typtab.hashes.size() && "Type wasn't hashed in before!");
-
-      hash ^= typtab.hashes[x] + 0x9e3779b9 + (hash<<6) + (hash>>2);
-    }
-
-    return hash;
-  }
-
-  std::uint_fast32_t make_node(type_table& typtab, TypeData&& dat) const
-  {
-    std::size_t hash = static_cast<std::size_t>(kind);
-
-    hash ^= dat.name.get_hash() + 0x9e3779b9 + (hash<<6) + (hash>>2);
-
-    for(auto& x : dat.args)
-    {
-      assert(x < typtab.hashes.size() && "Type wasn't hashed in before!");
-
-      hash ^= typtab.hashes[x] + 0x9e3779b9 + (hash<<6) + (hash>>2);
-    }
-    // TODO: use set?
-    if(auto it = std::find(typtab.hashes.begin(), typtab.hashes.end(), hash);
-        it != typtab.hashes.end())
-    {
-      return it - typtab.hashes.begin();
-    }
-    typtab.kinds.emplace_back(kind);
-    typtab.data.emplace_back(dat);
-    typtab.hashes.emplace_back(hash);
-
-    return typtab.kinds.size() - 1;
-  }
-};
-
-namespace type_tags
-{
-  constexpr static type_tag<type_kind::Kind> kind = {};
-  constexpr static type_tag<type_kind::Type> type = {};
-  constexpr static type_tag<type_kind::Prop> prop = {};
-  constexpr static type_tag<type_kind::TypeConstructor> type_constructor = {};
-  constexpr static type_tag<type_kind::Application> application = {};
-  constexpr static type_tag<type_kind::Id> id = {};
-  constexpr static type_tag<type_kind::Pi> pi = {};
-}
 

@@ -40,16 +40,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
 
-      for(auto& i : w[0].nodes)
-      {
-        i.print(std::cout, w[0].types);
-        std::cout << "\n";
-      }
-
-      if(global_ir.type_checks())
-        std::cout << "### Does type check." << std::endl;
-      else
-        std::cout << "!!! Does not type check." << std::endl;
+      global_ir.print(std::cout);
     } },
   { emit_classes::ir_graph, [](std::string_view t)
     {
@@ -59,37 +50,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
 
-      std::cout << "digraph {\n";
-      for(auto& n : global_ir.nodes)
-      {
-        std::cout << "  ";
-        if(n.node_name)
-          std::cout << n.node_name->get_string() << "\n";
-        else
-        {
-          std::cout << "\""; n.print(std::cout, global_ir.types); std::cout << "\"\n";
-        }
-      }
-
-      for(auto& e : global_ir.edges)
-      {
-        std::cout << "  ";
-        if(global_ir.nodes[e.from].node_name)
-          std::cout << global_ir.nodes[e.from].node_name->get_string();
-        else
-        {
-          std::cout << "\""; global_ir.nodes[e.from].print(std::cout, global_ir.types); std::cout << "\"";
-        }
-        std::cout << " -> ";
-        if(global_ir.nodes[e.to].node_name)
-          std::cout << global_ir.nodes[e.to].node_name->get_string();
-        else
-        {
-          std::cout << "\""; global_ir.nodes[e.to].print(std::cout, global_ir.types); std::cout << "\"";
-        }
-        std::cout << "\n";
-      }
-      std::cout << "}\n";
+      std::cout << "TODO\n";
     } },
   { emit_classes::tokens, [](std::string_view t)
     {

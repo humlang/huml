@@ -5,23 +5,21 @@
 type_table::type_table()
 {
   // Kind
-  type_tags::kind.make_node(*this, TypeData { "Kind" });
+  IRTags::Kind.make_node(*this, IRData { "Kind" }, IRDebugData {});
 
   // Type
-  type_tags::type.make_node(*this, TypeData { "Type" });
+  IRTags::Type.make_node(*this, IRData { "Type" }, IRDebugData {});
 
   // Prop
-  type_tags::prop.make_node(*this, TypeData { "Prop" });
+  IRTags::Prop.make_node(*this, IRData { "Prop" }, IRDebugData {});
 
-  // Unit    is inhabited by  \\(A : Type). \\(a : A). a
-  auto A = type_tags::id.make_node(*this, TypeData { "A", { }, Type_sort_idx });
-  type_tags::pi.make_node(*this, TypeData { "1",
-      { A,
-      type_tags::pi.make_node(*this, TypeData { "", {
-        type_tags::id.make_node(*this, TypeData { "_", { }, A }),
-        A
-        }}
-      )} });
+  // Unit    is inhabited by  \\(A : Type). \\(_ : A). a
+  auto A = IRTags::identifier.make_node(*this, IRData { "A", { }, Type_sort_idx }, IRDebugData {});
+  auto underscore = IRTags::identifier.make_node(*this, IRData { "_", { }, A }, IRDebugData {});  
+
+  auto inner = IRTags::lambda.make_node(*this, IRData { "", { underscore, A } }, IRDebugData {});
+
+  IRTags::lambda.make_node(*this, IRData { "1", { A, inner } }, IRDebugData {});
 }
 
 // [A / alpha]C                                         C                       A                      alpha

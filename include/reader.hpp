@@ -62,13 +62,6 @@ private:
   // always uses old for the error
   std::size_t mk_error();
 
-  std::size_t parse_type_prefix();
-  std::size_t parse_type(int precedence = 0);
-  std::size_t parse_pi();
-  std::size_t parse_kind();
-  std::size_t parse_type_identifier();
-  std::size_t parse_type_app(std::size_t lhs);
-  std::size_t parse_parenthesized_type();
 
   std::size_t parse_assign();
   std::size_t parse_expr_stmt();
@@ -78,25 +71,18 @@ private:
   std::size_t parse_constructor();
 
   std::size_t parse_type_check(std::size_t left);
-  std::size_t parse_literal();
   std::size_t parse_identifier();
-  std::size_t parse_block();
-  std::size_t parse_tuple();
   std::size_t parse_case();
-  std::size_t parse_top();
-  std::size_t parse_bot();
   std::size_t parse_Prop();
   std::size_t parse_Type();
   std::size_t parse_Kind();
   std::size_t parse_app(std::size_t lhs);
-  std::size_t parse_access(std::size_t lhs);
   std::size_t parse_lambda();
   std::size_t parse_keyword();
   std::size_t parse_match();
   std::size_t parse_statement();
   std::size_t parse_prefix();
   std::size_t parse_pattern();
-  std::size_t parse_binary(std::size_t left);
   std::size_t parse_expression(int precedence = 0);
   int precedence();
 
@@ -115,7 +101,7 @@ private:
 
   bool parsing_pattern { false };
   bool parsing_constructor { false };
-  bool parsing_type_checking { false };
+  std::uint_fast32_t parsing_type_checking { 0 };
 
   std::vector<fixit_info> fixits_stack;
 };

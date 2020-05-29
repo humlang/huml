@@ -7,28 +7,35 @@
 #include <iostream>
 
 hx_ir::hx_ir()
-  : nodes()
 {  }
+
+std::uint_fast32_t hx_ir::add(IRNodeKind kind, IRData&& dat, IRDebugData&& debug)
+{
+  kinds.insert(kinds.end(), kind);
+  data.emplace(data.end(), std::move(dat));
+  dbg_data.emplace(dbg_data.end(), std::move(debug));
+
+  return kinds.size() - 1;
+}
 
 bool hx_ir::type_checks()
 {
-  hx_ir_type_checking typch(types, *this);
+  hx_ir_type_checking typch(typtab, *this);
   typing_context ctx;
   ctx.reserve(1024);
 
   bool success = true;
-  for(std::size_t stmt = 0; stmt < this->nodes.size(); ++stmt)
+  for(std::size_t stmt = 0; stmt < kinds.size(); ++stmt)
   {
     auto t = typch.synthesize(ctx, stmt, 0);
 
-    auto& n = this->nodes[stmt];
     if(t == static_cast<std::uint_fast32_t>(-1))
     {
-      n.print(std::cout, this->types); std::cout << " # Does not typecheck.\n";
+      print_node(std::cout, stmt); std::cout << " # Does not typecheck.\n";
     }
     else
     {
-      n.print(std::cout, this->types); std::cout << " # Has type "; this->types.print_type(std::cout, t);
+      print_node(std::cout, stmt); std::cout << " # Has type "; print_node(std::cout, t);
       std::cout << "\n";
     }
     success = success && (t != static_cast<std::uint_fast32_t>(-1));
@@ -36,51 +43,80 @@ bool hx_ir::type_checks()
   return success;
 }
 
-void hx_ir::build_graph()
+void hx_ir::print(std::ostream& os)
 {
-  // create edges
+  assert(!kinds.empty() && "IR cannot be zero, there is never an empty module!");
 
-  /// 1. Collect all free variables of the type declarations.
-  symbol_set data_constructors;
-  for(auto& ctors_for_type : types.constructors)
+  for(auto& r : roots)
   {
-    for(auto& n : ctors_for_type.second.data)
-    {
-      data_constructors.insert(n.name);
-    }
+    print_node(os, r);
   }
-  std::uint_fast32_t node_index = 0;
-  for(auto& n : this->nodes)
+}
+
+std::uint_fast32_t hx_ir::print_node(std::ostream& os, std::uint_fast32_t node)
+{
+  auto& args = data[node].args;
+  switch(kinds[node])
   {
-    for(auto fv_p_it = n.free_variable_roots.begin();
-        fv_p_it != n.free_variable_roots.end();
-        ++fv_p_it)
-    {
-      auto& fv_p = *fv_p_it;
-
-      /// 2. Only print if it is not a data constructor
-      if(!data_constructors.contains(fv_p.first) && fv_p.second.potentially_bounded_ref == static_cast<std::uint_fast32_t>(-1))
-      {
-        // Check if we know this IR       TODO: Improve performance by not doing linear searches!
-        auto fit = std::find_if(this->nodes.begin(), this->nodes.end(), [&fv_p](hx_per_statement_ir& hir)
-            {
-              if(!hir.node_name)   // <- may happen for expression statements
-                return false;
-              return (!hir.node_name->get_string().empty() && *hir.node_name == fv_p.first);
-            });
-
-        if(fit != this->nodes.end())
+    case IRNodeKind::undef:      os << "undef"; break;
+    case IRNodeKind::unit:       os << "()"; break;
+    case IRNodeKind::Kind:       os << "Kind"; break;
+    case IRNodeKind::Type:       os << "Type"; break;
+    case IRNodeKind::Prop:       os << "Prop"; break;
+    case IRNodeKind::type_check: { auto cpy = node; os << "(("; node = print_node(os, args.front());
+                                   os << ") : "; print_node(os, data[cpy].type_annot); os << ")"; } break;
+    case IRNodeKind::app:        { os << "("; node = print_node(os, args.front());
+                                   os << ") ("; node = print_node(os, args.back());
+                                   os << ")"; } break;
+    case IRNodeKind::lambda:     {
+        auto cpy = node;
+        if(data[cpy].type_annot != IRData::no_type)
         {
-          edges.push_back(edge { node_index, static_cast<std::uint_fast32_t>(fit - this->nodes.begin()) });
+          os << "\\(";
+          node = print_node(os, args.front());
+          os << " : ";
+          print_node(os, data[cpy].type_annot);
+          os << "). ";
         }
         else
         {
-          globally_free_variables.push_back(fv_p.first);
+          os << "\\";
+          node = print_node(os, args.front());
+          os << ". ";
         }
-        // TODO: make sure this thing is unique for the symbol in fv_p
+        node = print_node(os, args.back());
+      } break;
+    case IRNodeKind::match:      { node = print_node(os, args.front()); os << " => ";
+                                   node = print_node(os, args.back()); } break;
+    case IRNodeKind::pattern:    node = print_node(os, args.front()); break;
+    case IRNodeKind::pattern_matcher: {
+      os << "case (";
+      node = print_node(os, args.front());
+      os << ") [";
+      for(std::uint_fast32_t i = 1; i < args.size(); ++i)
+      {
+        node = print_node(os, args[i]);
+        if(i + 1 < args.size())
+          os << " | ";
       }
-    }
-    ++node_index;
+      os << "]";
+    } break;
+    case IRNodeKind::param:      node = print_node(os, args.front()); break;
+    case IRNodeKind::identifier: os << data[node].name.get_string(); break;
+    case IRNodeKind::assign:     { node = print_node(os, args.front()); os << " = ";
+                                   node = print_node(os, args.front()); os << ";"; } break;
+    case IRNodeKind::assign_type: {
+      os << "type ";
+      node = print_node(os, data[node].type_annot);
+      os << ";";
+    } break;
+    case IRNodeKind::assign_data: {
+      os << "data " << data[node].name << " : ";
+      node = print_node(os, data[node].type_annot);
+      os << ";";
+    } break;
+    case IRNodeKind::expr_stmt:  { node = print_node(os, args.front()); os << ";"; } break;
   }
+  return node;
 }
 
