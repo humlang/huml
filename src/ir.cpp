@@ -98,6 +98,12 @@ std::uint_fast32_t hx_ir::print_node(std::ostream& os, std::uint_fast32_t node)
 {
   auto cpy = node;
   auto& argc = data[node].argc;
+  bool print_type = data[node].type_annot != IRData::no_type;
+
+  print_type = print_type && kinds[node] != IRNodeKind::assign_type && kinds[node] != IRNodeKind::assign_data;
+
+  if(print_type)
+    os << "(";
   switch(kinds[node])
   {
     case IRNodeKind::undef:      os << "undef"; break;
@@ -105,27 +111,13 @@ std::uint_fast32_t hx_ir::print_node(std::ostream& os, std::uint_fast32_t node)
     case IRNodeKind::Kind:       os << "Kind"; break;
     case IRNodeKind::Type:       os << "Type"; break;
     case IRNodeKind::Prop:       os << "Prop"; break;
-    case IRNodeKind::type_check: { os << "(("; node = print_node(os, node + 1);
-                                   os << ") : "; print_node(os, cpy + data[cpy].type_annot); os << ")"; } break;
     case IRNodeKind::app:        { os << "("; node = print_node(os, node + 1);
                                    os << ") ("; node = print_node(os, node + 1);
                                    os << ")"; } break;
     case IRNodeKind::lambda:     {
-        auto cpy = node;
-        if(data[cpy].type_annot != IRData::no_type)
-        {
-          os << "\\(";
-          node = print_node(os, node + 1);
-          os << " : ";
-          print_node(os, cpy + data[cpy].type_annot);
-          os << "). ";
-        }
-        else
-        {
-          os << "\\";
-          node = print_node(os, node + 1);
-          os << ". ";
-        }
+        os << "\\";
+        node = print_node(os, node + 1);
+        os << ". ";
         node = print_node(os, node + 1);
       } break;
     case IRNodeKind::match:      { node = print_node(os, node + 1); os << " => ";
@@ -148,17 +140,26 @@ std::uint_fast32_t hx_ir::print_node(std::ostream& os, std::uint_fast32_t node)
     case IRNodeKind::assign:     { node = print_node(os, node + 1); os << " = ";
                                    node = print_node(os, node + 1); os << ";"; } break;
     case IRNodeKind::assign_type: {
-      os << "type " << data[node].name << " : ";
-      print_node(os, node + data[node].type_annot);
+      os << "type ";
+      node = print_node(os, node + 1);
+      os << " : ";
+      print_node(os, cpy + data[cpy].type_annot);
       os << ";";
     } break;
     case IRNodeKind::assign_data: {
-      auto cpy = node;
-      os << "data "; node = print_node(os, node + 1); os << " : ";
+      os << "data ";
+      node = print_node(os, node + 1);
+      os << " : ";
       print_node(os, cpy + data[cpy].type_annot);
       os << ";";
     } break;
     case IRNodeKind::expr_stmt:  { node = print_node(os, node + 1); os << ";"; } break;
+  }
+  if(print_type)
+  {
+    os << " : ";
+    node = print_node(os, cpy + data[cpy].type_annot);
+    os << ")";
   }
   return node;
 }

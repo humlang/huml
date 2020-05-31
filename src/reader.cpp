@@ -584,12 +584,30 @@ std::size_t hx_reader::parse_lambda()
   if(!expect('\\', diagnostic_db::parser::lambda_expects_lambda))
     return mk_error();
 
+  bool type_checking_mode = accept('(');
+
   std::size_t to_ret = IRTags::lambda.make_node(global_scope, IRData { lam_tok.data, 2 },
                                                 IRDebugData { lam_tok.loc });
   parsing_pattern = true;
   auto param = parse_identifier();
   parsing_pattern = false;
   auto psymb = old.data;
+
+  if(accept(':'))
+  {
+    if(!type_checking_mode)
+    {
+      // TODO: emit diagnostic
+      return mk_error();
+    }
+
+    auto typ = parse_expression();
+
+    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
+      return mk_error();
+
+    global_scope.data[param].type_annot = typ - param;
+  }
 
   // TODO: Add type parsing similar to Pi
 
@@ -715,42 +733,9 @@ std::size_t hx_reader::parse_data_ctor()
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  // The rest are not args, but can by found with the type annotation
-  std::vector<IRData> params; params.reserve(32);
-  while(accept('('))
-  {
-    if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
-    {
-      fixits_stack.back().changes.emplace_back(old.loc.snd_proj(), nlohmann::json { {"what", old.loc},
-                                                                         {"how", "id"} });
-      return mk_error();
-    }
-    // symbol("_") is ok
-    symbol id = old.data;
-
-    if(!expect(':', diagnostic_db::parser::type_ctor_param_expects_colon))
-      return mk_error();
-
-    auto type = parse_expression();
-
-    if(!type || !expect(')', diagnostic_db::parser::type_ctor_param_expects_closing_paranthesis))
-      return mk_error();
-
-    params.emplace_back(IRData { id, {}, type });
-  }
   if(!expect(':', diagnostic_db::parser::type_assign_expects_equal))
     return mk_error();
   auto tail = parse_expression();
-
-  // build new type
-  std::size_t typ_begin = tail;
-  for(auto it = params.rbegin(); it != params.rend(); ++it)
-  {
-    std::size_t old_pi = typ_begin;
-
-    typ_begin = IRTags::lambda.make_node(global_scope, IRData { "", 2 }, IRDebugData {  });
-    typ_begin = IRTags::identifier.make_node(global_scope, std::move(*it), IRDebugData {  });
-  }
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
@@ -775,47 +760,15 @@ std::size_t hx_reader::parse_type_ctor()
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  std::vector<IRData> params; params.reserve(32);
-  while(accept('('))
-  {
-    if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
-    {
-      fixits_stack.back().changes.emplace_back(old.loc.snd_proj(), nlohmann::json { {"what", old.loc},
-                                                                         {"how", "id"} });
-      return mk_error();
-    }
-    // symbol("_") is ok
-    symbol id = old.data;
-
-    if(!expect(':', diagnostic_db::parser::type_ctor_param_expects_colon))
-      return mk_error();
-
-    auto type = parse_expression();
-
-    if(!type || !expect(')', diagnostic_db::parser::type_ctor_param_expects_closing_paranthesis))
-      return mk_error();
-
-    params.emplace_back(IRData { id, {}, type });
-  }
   if(!expect(':', diagnostic_db::parser::type_assign_expects_equal))
     return mk_error();
-
   auto tail = parse_expression();
 
-  // build new type
-  std::size_t typ_begin = tail;
-  for(auto it = params.rbegin(); it != params.rend(); ++it)
-  {
-    std::size_t old_pi = typ_begin;
-
-    typ_begin = IRTags::lambda.make_node(global_scope, IRData { "", 2 }, IRDebugData {});
-    typ_begin = IRTags::identifier.make_node(global_scope, std::move(*it), IRDebugData {});
-  }
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
-  global_scope.data[to_ret] = IRData { type_name_id, 1, typ_begin - to_ret };
-  global_scope.constructors[typ_begin]; // <- ensure it exists
+  global_scope.data[to_ret] = IRData { type_name_id, 1, tail - to_ret };
+  global_scope.constructors[tail]; // <- ensure it exists
 
   return to_ret;
 }
@@ -979,9 +932,9 @@ std::size_t hx_reader::parse_type_check(std::size_t left)
   if(right == static_cast<std::uint_fast32_t>(-1))
     return mk_error();
 
-  auto& b = global_scope;
+  global_scope.data[left].type_annot = right;
 
-  return IRTags::type_check.make_node(left, b, IRData { colon.data, 2 }, IRDebugData { colon.loc });
+  return left;
 }
 
 // e

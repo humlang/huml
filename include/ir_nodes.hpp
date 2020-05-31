@@ -21,7 +21,6 @@ enum class IRNodeKind : std::int_fast8_t
   assign_type,
   assign_data,
   expr_stmt,
-  type_check,
 };
 
 struct IRData
@@ -78,7 +77,6 @@ namespace IRTags
   static constexpr IRTag<IRNodeKind::assign_type> assign_type = {  };
   static constexpr IRTag<IRNodeKind::assign_data> assign_data = {  };
   static constexpr IRTag<IRNodeKind::expr_stmt> expr_stmt = {  };
-  static constexpr IRTag<IRNodeKind::type_check> type_check = {  };
   static constexpr IRTag<IRNodeKind::Kind> Kind = {  };
   static constexpr IRTag<IRNodeKind::Type> Type = {  };
   static constexpr IRTag<IRNodeKind::Prop> Prop = {  };
