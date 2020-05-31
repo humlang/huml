@@ -101,7 +101,6 @@ private:
 
   bool parsing_pattern { false };
   bool parsing_constructor { false };
-  std::uint_fast32_t parsing_type_checking { 0 };
 
   std::vector<fixit_info> fixits_stack;
 };

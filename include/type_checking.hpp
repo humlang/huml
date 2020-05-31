@@ -5,8 +5,6 @@
 
 #include <variant>
 
-struct type_table;
-
 struct marker
 {
   std::uint_fast32_t existential_ref;
@@ -31,8 +29,8 @@ std::vector<CTXElement> typedef typing_context;
 
 struct hx_ir_type_checking
 {
-  hx_ir_type_checking(type_table& typtab, hx_ir& nodes)
-    : typtab(typtab), ir(nodes)
+  hx_ir_type_checking(hx_ir& nodes)
+    : ir(nodes)
   {  }
 
   std::uint_fast32_t cleanup(std::uint_fast32_t typ);
@@ -56,7 +54,6 @@ struct hx_ir_type_checking
   std::uint_fast32_t subst(typing_context& ctx, std::uint_fast32_t type);
   bool is_well_formed(typing_context& ctx, const CTXElement& type);
 
-  type_table& typtab;
   hx_ir& ir;
 };
 

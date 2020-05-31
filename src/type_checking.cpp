@@ -1,20 +1,24 @@
 #include <type_checking.hpp>
-#include <types.hpp>
 
 std::uint_fast32_t hx_ir_type_checking::cleanup(std::uint_fast32_t at)
 {
   return 0;
 }
 
-bool is_free_variable(type_table& tab, std::uint_fast32_t type, std::uint_fast32_t free)
+std::pair<bool, std::uint_fast32_t> is_free_variable(hx_ir& tab, std::uint_fast32_t type, std::uint_fast32_t free)
 {
   if(type == free)
-    return true; // free occurs in type, i.e. it IS type
+    return { true, type }; // free occurs in type, i.e. it IS type
 
-  for(auto& x : tab.data[type].args)
-    if(is_free_variable(tab, x, free))
-      return true;
-  return false;
+  std::size_t iter = type;
+  for(std::size_t i = 0; i < tab.data[type].argc; ++i)
+  {
+    auto [a, b] = is_free_variable(tab, iter + 1, free);
+    if(a)
+      return { true, type };
+    iter = b;
+  }
+  return { false, type };
 }
 
 

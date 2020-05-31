@@ -27,10 +27,15 @@ enum class IRNodeKind : std::int_fast8_t
 struct IRData
 {
   constexpr static std::uint_fast32_t no_type = static_cast<std::uint_fast32_t>(-1);
+  constexpr static std::uint_fast32_t no_ref  = static_cast<std::uint_fast32_t>(-1);
 
   symbol name;
-  std::vector<std::uint_fast32_t> args {};
+
+  std::size_t argc { 0 };
+
   std::uint_fast32_t type_annot { no_type };
+
+  std::uint_fast32_t back_ref { no_ref };
 };
 
 struct IRDebugData
@@ -45,6 +50,14 @@ struct IRTag
   std::size_t make_node(Container& cur_ir, IRData&& data, IRDebugData&& debug) const
   {
     return cur_ir.add(kind, std::move(data), std::move(debug));
+
+    return cur_ir.kinds.size() - 1;
+  }
+
+  template<typename Iterator, typename Container>
+  std::size_t make_node(Iterator insert_at, Container& cur_ir, IRData&& data, IRDebugData&& debug) const
+  {
+    return cur_ir.add(std::forward<Iterator>(insert_at), kind, std::move(data), std::move(debug));
 
     return cur_ir.kinds.size() - 1;
   }

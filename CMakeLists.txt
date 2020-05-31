@@ -12,14 +12,12 @@ set(hx-lang_files src/reader.cpp
   src/program.cpp
   src/fixit_info.cpp
   src/compiler.cpp
-  src/types.cpp
   src/type_checking.cpp
   )
 
 set(hx-lang_vm_files src/vm.cpp
   src/repl.cpp
   src/ir.cpp
-  src/types.cpp
   src/assembler.cpp
   src/program.cpp
   src/symbol.cpp
