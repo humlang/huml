@@ -4,7 +4,7 @@
 #include <fixit_info.hpp>
 #include <symbol.hpp>
 #include <token.hpp>
-#include <ir.hpp>
+#include <ast.hpp>
 
 #include <unordered_map>
 #include <cassert>
@@ -91,7 +91,7 @@ private:
   token current;
   std::array<token, lookahead_size> next_toks;
 
-  hx_ir global_scope;
+  hx_ast global_scope;
   struct scoping_context
   {
     bool is_binding { false };

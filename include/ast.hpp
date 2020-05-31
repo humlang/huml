@@ -1,13 +1,13 @@
 #pragma once
 
 #include <source_range.hpp>
-#include <ir_nodes.hpp>
+#include <ast_nodes.hpp>
 
-struct hx_ir
+struct hx_ast
 {
   struct data_constructors
   {
-    std::vector<IRData> data;
+    std::vector<ASTData> data;
   };
   struct edge
   {
@@ -22,12 +22,12 @@ struct hx_ir
   static constexpr std::size_t Prop_sort_idx = 2;
   static constexpr std::size_t Unit_idx = 3;
 
-  hx_ir(); 
+  hx_ast(); 
 
-  std::uint_fast32_t add(IRNodeKind kind, IRData&& dat, IRDebugData&& dbg_data);
+  std::uint_fast32_t add(ASTNodeKind kind, ASTData&& dat, ASTDebugData&& dbg_data);
 
   template<typename Iterator>
-  std::uint_fast32_t add(Iterator insert_at, IRNodeKind kind, IRData&& dat, IRDebugData&& dbg_data);
+  std::uint_fast32_t add(Iterator insert_at, ASTNodeKind kind, ASTData&& dat, ASTDebugData&& dbg_data);
 
   std::uint_fast32_t subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with);
 
@@ -35,9 +35,9 @@ struct hx_ir
   void print(std::ostream& os);
   std::uint_fast32_t print_node(std::ostream& os, std::uint_fast32_t node);
 
-  std::vector<IRNodeKind> kinds;
-  std::vector<IRData> data;
-  std::vector<IRDebugData> dbg_data;
+  std::vector<ASTNodeKind> kinds;
+  std::vector<ASTData> data;
+  std::vector<ASTDebugData> dbg_data;
 
   std::vector<std::uint_fast32_t> roots;
   std::vector<std::uint_fast32_t> types;

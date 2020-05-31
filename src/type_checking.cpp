@@ -1,5 +1,7 @@
 #include <type_checking.hpp>
 
+#if 0
+
 std::uint_fast32_t hx_ir_type_checking::cleanup(std::uint_fast32_t at)
 {
   return 0;
@@ -60,4 +62,6 @@ bool hx_ir_type_checking::is_well_formed(typing_context& ctx, const CTXElement& 
 {
   return false;
 }
+
+#endif
 

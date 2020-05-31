@@ -92,11 +92,11 @@ auto token_precedence_map = tsl::robin_map<token_kind, int>( {
 constexpr static bool isprint(unsigned char c)
 { return (' ' <= c && c <= '~'); }
 
-static bool is_syntactically_callable(hx_ir& sc, std::size_t prefix)
+static bool is_syntactically_callable(hx_ast& sc, std::size_t prefix)
 {
   auto pref = sc.kinds[prefix];
 
-  return !(pref == IRNodeKind::unit);
+  return !(pref == ASTNodeKind::unit);
 }
 
 base_reader::base_reader(std::string_view module)
@@ -544,16 +544,16 @@ std::size_t hx_reader::parse_identifier()
     if(id == symbol("_"))
     {
       // Do not reference
-      return IRTags::identifier.make_node(global_scope,
-                                          IRData { old.data },
-                                          IRDebugData { old.loc });
+      return ASTTags::identifier.make_node(global_scope,
+                                          ASTData { old.data },
+                                          ASTDebugData { old.loc });
     }
     else
     {
-      return IRTags::identifier.make_node(global_scope,
-                                          IRData { old.data, 0, IRData::no_type,
+      return ASTTags::identifier.make_node(global_scope,
+                                          ASTData { old.data, 0, ASTData::no_type,
                                                    global_scope.kinds.size() - present->second - 1 },
-                                          IRDebugData { old.loc });
+                                          ASTDebugData { old.loc });
     }
   }
   if(!global_scope.free_variables_per_node[global_scope.roots.back()].contains(id))
@@ -561,7 +561,7 @@ std::size_t hx_reader::parse_identifier()
     // add free variable to free variables list
     global_scope.free_variables_per_node[global_scope.roots.back()].insert(id);
   }
-  return IRTags::identifier.make_node(global_scope, IRData { old.data }, IRDebugData { old.loc });
+  return ASTTags::identifier.make_node(global_scope, ASTData { old.data }, ASTDebugData { old.loc });
 }
 
 // e := e1 e2
@@ -571,7 +571,7 @@ std::size_t hx_reader::parse_app(std::size_t lhs)
   if(rhs == error_ref)
     return error_ref;
 
-  return IRTags::app.make_node(lhs, global_scope, IRData { "", 2 }, IRDebugData {  });
+  return ASTTags::app.make_node(lhs, global_scope, ASTData { "", 2 }, ASTDebugData {  });
 }
 
 // e := `\\` id `.` e       id can be _ to simply ignore the argument. Note that `\\` is a single backslash
@@ -586,8 +586,8 @@ std::size_t hx_reader::parse_lambda()
 
   bool type_checking_mode = accept('(');
 
-  std::size_t to_ret = IRTags::lambda.make_node(global_scope, IRData { lam_tok.data, 2 },
-                                                IRDebugData { lam_tok.loc });
+  std::size_t to_ret = ASTTags::lambda.make_node(global_scope, ASTData { lam_tok.data, 2 },
+                                                ASTDebugData { lam_tok.loc });
   parsing_pattern = true;
   auto param = parse_identifier();
   parsing_pattern = false;
@@ -626,8 +626,8 @@ std::size_t hx_reader::parse_lambda()
 // e := `case` e `[` p1 `=>` e1 `|` ... `|` pn `=>` en `]`
 std::size_t hx_reader::parse_case()
 {
-  std::size_t to_ret = IRTags::pattern_matcher.make_node(global_scope, IRData { current.data, 1 },
-                                                         IRDebugData { current.loc });
+  std::size_t to_ret = ASTTags::pattern_matcher.make_node(global_scope, ASTData { current.data, 1 },
+                                                         ASTDebugData { current.loc });
   auto keyword = current;
   if(!expect(token_kind::Keyword, diagnostic_db::parser::case_expects_keyword))
     return mk_error();
@@ -662,13 +662,13 @@ std::size_t hx_reader::parse_pattern()
   if(current.kind == token_kind::Identifier && current.data == symbol("_"))
   {
     auto id = parse_identifier();
-    std::size_t to_return = IRTags::pattern.make_node(global_scope, IRData { old.data, 1 },
-                                                       IRDebugData { old.loc });
+    std::size_t to_return = ASTTags::pattern.make_node(global_scope, ASTData { old.data, 1 },
+                                                       ASTDebugData { old.loc });
     parsing_pattern = false;
     return to_return;
   }
   auto vold = current;
-  std::size_t to_ret = IRTags::pattern.make_node(global_scope, IRData { vold.data, 1 }, IRDebugData { vold.loc });
+  std::size_t to_ret = ASTTags::pattern.make_node(global_scope, ASTData { vold.data, 1 }, ASTDebugData { vold.loc });
 
   parsing_pattern = true;
   scoping_ctx.is_binding = true;
@@ -682,7 +682,7 @@ std::size_t hx_reader::parse_pattern()
 // p `=>` e
 std::size_t hx_reader::parse_match()
 {
-  std::size_t to_ret = IRTags::match.make_node(global_scope, IRData { "->", 2 }, IRDebugData { current.loc });
+  std::size_t to_ret = ASTTags::match.make_node(global_scope, ASTData { "->", 2 }, ASTDebugData { current.loc });
   auto pat = parse_pattern();
 
   auto arrow = current;
@@ -700,7 +700,7 @@ std::size_t hx_reader::parse_Kind()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Kind))
     return mk_error();
-  return IRTags::Kind.make_node(global_scope, IRData { old.data }, IRDebugData { old.loc });
+  return ASTTags::Kind.make_node(global_scope, ASTData { old.data }, ASTDebugData { old.loc });
 }
 
 // e := Type
@@ -708,7 +708,7 @@ std::size_t hx_reader::parse_Type()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Type))
     return mk_error();
-  return IRTags::Type.make_node(global_scope, IRData { old.data }, IRDebugData { old.loc });
+  return ASTTags::Type.make_node(global_scope, ASTData { old.data }, ASTDebugData { old.loc });
 }
 
 // e := Prop
@@ -716,15 +716,15 @@ std::size_t hx_reader::parse_Prop()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Prop))
     return mk_error();
-  return IRTags::Prop.make_node(global_scope, IRData { old.data }, IRDebugData { old.loc });
+  return ASTTags::Prop.make_node(global_scope, ASTData { old.data }, ASTDebugData { old.loc });
 }
 
 // s := `data` name ( `(` id `:` type `)` )* `:` type `;`
 std::size_t hx_reader::parse_data_ctor()
 {
   auto old_loc = current.loc;
-  std::size_t to_ret = IRTags::assign_data.make_node(global_scope, IRData { "" },
-                                        IRDebugData { old_loc });
+  std::size_t to_ret = ASTTags::assign_data.make_node(global_scope, ASTData { "" },
+                                        ASTDebugData { old_loc });
   if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
     return mk_error();
 
@@ -739,9 +739,9 @@ std::size_t hx_reader::parse_data_ctor()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
-  global_scope.data[to_ret] = IRData { type_name_id, 1, tail - to_ret };
+  global_scope.data[to_ret] = ASTData { type_name_id, 1, tail - to_ret };
 
-  global_scope.constructors[tail].data.emplace_back(IRData { type_name_id, tail - to_ret });
+  global_scope.constructors[tail].data.emplace_back(ASTData { type_name_id, tail - to_ret });
 
   return to_ret;
 }
@@ -753,8 +753,8 @@ std::size_t hx_reader::parse_type_ctor()
   if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
     return mk_error();
 
-  std::size_t to_ret = IRTags::assign_type.make_node(global_scope, IRData { "" },
-                                        IRDebugData { old_loc });
+  std::size_t to_ret = ASTTags::assign_type.make_node(global_scope, ASTData { "" },
+                                        ASTDebugData { old_loc });
   scoping_ctx.is_binding = true;
   auto type_name = parse_identifier();
   scoping_ctx.is_binding = false;
@@ -767,7 +767,7 @@ std::size_t hx_reader::parse_type_ctor()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
-  global_scope.data[to_ret] = IRData { type_name_id, 1, tail - to_ret };
+  global_scope.data[to_ret] = ASTData { type_name_id, 1, tail - to_ret };
   global_scope.constructors[tail]; // <- ensure it exists
 
   return to_ret;
@@ -784,8 +784,8 @@ std::size_t hx_reader::parse_constructor()
 
 std::size_t hx_reader::parse_assign()
 {
-  std::size_t to_ret = IRTags::assign.make_node(global_scope, IRData { current.data, 2 },
-                                                IRDebugData { current.loc });
+  std::size_t to_ret = ASTTags::assign.make_node(global_scope, ASTData { current.data, 2 },
+                                                ASTDebugData { current.loc });
 
   auto current_source_loc = current.loc;
   scoping_ctx.is_binding = true;
@@ -814,7 +814,7 @@ std::size_t hx_reader::parse_assign()
 
 std::size_t hx_reader::parse_expr_stmt()
 {
-  std::size_t to_ret = IRTags::expr_stmt.make_node(global_scope, IRData { "", 1 }, IRDebugData { current.loc });
+  std::size_t to_ret = ASTTags::expr_stmt.make_node(global_scope, ASTData { "", 1 }, ASTDebugData { current.loc });
   auto current_source_loc = current.loc;
 
   auto expr = parse_expression();
@@ -989,7 +989,7 @@ std::size_t hx_reader::parse_expression(int precedence)
 }
 
 template<>
-std::vector<hx_ir> hx_reader::read(std::string_view module)
+std::vector<hx_ast> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
 

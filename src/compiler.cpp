@@ -1,7 +1,7 @@
 #include <compiler.hpp>
 #include <reader.hpp>
 #include <token.hpp>
-#include <ir.hpp>
+#include <ast.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -34,7 +34,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
   { emit_classes::help, [](auto){ assert(false); } },
   { emit_classes::ir_print, [](std::string_view t)
     {
-      auto w = hx_reader::read<hx_ir>(t);
+      auto w = hx_reader::read<hx_ast>(t);
 
       if(w.empty())
         return; // <- diagnostic will contain an error
@@ -44,7 +44,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
     } },
   { emit_classes::ir_graph, [](std::string_view t)
     {
-      auto w = hx_reader::read<hx_ir>(t);
+      auto w = hx_reader::read<hx_ast>(t);
 
       if(w.empty())
         return; // <- diagnostic will contain an error

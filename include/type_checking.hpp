@@ -1,10 +1,11 @@
 #pragma once
 
-#include <ir.hpp>
 #include <symbol.hpp>
+#include <ast.hpp>
 
 #include <variant>
 
+#if 0
 struct marker
 {
   std::uint_fast32_t existential_ref;
@@ -29,7 +30,7 @@ std::vector<CTXElement> typedef typing_context;
 
 struct hx_ir_type_checking
 {
-  hx_ir_type_checking(hx_ir& nodes)
+  hx_ir_type_checking(hx_ast& nodes)
     : ir(nodes)
   {  }
 
@@ -57,3 +58,4 @@ struct hx_ir_type_checking
   hx_ir& ir;
 };
 
+#endif

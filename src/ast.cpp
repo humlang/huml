@@ -1,34 +1,34 @@
-#include <ir.hpp>
+#include <ast.hpp>
 #include <type_checking.hpp>
 
 #include <iterator>
 
 #include <iostream>
 
-hx_ir::hx_ir()
+hx_ast::hx_ast()
 {
   // Kind
-  types.push_back(IRTags::Kind.make_node(*this, IRData { "Kind" }, IRDebugData {}));
+  types.push_back(ASTTags::Kind.make_node(*this, ASTData { "Kind" }, ASTDebugData {}));
 
   // Type
-  types.push_back(IRTags::Type.make_node(*this, IRData { "Type" }, IRDebugData {}));
+  types.push_back(ASTTags::Type.make_node(*this, ASTData { "Type" }, ASTDebugData {}));
 
   // Prop
-  types.push_back(IRTags::Prop.make_node(*this, IRData { "Prop" }, IRDebugData {}));
+  types.push_back(ASTTags::Prop.make_node(*this, ASTData { "Prop" }, ASTDebugData {}));
 
   // Unit    is inhabited by  \\(A : Type). \\(a : A). a
-  types.push_back(IRTags::lambda.make_node(*this, IRData { "1", 2 }, IRDebugData {}));
+  types.push_back(ASTTags::lambda.make_node(*this, ASTData { "1", 2 }, ASTDebugData {}));
 
-  auto A = IRTags::identifier.make_node(*this, IRData { "A", 0, Type_sort_idx }, IRDebugData {});
+  auto A = ASTTags::identifier.make_node(*this, ASTData { "A", 0, Type_sort_idx }, ASTDebugData {});
   types.push_back(A);
 
-  auto inner = IRTags::lambda.make_node(*this, IRData { "", 2, }, IRDebugData {});
+  auto inner = ASTTags::lambda.make_node(*this, ASTData { "", 2, }, ASTDebugData {});
 
-  auto underscore = IRTags::identifier.make_node(*this, IRData { "a", 0, A }, IRDebugData {});  
-  IRTags::identifier.make_node(*this, IRData { "a", 0, A }, IRDebugData {  });
+  auto underscore = ASTTags::identifier.make_node(*this, ASTData { "a", 0, A }, ASTDebugData {});  
+  ASTTags::identifier.make_node(*this, ASTData { "a", 0, A }, ASTDebugData {  });
 }
 
-std::uint_fast32_t hx_ir::add(IRNodeKind kind, IRData&& dat, IRDebugData&& debug)
+std::uint_fast32_t hx_ast::add(ASTNodeKind kind, ASTData&& dat, ASTDebugData&& debug)
 {
   kinds.insert(kinds.end(), kind);
   data.emplace(data.end(), std::move(dat));
@@ -38,7 +38,7 @@ std::uint_fast32_t hx_ir::add(IRNodeKind kind, IRData&& dat, IRDebugData&& debug
 }
 
 template<>
-std::uint_fast32_t hx_ir::add<std::size_t>(std::size_t insert_at, IRNodeKind kind, IRData&& dat, IRDebugData&& debug)
+std::uint_fast32_t hx_ast::add<std::size_t>(std::size_t insert_at, ASTNodeKind kind, ASTData&& dat, ASTDebugData&& debug)
 {
   kinds.insert(kinds.begin() + insert_at, kind);
   data.emplace(data.begin() + insert_at, std::move(dat));
@@ -48,7 +48,7 @@ std::uint_fast32_t hx_ir::add<std::size_t>(std::size_t insert_at, IRNodeKind kin
 }
 
 // [A / alpha]C                                         C                       A                      alpha
-std::uint_fast32_t hx_ir::subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with)
+std::uint_fast32_t hx_ast::subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with)
 {
   if(in == what)
     return with;
@@ -58,9 +58,10 @@ std::uint_fast32_t hx_ir::subst(std::uint_fast32_t in, std::uint_fast32_t what, 
   return in;
 }
 
-bool hx_ir::type_checks()
+bool hx_ast::type_checks()
 {
-  hx_ir_type_checking typch(*this);
+#if 0
+  hx_ast_type_checking typch(*this);
   typing_context ctx;
   ctx.reserve(1024);
 
@@ -81,11 +82,13 @@ bool hx_ir::type_checks()
     success = success && (t != static_cast<std::uint_fast32_t>(-1));
   }
   return success;
+#endif
+  return false;
 }
 
-void hx_ir::print(std::ostream& os)
+void hx_ast::print(std::ostream& os)
 {
-  assert(!kinds.empty() && "IR cannot be zero, there is never an empty module!");
+  assert(!kinds.empty() && "AST cannot be zero, there is never an empty module!");
 
   for(auto& r : roots)
   {
@@ -94,36 +97,36 @@ void hx_ir::print(std::ostream& os)
   }
 }
 
-std::uint_fast32_t hx_ir::print_node(std::ostream& os, std::uint_fast32_t node)
+std::uint_fast32_t hx_ast::print_node(std::ostream& os, std::uint_fast32_t node)
 {
   auto cpy = node;
   auto& argc = data[node].argc;
-  bool print_type = data[node].type_annot != IRData::no_type;
+  bool print_type = data[node].type_annot != ASTData::no_type;
 
-  print_type = print_type && kinds[node] != IRNodeKind::assign_type && kinds[node] != IRNodeKind::assign_data;
+  print_type = print_type && kinds[node] != ASTNodeKind::assign_type && kinds[node] != ASTNodeKind::assign_data;
 
   if(print_type)
     os << "(";
   switch(kinds[node])
   {
-    case IRNodeKind::undef:      os << "undef"; break;
-    case IRNodeKind::unit:       os << "()"; break;
-    case IRNodeKind::Kind:       os << "Kind"; break;
-    case IRNodeKind::Type:       os << "Type"; break;
-    case IRNodeKind::Prop:       os << "Prop"; break;
-    case IRNodeKind::app:        { os << "("; node = print_node(os, node + 1);
+    case ASTNodeKind::undef:      os << "undef"; break;
+    case ASTNodeKind::unit:       os << "()"; break;
+    case ASTNodeKind::Kind:       os << "Kind"; break;
+    case ASTNodeKind::Type:       os << "Type"; break;
+    case ASTNodeKind::Prop:       os << "Prop"; break;
+    case ASTNodeKind::app:        { os << "("; node = print_node(os, node + 1);
                                    os << ") ("; node = print_node(os, node + 1);
                                    os << ")"; } break;
-    case IRNodeKind::lambda:     {
+    case ASTNodeKind::lambda:     {
         os << "\\";
         node = print_node(os, node + 1);
         os << ". ";
         node = print_node(os, node + 1);
       } break;
-    case IRNodeKind::match:      { node = print_node(os, node + 1); os << " => ";
+    case ASTNodeKind::match:      { node = print_node(os, node + 1); os << " => ";
                                    node = print_node(os, node + 1); } break;
-    case IRNodeKind::pattern:    node = print_node(os, node + 1); break;
-    case IRNodeKind::pattern_matcher: {
+    case ASTNodeKind::pattern:    node = print_node(os, node + 1); break;
+    case ASTNodeKind::pattern_matcher: {
       os << "case (";
       node = print_node(os, node + 1);
       os << ") [";
@@ -135,25 +138,25 @@ std::uint_fast32_t hx_ir::print_node(std::ostream& os, std::uint_fast32_t node)
       }
       os << "]";
     } break;
-    case IRNodeKind::param:      node = print_node(os, node + 1); break;
-    case IRNodeKind::identifier: os << data[node].name.get_string(); break;
-    case IRNodeKind::assign:     { node = print_node(os, node + 1); os << " = ";
+    case ASTNodeKind::param:      node = print_node(os, node + 1); break;
+    case ASTNodeKind::identifier: os << data[node].name.get_string(); break;
+    case ASTNodeKind::assign:     { node = print_node(os, node + 1); os << " = ";
                                    node = print_node(os, node + 1); os << ";"; } break;
-    case IRNodeKind::assign_type: {
+    case ASTNodeKind::assign_type: {
       os << "type ";
       node = print_node(os, node + 1);
       os << " : ";
       print_node(os, cpy + data[cpy].type_annot);
       os << ";";
     } break;
-    case IRNodeKind::assign_data: {
+    case ASTNodeKind::assign_data: {
       os << "data ";
       node = print_node(os, node + 1);
       os << " : ";
       print_node(os, cpy + data[cpy].type_annot);
       os << ";";
     } break;
-    case IRNodeKind::expr_stmt:  { node = print_node(os, node + 1); os << ";"; } break;
+    case ASTNodeKind::expr_stmt:  { node = print_node(os, node + 1); os << ";"; } break;
   }
   if(print_type)
   {
