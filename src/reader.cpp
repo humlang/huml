@@ -552,7 +552,7 @@ std::size_t hx_reader::parse_identifier()
     {
       return ASTTags::identifier.make_node(global_scope,
                                           ASTData { old.data, 0, ASTData::no_type,
-                                                   global_scope.kinds.size() - present->second - 1 },
+                                                   global_scope.kinds.size() - present->second },
                                           ASTDebugData { old.loc });
     }
   }

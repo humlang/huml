@@ -28,6 +28,21 @@ hx_ast::hx_ast()
   ASTTags::identifier.make_node(*this, ASTData { "a", 0, A }, ASTDebugData {  });
 }
 
+std::uint_fast32_t hx_ast::after(std::uint_fast32_t at)
+{
+  std::uint_fast32_t node = at + 1;
+  if(data[at + 1].type_annot != ASTData::no_type)
+  {
+    node = after(at + 1 + data[at + 1].type_annot);
+  }
+  else
+  {
+    for(std::size_t i = 0; i < data[at + 1].argc; ++i)
+      node = after(node);
+  }
+  return node;
+}
+
 std::uint_fast32_t hx_ast::add(ASTNodeKind kind, ASTData&& dat, ASTDebugData&& debug)
 {
   kinds.insert(kinds.end(), kind);
@@ -60,15 +75,14 @@ std::uint_fast32_t hx_ast::subst(std::uint_fast32_t in, std::uint_fast32_t what,
 
 bool hx_ast::type_checks()
 {
-#if 0
   hx_ast_type_checking typch(*this);
   typing_context ctx;
   ctx.reserve(1024);
 
   bool success = true;
-  for(std::size_t stmt = 0; stmt < kinds.size(); ++stmt)
+  for(auto& stmt : roots)
   {
-    auto t = typch.synthesize(ctx, stmt, 0);
+    auto t = typch.synthesize(ctx, stmt);
 
     if(t == static_cast<std::uint_fast32_t>(-1))
     {
@@ -82,8 +96,6 @@ bool hx_ast::type_checks()
     success = success && (t != static_cast<std::uint_fast32_t>(-1));
   }
   return success;
-#endif
-  return false;
 }
 
 void hx_ast::print(std::ostream& os)
@@ -114,6 +126,8 @@ std::uint_fast32_t hx_ast::print_node(std::ostream& os, std::uint_fast32_t node)
     case ASTNodeKind::Kind:       os << "Kind"; break;
     case ASTNodeKind::Type:       os << "Type"; break;
     case ASTNodeKind::Prop:       os << "Prop"; break;
+    case ASTNodeKind::exist:      os << "~α~"; break;
+    case ASTNodeKind::ref:        node = print_node(os, node + data[node].back_ref);
     case ASTNodeKind::app:        { os << "("; node = print_node(os, node + 1);
                                    os << ") ("; node = print_node(os, node + 1);
                                    os << ")"; } break;

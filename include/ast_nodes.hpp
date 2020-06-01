@@ -5,6 +5,8 @@
 
 enum class ASTNodeKind : std::int_fast8_t
 {
+  ref = -2,
+  exist = -1, // <- only used for type_checking, must not occur anywhere else
   undef = 0,
   Kind,
   Type,
@@ -26,7 +28,7 @@ enum class ASTNodeKind : std::int_fast8_t
 struct ASTData
 {
   constexpr static std::uint_fast32_t no_type = static_cast<std::uint_fast32_t>(-1);
-  constexpr static std::uint_fast32_t no_ref  = static_cast<std::uint_fast32_t>(-1);
+  constexpr static std::int_fast32_t no_ref   = std::numeric_limits<std::uint_fast32_t>::max();
 
   symbol name;
 
@@ -34,7 +36,7 @@ struct ASTData
 
   std::uint_fast32_t type_annot { no_type };
 
-  std::uint_fast32_t back_ref { no_ref };
+  std::int_fast32_t back_ref { no_ref };
 };
 
 struct ASTDebugData

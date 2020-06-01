@@ -9,20 +9,14 @@ struct hx_ast
   {
     std::vector<ASTData> data;
   };
-  struct edge
-  {
-    std::uint_fast32_t from;
-    std::uint_fast32_t to;
-
-    bool operator<(const edge& other) const
-    { return from < other.from && to < other.to; }
-  };
   static constexpr std::size_t Kind_sort_idx = 0;
   static constexpr std::size_t Type_sort_idx = 1;
   static constexpr std::size_t Prop_sort_idx = 2;
   static constexpr std::size_t Unit_idx = 3;
 
   hx_ast(); 
+
+  std::uint_fast32_t after(std::uint_fast32_t at);
 
   std::uint_fast32_t add(ASTNodeKind kind, ASTData&& dat, ASTDebugData&& dbg_data);
 
@@ -45,8 +39,5 @@ struct hx_ast
 
   // node -> name of free variable
   tsl::robin_map<std::uint_fast32_t, symbol_set> free_variables_per_node;
-
-  std::vector<edge> edges;
-  std::vector<symbol> globally_free_variables;
 };
 
