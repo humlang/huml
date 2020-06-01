@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.5)
 
 project(hx-lang LANGUAGES CXX VERSION 0.0.1)
 
-set(hx-lang_files src/reader.cpp
-  src/token.cpp
+set(hx-lang_files src/token.cpp
+  src/parser.cpp
+  src/tokenizer.cpp
   src/ast.cpp
   src/symbol.cpp
   src/source_range.cpp
@@ -17,11 +18,12 @@ set(hx-lang_files src/reader.cpp
 
 set(hx-lang_vm_files src/vm.cpp
   src/repl.cpp
+  src/parser.cpp
+  src/tokenizer.cpp
   src/ast.cpp
   src/assembler.cpp
   src/program.cpp
   src/symbol.cpp
-  src/reader.cpp
   src/token.cpp
   src/diagnostic.cpp
   src/stream_lookup.cpp

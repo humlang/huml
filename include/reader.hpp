@@ -41,7 +41,7 @@ class hx_reader : base_reader
 {
 public:
   static constexpr std::size_t lookahead_size = 1;
-  static constexpr std::size_t error_ref = static_cast<std::size_t>(-1);
+  static constexpr ast_ptr error_ref = nullptr;
 
   template<typename T>
   static std::vector<T> read(std::string_view module) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
@@ -60,30 +60,24 @@ private:
   void consume();
 private:
   // always uses old for the error
-  std::size_t mk_error();
+  ast_ptr mk_error();
 
+  ast_ptr parse_assign();
+  ast_ptr parse_expr_stmt();
+  ast_ptr parse_type_ctor();
+  ast_ptr parse_data_ctor();
 
-  std::size_t parse_assign();
-  std::size_t parse_expr_stmt();
-  std::size_t parse_type_ctor();
-  std::size_t parse_data_ctor();
-
-  std::size_t parse_constructor();
-
-  std::size_t parse_type_check(std::size_t left);
-  std::size_t parse_identifier();
-  std::size_t parse_case();
-  std::size_t parse_Prop();
-  std::size_t parse_Type();
-  std::size_t parse_Kind();
-  std::size_t parse_app(std::size_t lhs);
-  std::size_t parse_lambda();
-  std::size_t parse_keyword();
-  std::size_t parse_match();
-  std::size_t parse_statement();
-  std::size_t parse_prefix();
-  std::size_t parse_pattern();
-  std::size_t parse_expression(int precedence = 0);
+  ast_ptr parse_type_check(ast_ptr left);
+  ast_ptr parse_identifier();
+  ast_ptr parse_Prop();
+  ast_ptr parse_Type();
+  ast_ptr parse_Kind();
+  ast_ptr parse_app(ast_ptr lhs);
+  ast_ptr parse_lambda();
+  ast_ptr parse_keyword();
+  ast_ptr parse_statement();
+  ast_ptr parse_prefix();
+  ast_ptr parse_expression(int precedence = 0);
   int precedence();
 
 private:
@@ -95,7 +89,7 @@ private:
   struct scoping_context
   {
     bool is_binding { false };
-    std::vector<std::pair<symbol, std::uint_fast32_t>> binder_stack;
+    std::vector<std::pair<symbol, ast_ptr>> binder_stack;
   };
   scoping_context scoping_ctx;
 

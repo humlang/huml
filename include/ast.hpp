@@ -3,41 +3,88 @@
 #include <source_range.hpp>
 #include <ast_nodes.hpp>
 
+
+struct ast_base
+{
+  ast_base(ASTNodeKind kind) : kind(kind) {}
+
+  ASTNodeKind kind;
+};
+using ast_ptr = ast_base*;
+
+struct identifier : ast_base
+{
+  identifier(symbol symb)
+    : ast_base(ASTNodeKind::identifier), symb(symb)
+  {  }
+
+  symbol symb;
+};
+
+struct prop : ast_base
+{ prop() : ast_base(ASTNodeKind::Prop) {} };
+
+struct type : ast_base
+{ type() : ast_base(ASTNodeKind::Type) {} };
+
+struct kind : ast_base
+{ kind() : ast_base(ASTNodeKind::Kind) {} };
+
+struct app : ast_base
+{
+  app(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::app), lhs(lhs), rhs(rhs)
+  {  }
+
+  ast_ptr lhs;
+  ast_ptr rhs;
+};
+
+struct lambda : ast_base
+{
+  lambda(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs)
+  {  }
+
+  ast_ptr lhs;
+  ast_ptr rhs;
+};
+
+struct assign : ast_base
+{
+  assign(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::assign), lhs(lhs), rhs(rhs)
+  {  }
+
+  ast_ptr lhs;
+  ast_ptr rhs;
+};
+
+struct assign_type : ast_base
+{
+  assign_type(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::assign_type), lhs(lhs), rhs(rhs)
+  {  }
+
+  ast_ptr lhs;
+  ast_ptr rhs;
+};
+
+struct assign_data : ast_base
+{
+  assign_data(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::assign_data), lhs(lhs), rhs(rhs)
+  {  }
+
+  ast_ptr lhs;
+  ast_ptr rhs;
+};
+
+struct expr_stmt : ast_base
+{
+  expr_stmt(ast_ptr lhs) : ast_base(ASTNodeKind::expr_stmt), lhs(lhs)
+  {  }
+
+  ast_ptr lhs;
+};
+
 struct hx_ast
 {
-  struct data_constructors
-  {
-    std::vector<ASTData> data;
-  };
-  static constexpr std::size_t Kind_sort_idx = 0;
-  static constexpr std::size_t Type_sort_idx = 1;
-  static constexpr std::size_t Prop_sort_idx = 2;
-  static constexpr std::size_t Unit_idx = 3;
-
-  hx_ast(); 
-
-  std::uint_fast32_t after(std::uint_fast32_t at);
-
-  std::uint_fast32_t add(ASTNodeKind kind, ASTData&& dat, ASTDebugData&& dbg_data);
-
-  template<typename Iterator>
-  std::uint_fast32_t add(Iterator insert_at, ASTNodeKind kind, ASTData&& dat, ASTDebugData&& dbg_data);
-
-  std::uint_fast32_t subst(std::uint_fast32_t in, std::uint_fast32_t what, std::uint_fast32_t with);
-
-  bool type_checks();
-  void print(std::ostream& os);
-  std::uint_fast32_t print_node(std::ostream& os, std::uint_fast32_t node);
-
-  std::vector<ASTNodeKind> kinds;
-  std::vector<ASTData> data;
-  std::vector<ASTDebugData> dbg_data;
-
-  std::vector<std::uint_fast32_t> roots;
-  std::vector<std::uint_fast32_t> types;
-  tsl::robin_map<std::uint_fast32_t, data_constructors> constructors;
-
-  // node -> name of free variable
-  tsl::robin_map<std::uint_fast32_t, symbol_set> free_variables_per_node;
+  std::vector<ast_base*> ast;
 };
 
