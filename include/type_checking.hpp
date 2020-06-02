@@ -3,28 +3,59 @@
 #include <symbol.hpp>
 #include <ast.hpp>
 
+struct exist;
 struct CTXElement
 {
-  std::size_t id_def; // <- absolute position of the binding occurence of id
-  std::size_t type;   // <- absolute position of a type
+  CTXElement(exist* ex) : existential(ex)
+  {  }
+
+  CTXElement(identifier* id, ast_ptr type)
+    : id_def(id->binding_occurence ? static_cast<identifier*>(id->binding_occurence) : id), type(type)
+  {  }
+
+  exist* existential { nullptr }; 
+  identifier* id_def { nullptr }; // <- absolute position of the binding occurence of id
+  ast_ptr type       { nullptr }; // <- absolute position of a type
 };
 
-std::vector<CTXElement> typedef typing_context;
+
+struct typing_context
+{
+  using pos = std::vector<CTXElement>::const_iterator;
+
+  ast_ptr subst(ast_ptr what);
+
+  pos lookup_id(identifier* id) const;
+  pos lookup_type(ast_ptr type) const;
+  pos lookup_ex(ast_ptr ex) const;
+
+  pos lookup_id(pos begin, identifier* id) const;
+  pos lookup_type(pos begin, ast_ptr type) const;
+  pos lookup_ex(pos begin, ast_ptr ex) const;
+
+  std::vector<CTXElement> data;
+};
 
 struct hx_ast_type_checking
 {
-  hx_ast_type_checking(hx_ast& nodes)
+  hx_ast_type_checking(const hx_ast& nodes)
     : ast(nodes)
   {  }
 
-  bool check(typing_context& ctx, std::size_t at, std::uint_fast32_t to_check);
-  std::uint_fast32_t synthesize(typing_context& ctx, std::size_t at);
+  ast_ptr find_type(typing_context& ctx, ast_ptr of);
 
-  bool is_subtype(typing_context& ctx, std::uint_fast32_t A, std::uint_fast32_t B);
+private:
+  bool check(typing_context& ctx, ast_ptr what, ast_ptr type);
+  ast_ptr synthesize(typing_context& ctx, ast_ptr what);
+  ast_ptr eta_synthesize(typing_context& ctx, ast_ptr A, ast_ptr e);
 
-  std::uint_fast32_t subst(typing_context& ctx, std::uint_fast32_t type);
-  bool is_well_formed(typing_context& ctx, const CTXElement& type);
+  bool is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B);
 
-  hx_ast& ast;
+  bool inst_l(typing_context& ctx, exist* alpha, ast_ptr A);
+  bool inst_r(typing_context& ctx, ast_ptr A, exist* alpha);
+
+//  ast_ptr cleanup(typing_context& ctx, ast_ptr orig);
+
+  const hx_ast& ast;
 };
 

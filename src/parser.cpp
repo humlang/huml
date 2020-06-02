@@ -69,15 +69,15 @@ ast_ptr hx_reader::parse_identifier()
     if(id == symbol("_"))
     {
       // Do not reference
+      return new identifier(id);
     }
     else
     {
+      return new identifier(id, present->second);
     }
   }
-  {
-    // add free variable to free variables list
-  }
-  return nullptr;
+  else
+    return new identifier(id); // <- free variable
 }
 
 // e := e1 e2
@@ -87,7 +87,7 @@ ast_ptr hx_reader::parse_app(ast_ptr lhs)
   if(rhs == error_ref)
     return error_ref;
 
-  return nullptr;
+  return new app(lhs, rhs);
 }
 
 // e := `\\` id `.` e       id can be _ to simply ignore the argument. Note that `\\` is a single backslash
@@ -120,10 +120,8 @@ ast_ptr hx_reader::parse_lambda()
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       return mk_error();
 
-    // store type annot
+    param->type = typ;
   }
-
-  // TODO: Add type parsing similar to Pi
 
   if(!expect('.', diagnostic_db::parser::lambda_expects_dot))
     return mk_error();
@@ -134,7 +132,7 @@ ast_ptr hx_reader::parse_lambda()
   lam_tok.loc += old.loc;
 // TODO:  global_scope.dbg_data[to_ret].loc = lam_tok;
 
-  return nullptr;
+  return new lambda(param, expr);
 }
 
 // e := Kind
@@ -142,7 +140,7 @@ ast_ptr hx_reader::parse_Kind()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Kind))
     return mk_error();
-  return nullptr;
+  return new kind();
 }
 
 // e := Type
@@ -150,7 +148,7 @@ ast_ptr hx_reader::parse_Type()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Type))
     return mk_error();
-  return nullptr;
+  return new type();
 }
 
 // e := Prop
@@ -158,7 +156,7 @@ ast_ptr hx_reader::parse_Prop()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Prop))
     return mk_error();
-  return nullptr;
+  return new prop();
 }
 
 // s := `data` name ( `(` id `:` type `)` )* `:` type `;`
@@ -178,8 +176,9 @@ ast_ptr hx_reader::parse_data_ctor()
   auto tail = parse_expression();
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
-
-  return nullptr;
+  
+  type_name->type = tail;
+  return new assign_data(type_name, tail);
 }
 
 // s := `type` name ( `(` id `:` type `)` )* `:` Sort `;`
@@ -201,7 +200,8 @@ ast_ptr hx_reader::parse_type_ctor()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
-  return nullptr;
+  type_name->type = tail;
+  return new assign_type(type_name, tail);
 }
 
 
@@ -229,7 +229,7 @@ ast_ptr hx_reader::parse_assign()
 
     return mk_error();
   }
-  return nullptr;
+  return new assign(var, arg);
 }
 
 ast_ptr hx_reader::parse_expr_stmt()
@@ -251,7 +251,7 @@ ast_ptr hx_reader::parse_expr_stmt()
     return mk_error();
   }
   //TODO: fix data
-  return nullptr;
+  return new expr_stmt(expr);
 }
 
 ast_ptr hx_reader::parse_statement()
@@ -347,7 +347,7 @@ ast_ptr hx_reader::parse_type_check(ast_ptr left)
   if(!right)
     return mk_error();
 
-  // store type
+  left->type = right;
   
   return left;
 }
@@ -402,17 +402,20 @@ std::vector<hx_ast> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
 
+  hx_ast ast;
   while(r.current.kind != token_kind::EndOfFile)
   {
     auto stmt = r.parse_statement();
 
-    // if(stmt == error_ref)   please fix it, user
-  }
+    if(stmt == r.error_ref)
+      continue; // please fix it, user
 
-  if(diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    ast.data.push_back(stmt);
+  }
+  if(ast.data.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
 
-  return { r.global_scope };
+  return { ast };
 }
 
 template<>

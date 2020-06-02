@@ -40,7 +40,10 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
 
-        std::cout << "!!! NOT TYPE CHECKING !!!\n";
+      global_ir.print(std::cout);
+
+      if(!global_ir.type_checks())
+        std::cerr << "~~~> Does not typecheck. <~~~\n";
     } },
   { emit_classes::ir_graph, [](std::string_view t)
     {

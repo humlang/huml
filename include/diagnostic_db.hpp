@@ -15,6 +15,9 @@ namespace diagnostic_db
 #define db_entry_arg(lv, name, txt) static const auto name = [](const source_range& range, auto t) \
 { return mk_diag::lv(range, __COUNTER__, format(FMT_STRING(txt), t)); }
 
+#define db_entry_arg2(lv, name, txt) static const auto name = [](const source_range& range, auto t1, auto t2) \
+{ return mk_diag::lv(range, __COUNTER__, format(FMT_STRING(txt), t1, t2)); }
+
 namespace args
 {
 
@@ -72,6 +75,17 @@ db_entry_arg(error, pi_expects_lparen, "Pi type expects a `(` here, instead got 
 db_entry_arg(error, pi_expects_rparen, "Pi type expects a `)` here, instead got \"{}\".");
 db_entry_arg(error, pi_requires_explicit_domain, "Pi type requires a domain introduced with a `:` type check, instead got \"{}\".");
 
+}
+
+namespace sema
+{
+db_entry_arg(error, id_not_in_context, "\"{}\" was never seen before.");
+db_entry_arg2(error, not_a_subtype, "\"{}\" is not a subtype of \"{}\".");
+db_entry_arg2(error, free_var_in_type, "\"{}\" must not occur in \"{}\".");
+db_entry_arg2(error, cannot_unify_existentials, "\"{}\" and \"{}\" are different, cannot unify them.");
+db_entry_arg(error, existential_not_in_context, "\"{}\" is not in the typing context.");
+db_entry_arg(error, not_invokable, "\"{}\" is not an invokable type.");
+db_entry_arg(error, unsolved_ex, "Cannot resolve dummy types for inferred type \"{}\". Add an annotation.");
 }
 
 

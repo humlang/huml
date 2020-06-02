@@ -85,7 +85,6 @@ private:
   token current;
   std::array<token, lookahead_size> next_toks;
 
-  hx_ast global_scope;
   struct scoping_context
   {
     bool is_binding { false };

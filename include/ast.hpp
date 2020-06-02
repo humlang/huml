@@ -3,22 +3,24 @@
 #include <source_range.hpp>
 #include <ast_nodes.hpp>
 
-
 struct ast_base
 {
   ast_base(ASTNodeKind kind) : kind(kind) {}
 
   ASTNodeKind kind;
+
+  ast_base* type { nullptr };
 };
 using ast_ptr = ast_base*;
 
 struct identifier : ast_base
 {
-  identifier(symbol symb)
-    : ast_base(ASTNodeKind::identifier), symb(symb)
+  identifier(symbol symb, ast_ptr binding_occurence = nullptr)
+    : ast_base(ASTNodeKind::identifier), symb(symb), binding_occurence(binding_occurence)
   {  }
 
   symbol symb;
+  ast_ptr binding_occurence;
 };
 
 struct prop : ast_base
@@ -85,6 +87,15 @@ struct expr_stmt : ast_base
 
 struct hx_ast
 {
-  std::vector<ast_base*> ast;
+  void print(std::ostream& os) const;
+  static void print(std::ostream& os, ast_ptr node);
+
+  static bool used(ast_ptr what, ast_ptr in)
+  { tsl::robin_set<identifier*> binders; return used(what, in, binders); }
+  static bool used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier*>& binders);
+
+  bool type_checks() const;
+
+  std::vector<ast_base*> data;
 };
 

@@ -5,7 +5,6 @@
 
 enum class ASTNodeKind : std::int_fast8_t
 {
-  ref = -2,
   exist = -1, // <- only used for type_checking, must not occur anywhere else
   undef = 0,
   Kind,
@@ -14,7 +13,6 @@ enum class ASTNodeKind : std::int_fast8_t
   unit,
   app,
   lambda,
-  param,
   pattern,
   match,
   pattern_matcher,
