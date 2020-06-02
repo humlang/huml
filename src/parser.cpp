@@ -1,5 +1,5 @@
 #include <reader.hpp>
-#include <diagnostics.h>
+#include <diagnostic.hpp>
 #include <diagnostic_db.hpp>
 
 #include <tsl/robin_map.h>
