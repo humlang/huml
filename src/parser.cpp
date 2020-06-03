@@ -6,6 +6,8 @@
 
 #include <sstream>
 
+const ast_ptr hx_reader::error_ref = nullptr;
+
 auto token_precedence_map = tsl::robin_map<token_kind, int>( {
   {token_kind::Colon, 1},
   {token_kind::Dot, 7},
@@ -69,15 +71,15 @@ ast_ptr hx_reader::parse_identifier()
     if(id == symbol("_"))
     {
       // Do not reference
-      return new identifier(id);
+      return std::make_shared<identifier>(id);
     }
     else
     {
-      return new identifier(id, present->second);
+      return std::make_shared<identifier>(id, present->second);
     }
   }
   else
-    return new identifier(id); // <- free variable
+    return std::make_shared<identifier>(id); // <- free variable
 }
 
 // e := e1 e2
@@ -87,7 +89,7 @@ ast_ptr hx_reader::parse_app(ast_ptr lhs)
   if(rhs == error_ref)
     return error_ref;
 
-  return new app(lhs, rhs);
+  return std::make_shared<app>(lhs, rhs);
 }
 
 // e := `\\` id `.` e       id can be _ to simply ignore the argument. Note that `\\` is a single backslash
@@ -132,7 +134,7 @@ ast_ptr hx_reader::parse_lambda()
   lam_tok.loc += old.loc;
 // TODO:  global_scope.dbg_data[to_ret].loc = lam_tok;
 
-  return new lambda(param, expr);
+  return std::make_shared<lambda>(param, expr);
 }
 
 // e := Kind
@@ -140,7 +142,7 @@ ast_ptr hx_reader::parse_Kind()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Kind))
     return mk_error();
-  return new kind();
+  return std::make_shared<kind>();
 }
 
 // e := Type
@@ -148,7 +150,7 @@ ast_ptr hx_reader::parse_Type()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Type))
     return mk_error();
-  return new type();
+  return std::make_shared<type>();
 }
 
 // e := Prop
@@ -156,7 +158,7 @@ ast_ptr hx_reader::parse_Prop()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Prop))
     return mk_error();
-  return new prop();
+  return std::make_shared<prop>();
 }
 
 // s := `data` name ( `(` id `:` type `)` )* `:` type `;`
@@ -178,7 +180,7 @@ ast_ptr hx_reader::parse_data_ctor()
     return mk_error();
   
   type_name->type = tail;
-  return new assign_data(type_name, tail);
+  return std::make_shared<assign_data>(type_name, tail);
 }
 
 // s := `type` name ( `(` id `:` type `)` )* `:` Sort `;`
@@ -201,7 +203,7 @@ ast_ptr hx_reader::parse_type_ctor()
     return mk_error();
 
   type_name->type = tail;
-  return new assign_type(type_name, tail);
+  return std::make_shared<assign_type>(type_name, tail);
 }
 
 
@@ -229,7 +231,7 @@ ast_ptr hx_reader::parse_assign()
 
     return mk_error();
   }
-  return new assign(var, arg);
+  return std::make_shared<assign>(var, arg);
 }
 
 ast_ptr hx_reader::parse_expr_stmt()
@@ -251,7 +253,7 @@ ast_ptr hx_reader::parse_expr_stmt()
     return mk_error();
   }
   //TODO: fix data
-  return new expr_stmt(expr);
+  return std::make_shared<expr_stmt>(expr);
 }
 
 ast_ptr hx_reader::parse_statement()

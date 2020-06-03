@@ -12,6 +12,8 @@ thread_local std::size_t exist_counter = 0;
 
 struct exist : ast_base
 {
+  using ptr = std::shared_ptr<exist>;
+
   exist(symbol symb) : ast_base(ASTNodeKind::exist), symb(symb)
   {  }
 
@@ -41,53 +43,53 @@ bool eqb(ast_ptr A, ast_ptr B)
     return true;
 
   case ASTNodeKind::identifier: {
-      return static_cast<identifier*>(A)->symb == static_cast<identifier*>(B)->symb
-        && eqb(static_cast<identifier*>(A)->binding_occurence, static_cast<identifier*>(B)->binding_occurence);
+      return std::static_pointer_cast<identifier>(A)->symb == std::static_pointer_cast<identifier>(B)->symb
+        && eqb(std::static_pointer_cast<identifier>(A)->binding_occurence, std::static_pointer_cast<identifier>(B)->binding_occurence);
     } break;
 
   case ASTNodeKind::app: {
-      app* a = static_cast<app*>(A);
-      app* b = static_cast<app*>(B);
+      app::ptr a = std::static_pointer_cast<app>(A);
+      app::ptr b = std::static_pointer_cast<app>(B);
 
       return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
     } break;
 
   case ASTNodeKind::lambda: {
-      lambda* a = static_cast<lambda*>(A);
-      lambda* b = static_cast<lambda*>(B);
+      lambda::ptr a = std::static_pointer_cast<lambda>(A);
+      lambda::ptr b = std::static_pointer_cast<lambda>(B);
 
       return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
     } break;
 
 
   case ASTNodeKind::expr_stmt: {
-      expr_stmt* a = static_cast<expr_stmt*>(A);
-      expr_stmt* b = static_cast<expr_stmt*>(B);
+      expr_stmt::ptr a = std::static_pointer_cast<expr_stmt>(A);
+      expr_stmt::ptr b = std::static_pointer_cast<expr_stmt>(B);
 
       return eqb(a->lhs, b->lhs);
     } break;
   case ASTNodeKind::assign: {
-      assign* a = static_cast<assign*>(A);
-      assign* b = static_cast<assign*>(B);
+      assign::ptr a = std::static_pointer_cast<assign>(A);
+      assign::ptr b = std::static_pointer_cast<assign>(B);
 
       return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
     } break;
   case ASTNodeKind::assign_type: {
-      assign_type* a = static_cast<assign_type*>(A);
-      assign_type* b = static_cast<assign_type*>(B);
+      assign_type::ptr a = std::static_pointer_cast<assign_type>(A);
+      assign_type::ptr b = std::static_pointer_cast<assign_type>(B);
 
       return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
     } break;
   case ASTNodeKind::assign_data: {
-      assign_data* a = static_cast<assign_data*>(A);
-      assign_data* b = static_cast<assign_data*>(B);
+      assign_data::ptr a = std::static_pointer_cast<assign_data>(A);
+      assign_data::ptr b = std::static_pointer_cast<assign_data>(B);
 
       return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
     } break;
 
   case ASTNodeKind::exist: {
-      exist* a = static_cast<exist*>(A);
-      exist* b = static_cast<exist*>(B);
+      exist::ptr a = std::static_pointer_cast<exist>(A);
+      exist::ptr b = std::static_pointer_cast<exist>(B);
 
       if(a->is_solved() && b->is_solved())
         return a->symb == b->symb && eqb(a->solution, b->solution);
@@ -110,28 +112,28 @@ bool has_existentials(ast_ptr a)
   case ASTNodeKind::exist: return true;
 
   case ASTNodeKind::app: {
-    app* aa = static_cast<app*>(a);
+    app::ptr aa = std::static_pointer_cast<app>(a);
     return has_existentials(aa->lhs) || has_existentials(aa->rhs);
   } break;
   case ASTNodeKind::lambda: {
-    lambda* al = static_cast<lambda*>(a);
+    lambda::ptr al = std::static_pointer_cast<lambda>(a);
     return has_existentials(al->lhs) || has_existentials(al->rhs);
   } break;
 
   case ASTNodeKind::expr_stmt: {
-    expr_stmt* al = static_cast<expr_stmt*>(a);
+    expr_stmt::ptr al = std::static_pointer_cast<expr_stmt>(a);
     return has_existentials(al->lhs);
   } break;
   case ASTNodeKind::assign: {
-    assign* al = static_cast<assign*>(a);
+    assign::ptr al = std::static_pointer_cast<assign>(a);
     return has_existentials(al->lhs) || has_existentials(al->rhs);
   } break;
   case ASTNodeKind::assign_data: {
-    assign_data* al = static_cast<assign_data*>(a);
+    assign_data::ptr al = std::static_pointer_cast<assign_data>(a);
     return has_existentials(al->lhs) || has_existentials(al->rhs);
   } break;
   case ASTNodeKind::assign_type: {
-    assign_type* al = static_cast<assign_type*>(a);
+    assign_type::ptr al = std::static_pointer_cast<assign_type>(a);
     return has_existentials(al->lhs) || has_existentials(al->rhs);
   } break;
   }
@@ -169,25 +171,25 @@ ast_ptr typing_context::subst(ast_ptr what)
     return what;
 
   case ASTNodeKind::app: {
-      app* ap = static_cast<app*>(what);
+      app::ptr ap = std::static_pointer_cast<app>(what);
       
       auto lhs = subst(ap->lhs);
       auto rhs = subst(ap->rhs);
 
-      return new app(lhs, rhs);
+      return std::make_shared<app>(lhs, rhs);
     } break;
 
   case ASTNodeKind::lambda: {
-      lambda* lam = static_cast<lambda*>(what);
+      lambda::ptr lam = std::static_pointer_cast<lambda>(what);
 
       auto lhs = subst(lam->lhs);
       auto rhs = subst(lam->rhs);
 
-      return new lambda(lhs, rhs);
+      return std::make_shared<lambda>(lhs, rhs);
     } break;
 
   case ASTNodeKind::exist: {
-      exist* ex = static_cast<exist*>(what);
+      exist::ptr ex = std::static_pointer_cast<exist>(what);
       
       if(ex->is_solved())
         return subst(ex->solution);
@@ -203,7 +205,7 @@ ast_ptr typing_context::subst(ast_ptr what)
   return nullptr;
 }
 
-typing_context::pos typing_context::lookup_id(identifier* id) const
+typing_context::pos typing_context::lookup_id(identifier::ptr id) const
 { return lookup_id(data.begin(), id); }
 
 typing_context::pos typing_context::lookup_type(ast_ptr type) const
@@ -212,7 +214,7 @@ typing_context::pos typing_context::lookup_type(ast_ptr type) const
 typing_context::pos typing_context::lookup_ex(ast_ptr ex) const
 { return lookup_ex(data.begin(), ex); }
 
-typing_context::pos typing_context::lookup_id(typing_context::pos begin, identifier* id) const
+typing_context::pos typing_context::lookup_id(typing_context::pos begin, identifier::ptr id) const
 {
   return std::find_if(begin, data.end(), [id = id->binding_occurence ? id->binding_occurence : id]
       (auto& elem) { return eqb(elem.id_def, id) && elem.type != nullptr && elem.existential == nullptr; });
@@ -238,8 +240,8 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
   case ASTNodeKind::lambda: {
       if(type->kind == ASTNodeKind::lambda)
       {
-        lambda* pi  = static_cast<lambda*>(type);
-        lambda* lam = static_cast<lambda*>(what);
+        lambda::ptr pi  = std::static_pointer_cast<lambda>(type);
+        lambda::ptr lam = std::static_pointer_cast<lambda>(what);
 
         // TODO: check if lhs->type is wellformed
         if(lam->lhs->type && !is_subtype(ctx, lam->lhs->type, pi->lhs->type))
@@ -253,7 +255,7 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
 
           return false;
         }
-        ctx.data.emplace_back(CTXElement { static_cast<identifier*>(lam->lhs), pi->lhs->type });
+        ctx.data.emplace_back(CTXElement { std::static_pointer_cast<identifier>(lam->lhs), pi->lhs->type });
         std::size_t ctx_size = ctx.data.size();
 
         if(!check(ctx, lam->rhs, pi->rhs))
@@ -300,7 +302,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   {
   // S-Ident
   case ASTNodeKind::identifier: {
-      auto it = ctx.lookup_id(static_cast<identifier*>(what));
+      auto it = ctx.lookup_id(std::static_pointer_cast<identifier>(what));
       if(it == ctx.data.end())
       {
         std::stringstream a;
@@ -314,7 +316,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
   // S-App
   case ASTNodeKind::app: {
-      app* aa = static_cast<app*>(what);
+      app::ptr aa = std::static_pointer_cast<app>(what);
 
       auto A = synthesize(ctx, aa->lhs);
       if(A == nullptr)
@@ -324,19 +326,19 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       if(C == nullptr)
         return nullptr;
 
-      return what->type = new app(ctx.subst(A), ctx.subst(C));
+      return what->type = std::make_shared<app>(ctx.subst(A), ctx.subst(C));
     } break;
 
   // S-Lambda
   case ASTNodeKind::lambda: {
-      lambda* lam = static_cast<lambda*>(what);
+      lambda::ptr lam = std::static_pointer_cast<lambda>(what);
 
-      auto alpha1 = new exist("α" + std::to_string(exist_counter++));
-      auto alpha2 = new exist("α" + std::to_string(exist_counter++));
+      auto alpha1 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
+      auto alpha2 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
 
       ctx.data.emplace_back(alpha2);
       ctx.data.emplace_back(alpha1);
-      ctx.data.emplace_back(static_cast<identifier*>(lam->lhs), alpha1);
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), alpha1);
       std::size_t ctx_size = ctx.data.size();
 
       // Check for type annotations
@@ -355,39 +357,39 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         return nullptr;
       ctx.data.erase(ctx.data.begin() + ctx_size - 1, ctx.data.end());
 
-      auto lamid = new identifier(static_cast<identifier*>(lam->lhs)->symb);
+      auto lamid = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
       lamid->type = ctx.subst(alpha1);
-      return what->type = new lambda(lamid, ctx.subst(alpha2));
+      return what->type = std::make_shared<lambda>(lamid, ctx.subst(alpha2));
     } break;
 
   // S-Assign
   case ASTNodeKind::assign: {
-      assign* as = static_cast<assign*>(what);
+      assign::ptr as = std::static_pointer_cast<assign>(what);
 
       auto A = synthesize(ctx, as->rhs);
       if(A == nullptr)
         return nullptr;
 
-      ctx.data.emplace_back(static_cast<identifier*>(as->lhs), A);
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), A);
       return what->type = A;
     } break;
   // S-AssignData
   case ASTNodeKind::assign_data: {
-      assign_data* as = static_cast<assign_data*>(what);
+      assign_data::ptr as = std::static_pointer_cast<assign_data>(what);
       // TODO: check wellformedness
-      ctx.data.emplace_back(static_cast<identifier*>(as->lhs), as->rhs);
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), as->rhs);
       return what->type = as->rhs;
     } break;
   // S-AssignType
   case ASTNodeKind::assign_type: {
-      assign_type* as = static_cast<assign_type*>(what);
+      assign_type::ptr as = std::static_pointer_cast<assign_type>(what);
       // TODO: check wellformedness
-      ctx.data.emplace_back(static_cast<identifier*>(as->lhs), as->rhs);
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), as->rhs);
       return what->type = as->rhs;
     } break;
   // S-ExprStmt
   case ASTNodeKind::expr_stmt: {
-      expr_stmt* ex = static_cast<expr_stmt*>(what);
+      expr_stmt::ptr ex = std::static_pointer_cast<expr_stmt>(what);
 
       return what->type = synthesize(ctx, ex->lhs);
     } break;
@@ -401,7 +403,7 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
   {
   // >=>-Exist
   case ASTNodeKind::exist: {
-      exist* ex = static_cast<exist*>(A);
+      exist::ptr ex = std::static_pointer_cast<exist>(A);
 
       auto ex_it = ctx.lookup_ex(ex);
       if(ex_it == ctx.data.end())
@@ -410,16 +412,16 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
         return nullptr;
       }
 
-      exist* alpha1 = new exist("α" + std::to_string(exist_counter++));
-      exist* alpha2 = new exist("α" + std::to_string(exist_counter++));
+      exist::ptr alpha1 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
+      exist::ptr alpha2 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
 
       // update context
       ctx.data.insert(ex_it, alpha1);
       ctx.data.insert(ex_it, alpha2);
 
-      identifier* lamid = new identifier("_");
+      identifier::ptr lamid = std::make_shared<identifier>("_");
       lamid->type = alpha1;
-      ex->solution = new lambda(lamid, alpha2);
+      ex->solution = std::make_shared<lambda>(lamid, alpha2);
 
       if(!check(ctx, e, alpha1))
         return nullptr;
@@ -427,7 +429,7 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
     } break;
   // >=>-Lam
   case ASTNodeKind::lambda: {
-      lambda* lam = static_cast<lambda*>(A);
+      lambda::ptr lam = std::static_pointer_cast<lambda>(A);
 
       if(!check(ctx, e, lam->lhs->type))
         return nullptr;
@@ -460,15 +462,15 @@ bool hx_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
   case ASTNodeKind::identifier: return eqb(A, B);
   // <:-App
   case ASTNodeKind::app: {
-      app* aa = static_cast<app*>(A);
-      app* ba = static_cast<app*>(B);
+      app::ptr aa = std::static_pointer_cast<app>(A);
+      app::ptr ba = std::static_pointer_cast<app>(B);
 
       return is_subtype(ctx, aa->lhs, ba->lhs) && is_subtype(ctx, aa->rhs, ba->rhs);
     } break;
   // <:-Lam
   case ASTNodeKind::lambda: {
-      lambda* al = static_cast<lambda*>(A);
-      lambda* bl = static_cast<lambda*>(B);
+      lambda::ptr al = std::static_pointer_cast<lambda>(A);
+      lambda::ptr bl = std::static_pointer_cast<lambda>(B);
 
       return is_subtype(ctx, bl->lhs->type, al->lhs->type)
         && is_subtype(ctx, ctx.subst(al->rhs), ctx.subst(bl->rhs));
@@ -479,8 +481,8 @@ def:
       if(A->kind == ASTNodeKind::exist && B->kind == ASTNodeKind::exist)
       {
         // <:-Exist
-        exist* ae = static_cast<exist*>(A);
-        exist* be = static_cast<exist*>(B);
+        exist::ptr ae = std::static_pointer_cast<exist>(A);
+        exist::ptr be = std::static_pointer_cast<exist>(B);
         if(ae->is_solved() || be->is_solved())
           return is_subtype(ctx, ctx.subst(ae), ctx.subst(be));
 
@@ -514,7 +516,7 @@ def:
           diagnostic <<= diagnostic_db::sema::free_var_in_type(source_range { }, a.str(), b.str());
           return false;
         }
-        return inst_l(ctx, static_cast<exist*>(A), B);
+        return inst_l(ctx, std::static_pointer_cast<exist>(A), B);
       }
       else if(A->kind != ASTNodeKind::exist && B->kind == ASTNodeKind::exist)
       {
@@ -529,20 +531,20 @@ def:
           diagnostic <<= diagnostic_db::sema::free_var_in_type(source_range { }, a.str(), b.str());
           return false;
         }
-        return inst_r(ctx, A, static_cast<exist*>(B));
+        return inst_r(ctx, A, std::static_pointer_cast<exist>(B));
       }
       return false; // <- TODO: emit diagnostic
     } break;
   }
 }
 
-bool hx_ast_type_checking::inst_l(typing_context& ctx, exist* alpha, ast_ptr A)
+bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr A)
 {
   switch(A->kind)
   {
   // <=L-Exist
   case ASTNodeKind::exist: {
-      exist* beta = static_cast<exist*>(A);
+      exist::ptr beta = std::static_pointer_cast<exist>(A);
 
       auto alpha_it = ctx.lookup_ex(alpha);
       auto beta_it  = ctx.lookup_ex(alpha_it, beta);
@@ -568,22 +570,22 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist* alpha, ast_ptr A)
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
-      lambda* lam = static_cast<lambda*>(A);
+      lambda::ptr lam = std::static_pointer_cast<lambda>(A);
       
-      auto alpha1 = new exist("α" + std::to_string(exist_counter++));
-      auto alpha2 = new exist("α" + std::to_string(exist_counter++));
+      auto alpha1 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
+      auto alpha2 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
 
       alpha_it = ctx.data.insert(alpha_it, alpha1);
       alpha_it = ctx.data.insert(alpha_it, alpha2);
 
-      auto lamid = new identifier(static_cast<identifier*>(lam->lhs)->symb);
+      auto lamid = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
       lamid->type = alpha1;
-      alpha->solution = new lambda(lamid, alpha2);
+      alpha->solution = std::make_shared<lambda>(lamid, alpha2);
 
       bool fst = is_subtype(ctx, lam->lhs->type, alpha1);
       lamid->type = ctx.subst(alpha1);
       bool snd = is_subtype(ctx, alpha2, ctx.subst(lam->rhs));
-      static_cast<lambda*>(alpha->solution)->rhs = ctx.subst(alpha2);
+      std::static_pointer_cast<lambda>(alpha->solution)->rhs = ctx.subst(alpha2);
 
       return fst && snd;
     } break;
@@ -601,13 +603,13 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist* alpha, ast_ptr A)
   }
 }
 
-bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist* alpha)
+bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alpha)
 {
   switch(A->kind)
   {
   // <=R-Exist
   case ASTNodeKind::exist: {
-      exist* beta = static_cast<exist*>(A);
+      exist::ptr beta = std::static_pointer_cast<exist>(A);
 
       auto alpha_it = ctx.lookup_ex(alpha);
       auto beta_it  = ctx.lookup_ex(alpha_it, beta);
@@ -633,22 +635,22 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist* alpha)
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
-      lambda* lam = static_cast<lambda*>(A);
+      lambda::ptr lam = std::static_pointer_cast<lambda>(A);
       
-      auto alpha1 = new exist("α" + std::to_string(exist_counter++));
-      auto alpha2 = new exist("α" + std::to_string(exist_counter++));
+      auto alpha1 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
+      auto alpha2 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
 
       alpha_it = ctx.data.insert(alpha_it, alpha1);
       alpha_it = ctx.data.insert(alpha_it, alpha2);
 
-      auto lamid = new identifier(static_cast<identifier*>(lam->lhs)->symb);
+      auto lamid = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
       lamid->type = alpha1;
-      alpha->solution = new lambda(lamid, alpha2);
+      alpha->solution = std::make_shared<lambda>(lamid, alpha2);
 
       bool fst = is_subtype(ctx, lam->lhs->type, alpha1);
       lamid->type = alpha1;
       bool snd = is_subtype(ctx, alpha2, ctx.subst(lam->rhs));
-      static_cast<lambda*>(alpha->solution)->rhs = ctx.subst(alpha2);
+      std::static_pointer_cast<lambda>(alpha->solution)->rhs = ctx.subst(alpha2);
 
       return fst && snd;
     } break;
@@ -665,51 +667,4 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist* alpha)
     } break;
   }
 }
-
-/*
-ast_ptr hx_ast_type_checking::cleanup(typing_context& ctx, ast_ptr orig)
-{
-  switch(orig->kind)
-  {
-  case ASTNodeKind::Kind:
-  case ASTNodeKind::Type:
-  case ASTNodeKind::Prop:
-  case ASTNodeKind::unit:
-  case ASTNodeKind::identifier:
-  case ASTNodeKind::exist:
-    return ctx.subst(orig);
-
-  case ASTNodeKind::app: {
-      app* ap = static_cast<app*>(orig);
-      
-      return new app(ctx.subst(ap->lhs), ctx.subst(ap->rhs));
-    } break;
-  case ASTNodeKind::lambda: {
-      lambda* ap = static_cast<lambda*>(orig);
-      
-      return new lambda(ctx.subst(ap->lhs), ctx.subst(ap->rhs));
-    } break;
-  case ASTNodeKind::assign: {
-      assign* as = static_cast<assign*>(orig);
-
-      return new assign(as->lhs, ctx.subst(as->rhs));
-    } break;
-  case ASTNodeKind::assign_data: {
-      assign_data* as = static_cast<assign_data*>(orig);
-
-      return new assign_data(as->lhs, ctx.subst(as->rhs));
-    } break;
-  case ASTNodeKind::assign_type: {
-      assign_type* as = static_cast<assign_type*>(orig);
-
-      return new assign_type(as->lhs, ctx.subst(as->rhs));
-    } break;
-  case ASTNodeKind::expr_stmt: {
-      expr_stmt* ex = static_cast<expr_stmt*>(orig);
-
-      return new expr_stmt(ctx.subst(ex->lhs));
-    } break;
-  }
-}
-*/
 

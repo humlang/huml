@@ -6,16 +6,16 @@
 struct exist;
 struct CTXElement
 {
-  CTXElement(exist* ex) : existential(ex)
+  CTXElement(std::shared_ptr<exist> ex) : existential(ex)
   {  }
 
-  CTXElement(identifier* id, ast_ptr type)
-    : id_def(id->binding_occurence ? static_cast<identifier*>(id->binding_occurence) : id), type(type)
+  CTXElement(identifier::ptr id, ast_ptr type)
+    : id_def(id->binding_occurence ? std::static_pointer_cast<identifier>(id->binding_occurence) : id), type(type)
   {  }
 
-  exist* existential { nullptr }; 
-  identifier* id_def { nullptr }; // <- absolute position of the binding occurence of id
-  ast_ptr type       { nullptr }; // <- absolute position of a type
+  std::shared_ptr<exist> existential { nullptr }; 
+  identifier::ptr id_def             { nullptr }; // <- absolute position of the binding occurence of id
+  ast_ptr type                       { nullptr }; // <- absolute position of a type
 };
 
 
@@ -25,11 +25,11 @@ struct typing_context
 
   ast_ptr subst(ast_ptr what);
 
-  pos lookup_id(identifier* id) const;
+  pos lookup_id(identifier::ptr id) const;
   pos lookup_type(ast_ptr type) const;
   pos lookup_ex(ast_ptr ex) const;
 
-  pos lookup_id(pos begin, identifier* id) const;
+  pos lookup_id(pos begin, identifier::ptr id) const;
   pos lookup_type(pos begin, ast_ptr type) const;
   pos lookup_ex(pos begin, ast_ptr ex) const;
 
@@ -51,8 +51,8 @@ private:
 
   bool is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B);
 
-  bool inst_l(typing_context& ctx, exist* alpha, ast_ptr A);
-  bool inst_r(typing_context& ctx, ast_ptr A, exist* alpha);
+  bool inst_l(typing_context& ctx, std::shared_ptr<exist> alpha, ast_ptr A);
+  bool inst_r(typing_context& ctx, ast_ptr A, std::shared_ptr<exist> alpha);
 
 //  ast_ptr cleanup(typing_context& ctx, ast_ptr orig);
 

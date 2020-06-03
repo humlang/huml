@@ -41,7 +41,7 @@ class hx_reader : base_reader
 {
 public:
   static constexpr std::size_t lookahead_size = 1;
-  static constexpr ast_ptr error_ref = nullptr;
+  static const ast_ptr error_ref; // see parser.cpp
 
   template<typename T>
   static std::vector<T> read(std::string_view module) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
