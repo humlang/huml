@@ -31,6 +31,7 @@ enum class token_kind : std::int8_t
     LiteralNumber = 2,
     Keyword = 3,
     Doublearrow = 4, // =>
+    Arrow = 5,  // ->
     Backslash = '\\',
     Pipe = '|',
     Colon = ':',

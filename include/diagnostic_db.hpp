@@ -48,6 +48,8 @@ db_entry_arg(error, tuple_expects_comma, "Tuple expects a comma here, instead go
 db_entry_arg(error, tuple_expects_closing_paranthesis, "Tuple expected a closing parenthesis, instead got \"{}\".");
 db_entry_arg(error, type_ctor_param_expects_closing_paranthesis, "Parameter of type constructor expects a closing parenthesis, instead got \"{}\".");
 db_entry_arg(error, type_ctor_param_expects_colon, "Parameter of type constructor expects a \":\", instead got \"{}\".");
+db_entry_arg(error, lambda_param_type_decl_expects_colon, "Parameter of lambda expects a \":\" here to mark its type, instead got \"{}\".");
+db_entry_arg(error, lambda_expects_arrow, "Lambda expression expects an \"->\" here, instead got \"{}\".");
 db_entry_arg(error, case_expects_lbracket, "Case expects an \"[\" here, instead got \"{}\".");
 db_entry_arg(error, case_expects_rbracket, "Case expects an \"]\" here, instead got \"{}\".");
 db_entry_arg(error, case_expects_keyword, "Keyword expected for case expression, instead got \"{}\".");

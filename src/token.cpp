@@ -8,6 +8,7 @@ std::string_view kind_to_str(token_kind kind)
   {
   default:
   case token_kind::EndOfFile: return "EOF";
+  case token_kind::Arrow: return "->";
   case token_kind::Identifier: return "Identifier";
   case token_kind::LiteralNumber: return "LiteralNumber";
   case token_kind::Keyword: return "Keyword";

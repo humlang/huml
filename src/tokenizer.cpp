@@ -258,8 +258,17 @@ restart_get:
   } break;
   case '-':
   {
-    kind = token_kind::Minus;
-    data = "-";
+    if(col < linebuf.size() && linebuf[col] == '>')
+    {
+      kind = token_kind::Arrow;
+      data = "->";
+      ch = linebuf[col++];
+    }
+    else
+    {
+      kind = token_kind::Minus;
+      data = "-";
+    }
   } break;
   case '{':
     {

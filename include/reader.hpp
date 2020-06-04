@@ -40,7 +40,7 @@ private:
 class hx_reader : base_reader
 {
 public:
-  static constexpr std::size_t lookahead_size = 1;
+  static constexpr std::size_t lookahead_size = 2;
   static const ast_ptr error_ref; // see parser.cpp
 
   template<typename T>
@@ -67,6 +67,7 @@ private:
   ast_ptr parse_type_ctor();
   ast_ptr parse_data_ctor();
 
+  ast_ptr parse_with_parentheses();
   ast_ptr parse_type_check(ast_ptr left);
   ast_ptr parse_identifier();
   ast_ptr parse_Prop();

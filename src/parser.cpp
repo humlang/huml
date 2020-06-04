@@ -98,16 +98,46 @@ ast_ptr hx_reader::parse_app(ast_ptr lhs)
 //                                         parantheses are needed to distinguish between pi and tuple access
 ast_ptr hx_reader::parse_lambda()
 {
+  if(current.kind == token_kind::Identifier)
+  {
+    // A -> B
+    parsing_pattern = true;
+    auto param = parse_identifier();
+    parsing_pattern = false;
+    auto psymb = old.data;
+
+    if(!expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow))
+      return mk_error();
+
+    scoping_ctx.binder_stack.emplace_back(psymb, param);
+    auto expr = parse_expression();
+    scoping_ctx.binder_stack.pop_back();
+
+    return std::make_shared<lambda>(param, expr);
+  }
+  // We require a lambda
   auto lam_tok = current;
   if(!expect('\\', diagnostic_db::parser::lambda_expects_lambda))
     return mk_error();
 
   bool type_checking_mode = accept('(');
+  std::size_t parentheses = 0;
+  while(accept('('))
+    parentheses++;
 
   parsing_pattern = true;
   auto param = parse_identifier();
   parsing_pattern = false;
   auto psymb = old.data;
+
+  if(param == error_ref)
+    return mk_error();
+
+  while(parentheses-- > 0)
+  {
+    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
+      return mk_error();
+  }
 
   if(accept(':'))
   {
@@ -285,6 +315,56 @@ ast_ptr hx_reader::parse_keyword()
   return mk_error();
 }
 
+ast_ptr hx_reader::parse_with_parentheses()
+{
+  if(!expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen))
+    return mk_error();
+
+  if(accept(')'))
+    return std::make_shared<unit>();
+
+  if(current.kind == token_kind::Identifier && next_toks[0].kind == token_kind::Colon)
+  {
+    // type checking or lambda
+
+    auto id = parse_identifier();
+    auto psymb = old.data;
+
+    if(!expect(':', diagnostic_db::parser::type_ctor_param_expects_colon))
+      return mk_error();
+
+    auto typ = parse_expression();
+
+    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
+      return mk_error();
+
+    id->type = typ;
+
+    if(accept(token_kind::Arrow))
+    {
+      // lambda
+      scoping_ctx.binder_stack.emplace_back(psymb, id);
+      auto body = parse_expression();
+      scoping_ctx.binder_stack.pop_back();
+
+      return std::make_shared<lambda>(id, body);
+    }
+    // just an identifier with a type annotation
+    return id;
+  }
+  else
+  {
+    // type checking or parenthesized expression
+
+    auto expr = parse_expression();
+
+    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
+      return mk_error();
+
+    return expr;
+  }
+}
+
 // e := identifier 
 ast_ptr hx_reader::parse_prefix()
 {
@@ -300,22 +380,13 @@ ast_ptr hx_reader::parse_prefix()
 
     case token_kind::LParen:
     {
-      if(!expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen))
-        return mk_error();
-
-      if(accept(')'))
-        return std::make_shared<unit>();
-
-      auto ex = parse_expression();
-
-      if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
-        return mk_error();
-
-      return ex;
+      return parse_with_parentheses();
     }
 
     case token_kind::Identifier:
     {
+      if(next_toks[0].kind == token_kind::Arrow)
+        return parse_lambda();
       return parse_identifier();
     }
     case token_kind::Keyword:
