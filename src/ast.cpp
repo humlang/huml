@@ -76,7 +76,7 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
       print(os, ap->lhs);
       os << ") (";
       print(os, ap->rhs);
-      os << ")";
+      os << "))";
     } break;                                  
   }
   if(node->type != nullptr)
@@ -169,7 +169,8 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
       
       if(used(what, lam->rhs, binders))
         ret = true;
-      binders.erase(itp.first);
+      assert(!binders.empty());
+      binders.erase(binders.find(std::static_pointer_cast<identifier>(lam->lhs)));
 
       if(lam->lhs->type)
         ret = ret || used(what, lam->lhs->type, binders);

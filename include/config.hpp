@@ -11,23 +11,23 @@ enum class emit_classes
   undef,
   help,
   tokens,
-  ir_print,
-  ir_graph
+  ast_print,
+  ast_typecheck,
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM( emit_classes, {
   { emit_classes::undef, "undef" },
   { emit_classes::help, "help" },
   { emit_classes::tokens, "tokens" },
-  { emit_classes::ir_print, "ir-print" },
-  { emit_classes::ir_graph, "ir-graph" },
+  { emit_classes::ast_print, "ast-print" },
+  { emit_classes::ast_typecheck, "ast-typecheck" },
 })
 
 const static auto emit_classes_list = {
   emit_classes::help,
   emit_classes::tokens,
-  emit_classes::ir_print,
-  emit_classes::ir_graph
+  emit_classes::ast_print,
+  emit_classes::ast_typecheck,
 };
 
 void print_emit_classes(std::FILE* f);

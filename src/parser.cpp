@@ -303,6 +303,9 @@ ast_ptr hx_reader::parse_prefix()
       if(!expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen))
         return mk_error();
 
+      if(accept(')'))
+        return std::make_shared<unit>();
+
       auto ex = parse_expression();
 
       if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))

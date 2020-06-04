@@ -26,6 +26,9 @@ struct identifier : ast_base
   ast_ptr binding_occurence;
 };
 
+struct unit : ast_base
+{ using ptr = std::shared_ptr<unit>; unit() : ast_base(ASTNodeKind::unit) {} };
+
 struct prop : ast_base
 { using ptr = std::shared_ptr<prop>; prop() : ast_base(ASTNodeKind::Prop) {} };
 

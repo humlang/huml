@@ -32,7 +32,7 @@ void printer<print_newline>::indent(std::size_t depth)
 static const std::map<emit_classes, std::function<void(std::string_view)>> emitter =
 {
   { emit_classes::help, [](auto){ assert(false); } },
-  { emit_classes::ir_print, [](std::string_view t)
+  { emit_classes::ast_print, [](std::string_view t)
     {
       auto w = hx_reader::read<hx_ast>(t);
 
@@ -41,11 +41,8 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
       auto& global_ir = w.back();
 
       global_ir.print(std::cout);
-
-      if(!global_ir.type_checks())
-        std::cerr << "~~~> Does not typecheck. <~~~\n";
     } },
-  { emit_classes::ir_graph, [](std::string_view t)
+  { emit_classes::ast_typecheck, [](std::string_view t)
     {
       auto w = hx_reader::read<hx_ast>(t);
 
@@ -53,7 +50,10 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
 
-      std::cout << "TODO\n";
+      if(!global_ir.type_checks())
+        std::cout << "~~~> Does not typecheck. <~~~\n";
+      else
+        std::cout << "~~~> Does typecheck. <~~~\n";
     } },
   { emit_classes::tokens, [](std::string_view t)
     {
@@ -88,11 +88,18 @@ void compiler::go()
     }
     for(auto rit = runners.begin(); rit != runners.end(); )
     {
+      assert(rit->valid() && "Future has become invalid!");
       if(rit->wait_for(std::chrono::nanoseconds(100)) == std::future_status::ready)
         rit = runners.erase(rit);
       else
         ++rit;
     }
+  }
+  for(auto rit = runners.begin(); rit != runners.end(); )
+  {
+    assert(rit->valid() && "Future has become invalid!");
+    rit->wait();
+    rit = runners.erase(rit);
   }
 }
 
