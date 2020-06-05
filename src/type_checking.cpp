@@ -411,6 +411,7 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
       auto ex_it = ctx.lookup_ex(ex);
       if(ex_it == ctx.data.end())
       {
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range {  }, ex->symb.get_string());
         return nullptr;
       }
@@ -560,11 +561,13 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
 
       if(alpha_it == ctx.data.end())
       {
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
       if(beta_it == ctx.data.end())
       {
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, beta->symb.get_string());
         return false;
       }
@@ -576,6 +579,7 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
       auto alpha_it = ctx.lookup_ex(alpha);
       if(alpha_it == ctx.data.end())
       {
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
@@ -603,6 +607,7 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
       if(ctx.lookup_ex(alpha) == ctx.data.end())
       {
         // TODO: fix source_range
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
@@ -625,11 +630,13 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
 
       if(alpha_it == ctx.data.end())
       {
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
       if(beta_it == ctx.data.end())
       {
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, beta->symb.get_string());
         return false;
       }
@@ -641,6 +648,7 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
       auto alpha_it = ctx.lookup_ex(alpha);
       if(alpha_it == ctx.data.end())
       {
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
@@ -668,6 +676,7 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
       if(ctx.lookup_ex(alpha) == ctx.data.end())
       {
         // TODO: fix source_range
+        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
