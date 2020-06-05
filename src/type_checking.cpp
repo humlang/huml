@@ -266,7 +266,7 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
     } // fallthrough
   // C-Sub
   default: {
-      auto A = synthesize(ctx, what);
+      auto A = synthesize(ctx, what, true); // <- we need to prevent an infinte loop
       if(A == nullptr)
         return false;
 
@@ -286,9 +286,9 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
   }
 }
 
-ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
+ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what, bool ignore_type)
 {
-  if(what->type != nullptr)
+  if(!ignore_type && what->type != nullptr)
   {
     // S-Annot
     if(!check(ctx, what, what->type))

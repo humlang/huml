@@ -197,6 +197,9 @@ bool hx_ast::type_checks() const
   {
     auto typ = checker.find_type(ctx, root);
 
+    if(typ == nullptr)
+      type_checks = false;
+
     // TODO: and now? :-)
   }
 

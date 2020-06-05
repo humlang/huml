@@ -46,7 +46,7 @@ struct hx_ast_type_checking
 
 private:
   bool check(typing_context& ctx, ast_ptr what, ast_ptr type);
-  ast_ptr synthesize(typing_context& ctx, ast_ptr what);
+  ast_ptr synthesize(typing_context& ctx, ast_ptr what, bool ignore_type = false);
   ast_ptr eta_synthesize(typing_context& ctx, ast_ptr A, ast_ptr e);
 
   bool is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B);

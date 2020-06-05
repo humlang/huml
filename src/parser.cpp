@@ -100,6 +100,7 @@ ast_ptr hx_reader::parse_lambda()
 {
   if(current.kind == token_kind::Identifier)
   {
+    /// Shorthand for \_:A.B
     // A -> B
     parsing_pattern = true;
     auto param = parse_identifier();
@@ -113,7 +114,9 @@ ast_ptr hx_reader::parse_lambda()
     auto expr = parse_expression();
     scoping_ctx.binder_stack.pop_back();
 
-    return std::make_shared<lambda>(param, expr);
+    auto id = std::make_shared<identifier>("_");
+    id->type = param;
+    return std::make_shared<lambda>(id, expr);
   }
   // We require a lambda
   auto lam_tok = current;
