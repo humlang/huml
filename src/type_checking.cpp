@@ -266,7 +266,7 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
     } // fallthrough
   // C-Sub
   default: {
-      auto A = synthesize(ctx, what, true); // <- we need to prevent an infinte loop
+      auto A = synthesize(ctx, what); // <- we need to prevent an infinte loop
       if(A == nullptr)
         return false;
 
@@ -286,10 +286,12 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
   }
 }
 
-ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what, bool ignore_type)
+ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 {
-  if(!ignore_type && what->type != nullptr)
+  if(type_check_calls < 1 && what->type != nullptr)
   {
+    ++type_check_calls;
+
     // S-Annot
     if(!check(ctx, what, what->type))
       return nullptr;
@@ -297,6 +299,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what, bool
 
     return what->type;
   }
+  type_check_calls = 0;
 
   switch(what->kind)
   {
@@ -326,7 +329,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what, bool
       if(C == nullptr)
         return nullptr;
 
-      return what->type = std::make_shared<app>(ctx.subst(A), ctx.subst(C));
+      return what->type = ctx.subst(C);
     } break;
 
   // S-Lambda
@@ -462,6 +465,9 @@ bool hx_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
   case ASTNodeKind::identifier: return eqb(A, B);
   // <:-App
   case ASTNodeKind::app: {
+      if(B->kind != ASTNodeKind::app)
+        return false;
+
       app::ptr aa = std::static_pointer_cast<app>(A);
       app::ptr ba = std::static_pointer_cast<app>(B);
 
@@ -469,6 +475,9 @@ bool hx_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
     } break;
   // <:-Lam
   case ASTNodeKind::lambda: {
+      if(B->kind != ASTNodeKind::lambda)
+        return false;
+
       lambda::ptr al = std::static_pointer_cast<lambda>(A);
       lambda::ptr bl = std::static_pointer_cast<lambda>(B);
 

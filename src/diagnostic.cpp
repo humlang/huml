@@ -127,8 +127,11 @@ void diagnostics_manager::print(std::FILE* file)
 
           // move file pointer to line right before the first line we need to perform std::getline at
           ifile.seekg(std::ios::beg);
-          for(; row + 1 < correction->first.row - 1; ++row){
-            ifile.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+          if(row < correction->first.row)
+          {
+            for(; row + 1 < correction->first.row - 1; ++row){
+              ifile.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+            }
           }
           std::size_t already_printed_col = 0;
           std::string buf;
