@@ -251,22 +251,23 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
           hx_ast::print(b, pi->lhs->type);
 
           // TODO: fix diagnostic location
+          assert(false);
           diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
           return false;
         }
         ctx.data.emplace_back(CTXElement { std::static_pointer_cast<identifier>(lam->lhs), pi->lhs->type });
-        std::size_t ctx_size = ctx.data.size();
 
         if(!check(ctx, lam->rhs, pi->rhs))
           return false;
-        ctx.data.erase(ctx.data.begin() + ctx_size - 1, ctx.data.end());
+        ctx.data.erase(ctx.lookup_id(std::static_pointer_cast<identifier>(lam->lhs)), ctx.data.end());
         return true;
       }
     } // fallthrough
   // C-Sub
   default: {
-      auto A = synthesize(ctx, what); // <- we need to prevent an infinte loop
+      what->type = nullptr; // <- we need to prevent an infinte loop
+      auto A = synthesize(ctx, what);
       if(A == nullptr)
         return false;
 
@@ -277,10 +278,12 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
         hx_ast::print(b, type);
 
         // TODO: fix diagnostic location
+        assert(false);
         diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
         return false;
       }
+      what->type = type;
       return true;
     } break;
   }
@@ -288,10 +291,8 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
 
 ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 {
-  if(type_check_calls < 1 && what->type != nullptr)
+  if(what->type != nullptr)
   {
-    ++type_check_calls;
-
     // S-Annot
     if(!check(ctx, what, what->type))
       return nullptr;
@@ -299,7 +300,6 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
     return what->type;
   }
-  type_check_calls = 0;
 
   switch(what->kind)
   {
@@ -342,7 +342,6 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       ctx.data.emplace_back(alpha2);
       ctx.data.emplace_back(alpha1);
       ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), alpha1);
-      std::size_t ctx_size = ctx.data.size();
 
       // Check for type annotations
       if(lam->lhs->type != nullptr && !is_subtype(ctx, lam->lhs->type, alpha1))
@@ -352,13 +351,14 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         hx_ast::print(b, lam->lhs->type);
 
         // TODO: fix diagnostic location
+        assert(false);
         diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
         return nullptr;
       }
 
       if(!check(ctx, lam->rhs, alpha2))
         return nullptr;
-      ctx.data.erase(ctx.data.begin() + ctx_size - 1, ctx.data.end());
+      ctx.data.erase(ctx.lookup_id(std::static_pointer_cast<identifier>(lam->lhs)), ctx.data.end());
 
       auto lamid = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
       lamid->type = ctx.subst(alpha1);
@@ -411,7 +411,6 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
       auto ex_it = ctx.lookup_ex(ex);
       if(ex_it == ctx.data.end())
       {
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range {  }, ex->symb.get_string());
         return nullptr;
       }
@@ -502,6 +501,9 @@ def:
           auto alpha_it = ctx.lookup_ex(A);
           auto beta_it  = ctx.lookup_ex(B);
 
+          assert(alpha_it != ctx.data.end() && "ae must appear in the context.");
+          assert(beta_it != ctx.data.end() && "be must appear in the context.");
+
           if(alpha_it < beta_it)
             return inst_l(ctx, ae, B);
           else if(beta_it < alpha_it)
@@ -561,13 +563,11 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
 
       if(alpha_it == ctx.data.end())
       {
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
       if(beta_it == ctx.data.end())
       {
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, beta->symb.get_string());
         return false;
       }
@@ -579,7 +579,6 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
       auto alpha_it = ctx.lookup_ex(alpha);
       if(alpha_it == ctx.data.end())
       {
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
@@ -607,7 +606,6 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
       if(ctx.lookup_ex(alpha) == ctx.data.end())
       {
         // TODO: fix source_range
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
@@ -630,13 +628,11 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
 
       if(alpha_it == ctx.data.end())
       {
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
       if(beta_it == ctx.data.end())
       {
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, beta->symb.get_string());
         return false;
       }
@@ -648,7 +644,6 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
       auto alpha_it = ctx.lookup_ex(alpha);
       if(alpha_it == ctx.data.end())
       {
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
@@ -676,7 +671,6 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
       if(ctx.lookup_ex(alpha) == ctx.data.end())
       {
         // TODO: fix source_range
-        assert(false);
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }

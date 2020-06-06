@@ -56,6 +56,5 @@ private:
 
 
   const hx_ast& ast;
-  std::size_t type_check_calls { 0U };
 };
 

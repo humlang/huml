@@ -110,9 +110,8 @@ ast_ptr hx_reader::parse_lambda()
     if(!expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow))
       return mk_error();
 
-    scoping_ctx.binder_stack.emplace_back(psymb, param);
+    // No scoping, the argument implicitly is "_" so there is nothing to bind!
     auto expr = parse_expression();
-    scoping_ctx.binder_stack.pop_back();
 
     auto id = std::make_shared<identifier>("_");
     id->type = param;
