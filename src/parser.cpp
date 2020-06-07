@@ -114,7 +114,7 @@ ast_ptr hx_reader::parse_lambda()
     auto expr = parse_expression();
 
     auto id = std::make_shared<identifier>("_");
-    id->type = param;
+    id->annot = param;
     return std::make_shared<lambda>(id, expr);
   }
   // We require a lambda
@@ -154,7 +154,7 @@ ast_ptr hx_reader::parse_lambda()
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       return mk_error();
 
-    param->type = typ;
+    param->annot = typ;
   }
 
   if(!expect('.', diagnostic_db::parser::lambda_expects_dot))
@@ -211,7 +211,7 @@ ast_ptr hx_reader::parse_data_ctor()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
   
-  type_name->type = tail;
+  type_name->annot = tail;
   return std::make_shared<assign_data>(type_name, tail);
 }
 
@@ -234,7 +234,7 @@ ast_ptr hx_reader::parse_type_ctor()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
-  type_name->type = tail;
+  type_name->annot = tail;
   return std::make_shared<assign_type>(type_name, tail);
 }
 
@@ -340,7 +340,7 @@ ast_ptr hx_reader::parse_with_parentheses()
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       return mk_error();
 
-    id->type = typ;
+    id->annot = typ;
 
     if(accept(token_kind::Arrow))
     {
@@ -425,7 +425,7 @@ ast_ptr hx_reader::parse_type_check(ast_ptr left)
   if(!right)
     return mk_error();
 
-  left->type = right;
+  left->annot = right;
   
   return left;
 }

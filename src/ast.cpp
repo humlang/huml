@@ -12,7 +12,7 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
     os << "NULL";
     return;
   }
-  if(node->type != nullptr)
+  if(node->annot != nullptr)
     os << "((";
   switch(node->kind)
   {
@@ -79,10 +79,10 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
       os << "))";
     } break;                                  
   }
-  if(node->type != nullptr)
+  if(node->annot != nullptr)
   {
     os << ") : (";
-    print(os, node->type);
+    print(os, node->annot);
     os << "))";
   }
 }
@@ -172,8 +172,8 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
       assert(!binders.empty());
       binders.erase(binders.find(std::static_pointer_cast<identifier>(lam->lhs)));
 
-      if(lam->lhs->type)
-        ret = ret || used(what, lam->lhs->type, binders);
+      if(lam->lhs->annot)
+        ret = ret || used(what, lam->lhs->annot, binders);
     } break;
   case ASTNodeKind::app:         {
       app::ptr ap = std::static_pointer_cast<app>(in);
@@ -184,7 +184,7 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
         ret = true;
     } break;                                  
   }
-  return ret || (in->type ? used(what, in->type, binders) : false);
+  return ret || (in->annot ? used(what, in->annot, binders) : false);
 }
 
 bool hx_ast::type_checks() const
@@ -199,8 +199,6 @@ bool hx_ast::type_checks() const
 
     if(typ == nullptr)
       type_checks = false;
-
-    // TODO: and now? :-)
   }
 
   return type_checks;

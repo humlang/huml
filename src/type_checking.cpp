@@ -243,6 +243,11 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
         lambda::ptr pi  = std::static_pointer_cast<lambda>(type);
         lambda::ptr lam = std::static_pointer_cast<lambda>(what);
 
+        if(pi->lhs->annot != nullptr && pi->lhs->type == nullptr)
+          pi->lhs->type = pi->lhs->annot;
+        if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
+          lam->lhs->type = lam->lhs->annot;
+
         // TODO: check if lhs->type is wellformed
         if(lam->lhs->type && !is_subtype(ctx, lam->lhs->type, pi->lhs->type))
         {
@@ -251,7 +256,6 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
           hx_ast::print(b, pi->lhs->type);
 
           // TODO: fix diagnostic location
-          assert(false);
           diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
           return false;
@@ -266,7 +270,6 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
     } // fallthrough
   // C-Sub
   default: {
-      what->type = nullptr; // <- we need to prevent an infinte loop
       auto A = synthesize(ctx, what);
       if(A == nullptr)
         return false;
@@ -278,7 +281,6 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
         hx_ast::print(b, type);
 
         // TODO: fix diagnostic location
-        assert(false);
         diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
         return false;
@@ -291,14 +293,16 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
 
 ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 {
-  if(what->type != nullptr)
+  if(what->annot != nullptr)
   {
     // S-Annot
-    if(!check(ctx, what, what->type))
+    auto annot = what->annot;
+    what->annot = nullptr;
+    if(!check(ctx, what, annot))
       return nullptr;
     // TODO: check wellformedness
 
-    return what->type;
+    return what->annot = annot;
   }
 
   switch(what->kind)
@@ -343,6 +347,9 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       ctx.data.emplace_back(alpha1);
       ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), alpha1);
 
+      if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
+        lam->lhs->type = lam->lhs->annot;
+
       // Check for type annotations
       if(lam->lhs->type != nullptr && !is_subtype(ctx, lam->lhs->type, alpha1))
       {
@@ -351,7 +358,6 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         hx_ast::print(b, lam->lhs->type);
 
         // TODO: fix diagnostic location
-        assert(false);
         diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
         return nullptr;
       }
@@ -434,6 +440,9 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
   case ASTNodeKind::lambda: {
       lambda::ptr lam = std::static_pointer_cast<lambda>(A);
 
+      if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
+        lam->lhs->type = lam->lhs->annot;
+
       if(!check(ctx, e, lam->lhs->type))
         return nullptr;
       return lam->rhs;
@@ -480,6 +489,11 @@ bool hx_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
 
       lambda::ptr al = std::static_pointer_cast<lambda>(A);
       lambda::ptr bl = std::static_pointer_cast<lambda>(B);
+
+      if(al->lhs->annot != nullptr && al->lhs->type == nullptr)
+        al->lhs->type = al->lhs->annot;
+      if(bl->lhs->annot != nullptr && bl->lhs->type == nullptr)
+        bl->lhs->type = bl->lhs->annot;
 
       return is_subtype(ctx, bl->lhs->type, al->lhs->type)
         && is_subtype(ctx, ctx.subst(al->rhs), ctx.subst(bl->rhs));
@@ -583,6 +597,8 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
         return false;
       }
       lambda::ptr lam = std::static_pointer_cast<lambda>(A);
+      if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
+        lam->lhs->type = lam->lhs->annot;
       
       auto alpha1 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
       auto alpha2 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
@@ -648,6 +664,8 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
         return false;
       }
       lambda::ptr lam = std::static_pointer_cast<lambda>(A);
+      if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
+        lam->lhs->type = lam->lhs->annot;
       
       auto alpha1 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
       auto alpha2 = std::make_shared<exist>("α" + std::to_string(exist_counter++));

@@ -11,6 +11,7 @@ struct ast_base
   ASTNodeKind kind;
 
   std::shared_ptr<ast_base> type { nullptr };
+  std::shared_ptr<ast_base> annot { nullptr };
 };
 using ast_ptr = std::shared_ptr<ast_base>;
 
