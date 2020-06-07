@@ -75,6 +75,7 @@ private:
   ast_ptr parse_Kind();
   ast_ptr parse_app(ast_ptr lhs);
   ast_ptr parse_lambda();
+  ast_ptr parse_arrow_lam(ast_ptr argument);
   ast_ptr parse_keyword();
   ast_ptr parse_statement();
   ast_ptr parse_prefix();

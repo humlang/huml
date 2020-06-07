@@ -56,11 +56,13 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
   case ASTNodeKind::lambda:      {
       lambda::ptr lam = std::static_pointer_cast<lambda>(node);
 
-      if(!hx_ast::used(lam->lhs, lam->rhs))
+      if(lam->lhs->annot != nullptr && !hx_ast::used(lam->lhs, lam->rhs))
       {
-        print(os, lam->lhs);
+        os << "(";
+        print(os, lam->lhs->annot);
         os << " -> ";
         print(os, lam->rhs);
+        os << ")";
       }
       else
       {
@@ -137,6 +139,9 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
     } break;
   case ASTNodeKind::identifier:  {
       identifier::ptr id = std::static_pointer_cast<identifier>(in);
+
+      if(id->symb == symbol("_"))
+        return false;  // always just ignore the underscore
 
       if(id->binding_occurence)
       {

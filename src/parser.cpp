@@ -10,6 +10,7 @@ const ast_ptr hx_reader::error_ref = nullptr;
 
 auto token_precedence_map = tsl::robin_map<token_kind, int>( {
   {token_kind::Colon, 1},
+  {token_kind::Arrow, 1},
   {token_kind::Dot, 7},
   {token_kind::Plus, 5},
   {token_kind::Minus, 5},
@@ -430,6 +431,18 @@ ast_ptr hx_reader::parse_type_check(ast_ptr left)
   return left;
 }
 
+// Pi    (A -> B) -> C    will be    \(_ : A -> B). C
+ast_ptr hx_reader::parse_arrow_lam(ast_ptr argument)
+{
+  assert(expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow));
+
+  auto bdy = parse_expression();
+
+  auto arg = std::make_shared<identifier>("_");
+  arg->annot = argument;
+  return std::make_shared<lambda>(arg, bdy);
+}
+
 // e
 ast_ptr hx_reader::parse_expression(int precedence)
 {
@@ -453,6 +466,11 @@ ast_ptr hx_reader::parse_expression(int precedence)
       case token_kind::Doublearrow:
       {
         return prefix;
+      } break;
+
+      case token_kind::Arrow:
+      {
+        return parse_arrow_lam(prefix);
       } break;
 
       case token_kind::Colon:
