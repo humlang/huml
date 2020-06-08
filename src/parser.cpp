@@ -67,7 +67,7 @@ ast_ptr hx_reader::parse_identifier()
   auto present = std::find_if(scoping_ctx.binder_stack.rbegin(), scoping_ctx.binder_stack.rend(),
         [&id](auto x) { return x.first == id; });
 
-  if(present != scoping_ctx.binder_stack.rend() && !scoping_ctx.is_binding)
+  if(present != scoping_ctx.binder_stack.rend()) // && !scoping_ctx.is_binding)
   {
     if(id == symbol("_"))
     {
@@ -81,7 +81,12 @@ ast_ptr hx_reader::parse_identifier()
     }
   }
   else
-    return std::make_shared<identifier>(id); // <- free variable
+  {
+    auto to_ret = std::make_shared<identifier>(id); // <- free variable
+    if(scoping_ctx.is_binding)
+      scoping_ctx.binder_stack.emplace_back(id, to_ret);
+    return to_ret;
+  }
 }
 
 // e := e1 e2

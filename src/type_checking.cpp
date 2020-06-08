@@ -180,7 +180,7 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
   if(in->type != nullptr)
     to_ret->type = subst(what, for_, in->type);
   if(in->annot != nullptr)
-    to_ret->annot = subst(what, for_, in->type);
+    to_ret->annot = subst(what, for_, in->annot);
   return to_ret;
 }
 
@@ -353,6 +353,43 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
 {
   switch(what->kind)
   {
+  // C-Match
+  case ASTNodeKind::match: {
+      auto mm = std::static_pointer_cast<match>(what);
+
+      checking_pattern = true;
+      if(!check(ctx, mm->pat, type))
+      {
+        checking_pattern = false;
+        return false;
+      }
+      checking_pattern = false;
+
+      if(!check(ctx, mm->exp, type))
+        return false;
+      return true;
+    } break;
+  // C-Underscore
+  case ASTNodeKind::identifier: {
+      auto the_id = std::static_pointer_cast<identifier>(what);
+
+      if(the_id->symb == symbol("_"))
+        return true; // If the symbol is an underscore, we refine, i.e. it doesn't matter
+      if(checking_pattern) {
+        auto it = ctx.lookup_id(std::static_pointer_cast<identifier>(what));
+
+        if(it != ctx.data.end()) {
+          goto c_sub;
+        }
+        else {
+          // we check a pattern, any free variable is implicitly bound!
+          ctx.data.emplace_back(CTXElement { the_id, type });
+
+          return true;
+        }
+      }
+      goto c_sub;
+    }
   // C-Lambda
   case ASTNodeKind::lambda: {
       if(type->kind == ASTNodeKind::lambda)
@@ -386,9 +423,11 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
         ctx.data.erase(ctx.lookup_id(std::static_pointer_cast<identifier>(lam->lhs)), ctx.data.end());
         return true;
       }
+      goto c_sub;
     } // fallthrough
   // C-Sub
   default: {
+c_sub:
       auto A = synthesize(ctx, what);
       if(A == nullptr)
         return false;
@@ -491,6 +530,20 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       return what->type = std::make_shared<lambda>(lam->lhs, lam->rhs->type);
     } break;
 
+  // S-Case
+  case ASTNodeKind::pattern_matcher: {
+      pattern_matcher::ptr pm = std::static_pointer_cast<pattern_matcher>(what);
+
+      auto A = synthesize(ctx, pm->to_match);
+      if(A == nullptr)
+        return nullptr;
+
+      for(auto& r : pm->data)
+        if(!check(ctx, r, A))
+          return nullptr;
+      return A;
+    } break;
+
   // S-Assign
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(what);
@@ -523,6 +576,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       return what->type = synthesize(ctx, ex->lhs);
     } break;
   }
+  assert(false && "Unimplemented synthesis.");
   return nullptr;
 }
 
