@@ -43,7 +43,7 @@ namespace hx
     typing_context tctx;
     scoping_context sctx;
 
-    std::size_t failed_inputs;
+    std::size_t failed_inputs { 0 };
   };
 
 }

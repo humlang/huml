@@ -125,6 +125,16 @@ R"(
 
   void REPL::process_command(const std::string& line)
   {
+    bool failed = false;
+    struct Guard
+    { Guard(bool& f, std::size_t& in) : f(f), in(in) {}
+      ~Guard() { if(f) in++; else in = 0; }
+
+      bool& f;
+      std::size_t& in;
+    };
+    Guard guard(failed, failed_inputs);
+
     if(line == "'quit" || std::cin.eof())
       quit();
     else if(line == "'history")
@@ -136,13 +146,19 @@ R"(
     }
     else
     {
+      if(line.empty())
+        return;
       auto [global_ir, new_sctx] = hx_reader::read_text(line, std::move(sctx));
       sctx = std::move(new_sctx);
 
       if(global_ir.data.empty())
       {
-        if(failed_inputs++ > 1)
+        if(failed_inputs > 1)
+        {
           std::cout << "Type \"'quit\" or hit Ctrl-D to quit.\n";
+        }
+        failed = true;
+        diagnostic.reset();
         return;
       }
       if(!diagnostic.empty())
