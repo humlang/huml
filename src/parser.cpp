@@ -76,7 +76,8 @@ ast_ptr hx_reader::parse_identifier()
     }
     else
     {
-      return std::make_shared<identifier>(id, present->second);
+      // literally use the binding as reference
+      return present->second;
     }
   }
   else
@@ -211,6 +212,8 @@ ast_ptr hx_reader::parse_data_ctor()
   auto tail = parse_expression();
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
+
+  scoping_ctx.binder_stack.emplace_back(type_name_id, type_name);
   
   type_name->annot = tail;
   return std::make_shared<assign_data>(type_name, tail);
@@ -235,6 +238,8 @@ ast_ptr hx_reader::parse_type_ctor()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     return mk_error();
 
+  scoping_ctx.binder_stack.emplace_back(type_name_id, type_name);
+
   type_name->annot = tail;
   return std::make_shared<assign_type>(type_name, tail);
 }
@@ -251,6 +256,7 @@ ast_ptr hx_reader::parse_assign()
     return mk_error();
   auto arg = parse_expression();
 
+  scoping_ctx.binder_stack.emplace_back(var_symb, var);
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
   {
     source_range loc = {};
@@ -498,6 +504,9 @@ std::vector<hx_ast> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
 
+  scoping_context ctx;
+  r.scoping_ctx = ctx;
+
   hx_ast ast;
   while(r.current.kind != token_kind::EndOfFile)
   {
@@ -515,6 +524,29 @@ std::vector<hx_ast> hx_reader::read(std::string_view module)
 }
 
 template<>
+std::vector<std::pair<hx_ast, scoping_context>> hx_reader::read_with_ctx(std::string_view module, scoping_context&& ctx)
+{
+  hx_reader r(module);
+
+  r.scoping_ctx = ctx;
+
+  hx_ast ast;
+  while(r.current.kind != token_kind::EndOfFile)
+  {
+    auto stmt = r.parse_statement();
+
+    if(stmt == r.error_ref)
+      continue; // please fix it, user
+
+    ast.data.push_back(stmt);
+  }
+  if(ast.data.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
+
+  return { { ast, r.scoping_ctx } };
+}
+
+template<>
 std::vector<token> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
@@ -528,6 +560,29 @@ std::vector<token> hx_reader::read(std::string_view module)
   if(toks.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
     diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
   return toks;
+}
+
+std::pair<hx_ast, scoping_context> hx_reader::read_text(const std::string& text, scoping_context&& ctx)
+{
+  std::stringstream ss(text);
+  hx_reader r(ss);
+
+  r.scoping_ctx = ctx;
+
+  hx_ast ast;
+  while(r.current.kind != token_kind::EndOfFile)
+  {
+    auto stmt = r.parse_statement();
+
+    if(stmt == r.error_ref)
+      continue; // please fix it, user
+
+    ast.data.push_back(stmt);
+  }
+  if(ast.data.empty() && diagnostic.empty()) // only emit "empty module" if there hasn't been any diagnostic anyway
+    diagnostic <<= diagnostic_db::parser::empty_module(r.current.loc);
+
+  return { ast, r.scoping_ctx };
 }
 
 int hx_reader::precedence() {

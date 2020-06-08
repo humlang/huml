@@ -54,9 +54,6 @@ json::json fixit(const source_range& range, const fixit_info& info)
 
 }
 
-diagnostics_manager::~diagnostics_manager()
-{ assert(printed && "Messages have been printed."); }
-
 diagnostics_manager& diagnostics_manager::operator<<=(const json::json& msg)
 {
   std::lock_guard<std::mutex> guard(mut);
@@ -74,8 +71,6 @@ diagnostics_manager& diagnostics_manager::operator<<=(const json::json& msg)
 
 void diagnostics_manager::print(std::FILE* file)
 {
-  if(printed)
-    return;
   std::lock_guard<std::mutex> guard(mut);
   for(auto& w : data)
   {
@@ -196,7 +191,6 @@ void diagnostics_manager::print(std::FILE* file)
       fmt::print(file, fg(fmt::color::white), "\n");
     }
   }
-  printed = true;
 }
 
 int diagnostics_manager::error_code() const

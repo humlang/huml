@@ -1,5 +1,8 @@
 #include <repl.hpp>
+#include <reader.hpp>
 #include <assembler.hpp>
+#include <diagnostic.hpp>
+#include <type_checking.hpp>
 
 #include <fmt/format.h>
 
@@ -22,6 +25,7 @@ bool prompt_yes_no()
   return answer == "Y"   || answer == "y"   || answer.empty()
       || answer == "yes" || answer == "YES" || answer == "Yes";
 }
+
 
 template<typename T>
 void base_repl<T>::quit()
@@ -59,6 +63,123 @@ void base_repl<T>::write()
 
   fmt::print("\nState written to \"{}\".\n", filepath);
 }
+
+template struct base_repl<hx::REPL>;
+template struct base_repl<virt::REPL>;
+
+
+namespace hx
+{
+  REPL::REPL(std::string_view t) : base_repl()
+  {
+    if(t == "STDIN")
+      return;
+    auto w = hx_reader::read_with_ctx<hx_ast>(t, std::move(sctx));
+    sctx = std::move(w.back().second);
+
+    auto& global_ir = w.back().first;
+    if(!diagnostic.empty())
+    {
+      diagnostic.print(stdout);
+      diagnostic.reset();
+    }
+
+    hx_ast_type_checking checker(global_ir);
+    for(auto& r : global_ir.data)
+    {
+      auto typ = checker.find_type(tctx, r);
+      if(!diagnostic.empty())
+      {
+        diagnostic.print(stdout);
+        diagnostic.reset();
+      }
+      else
+      {
+        global_ir.print(std::cout, typ);
+        std::cout << "\n";
+      }
+    }
+  }
+
+  void REPL::run_impl()
+  {
+  std::cout << 
+R"(
+    ─┐   ╷   ┌─┐ ┌┐╷ ┌─┐
+    ┌┘ ─ │   ├─┤ │││ │┌┐
+    •    └── ╵ ╵ ╵└┘ └─┘
+    
+)";
+  //  std::cout << ">> Welcome to hx-lang. Happy Hacking!\n";
+
+    while(!stopped)
+    {
+      std::cout << "><(typ-c)°> ";
+
+      std::string line;
+      std::getline(std::cin, line);
+
+      process_command(line);
+    }
+  }
+
+  void REPL::process_command(const std::string& line)
+  {
+    if(line == "'quit" || std::cin.eof())
+      quit();
+    else if(line == "'history")
+      history();
+    else if(line == "'clear-context")
+    {
+      sctx.binder_stack.clear();
+      tctx.data.clear();
+    }
+    else
+    {
+      auto [global_ir, new_sctx] = hx_reader::read_text(line, std::move(sctx));
+      sctx = std::move(new_sctx);
+
+      if(global_ir.data.empty())
+      {
+        if(failed_inputs++ > 1)
+          std::cout << "Type \"'quit\" or hit Ctrl-D to quit.\n";
+        return;
+      }
+      if(!diagnostic.empty())
+      {
+        diagnostic.print(stdout);
+        diagnostic.reset();
+      }
+      hx_ast_type_checking checker(global_ir);
+
+      for(auto& r : global_ir.data)
+      {
+        if(r == nullptr)
+          continue;
+
+        auto typ = checker.find_type(tctx, r);
+        if(!diagnostic.empty())
+        {
+          diagnostic.print(stdout);
+          diagnostic.reset();
+        }
+
+        if(typ == nullptr)
+          std::cout << "Could not synthesize type.\n";
+        else
+        {
+          if(r->kind == ASTNodeKind::expr_stmt)
+          {
+            global_ir.print_as_type(std::cout, typ);
+            std::cout << "\n";
+          }
+        }
+      }
+    }
+    commands.emplace_back(line);
+  }
+}
+
 
 namespace virt
 {
@@ -192,5 +313,4 @@ namespace virt
     fmt::print("\nState loaded from \"{}\".\n", filepath);
   }
 }
-
 

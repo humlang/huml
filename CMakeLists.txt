@@ -6,6 +6,7 @@ set(hx-lang_files src/token.cpp
   src/parser.cpp
   src/tokenizer.cpp
   src/ast.cpp
+  src/repl.cpp
   src/symbol.cpp
   src/source_range.cpp
   src/diagnostic.cpp
@@ -14,6 +15,8 @@ set(hx-lang_files src/token.cpp
   src/fixit_info.cpp
   src/compiler.cpp
   src/type_checking.cpp
+  src/vm.cpp
+  src/assembler.cpp
   )
 
 set(hx-lang_vm_files src/vm.cpp

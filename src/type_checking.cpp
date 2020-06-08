@@ -43,8 +43,8 @@ bool eqb(ast_ptr A, ast_ptr B)
     return true;
 
   case ASTNodeKind::identifier: {
-      return std::static_pointer_cast<identifier>(A)->symb == std::static_pointer_cast<identifier>(B)->symb
-        && eqb(std::static_pointer_cast<identifier>(A)->binding_occurence, std::static_pointer_cast<identifier>(B)->binding_occurence);
+      // pointer to an identifier are equal if they have the same binding
+      return A == B;
     } break;
 
   case ASTNodeKind::app: {
@@ -100,6 +100,59 @@ bool eqb(ast_ptr A, ast_ptr B)
     } break;
   }
   return false;
+}
+
+ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
+{
+  ast_ptr to_ret = in;
+  if(eqb(what, in))
+  {
+    to_ret = for_;
+  }
+  else
+  {
+    switch(in->kind)
+    {
+    default: to_ret = in; break;
+
+    case ASTNodeKind::app: {
+        app::ptr a = std::static_pointer_cast<app>(in);
+
+        auto x = subst(what, for_, a->lhs);
+        auto y = subst(what, for_, a->rhs);
+
+        to_ret = std::make_shared<app>(x, y);
+      } break;
+
+    case ASTNodeKind::lambda: {
+        lambda::ptr a = std::static_pointer_cast<lambda>(in);
+
+        if(a->lhs->type != nullptr)
+          a->lhs->type = subst(what, for_, a->lhs->type);
+        if(a->lhs->annot != nullptr)
+          a->lhs->annot = subst(what, for_, a->lhs->annot);
+        auto y = subst(what, for_, a->rhs);
+
+        to_ret = std::make_shared<lambda>(a->lhs, y);
+      } break;
+
+
+    case ASTNodeKind::exist: {
+        exist::ptr a = std::static_pointer_cast<exist>(in);
+
+        if(a->is_solved())
+          to_ret = subst(what, for_, a->solution);
+        else
+          to_ret = a;
+      } break;
+    }
+  }
+
+  if(in->type != nullptr)
+    to_ret->type = subst(what, for_, in->type);
+  if(in->annot != nullptr)
+    to_ret->annot = subst(what, for_, in->type);
+  return to_ret;
 }
 
 bool has_existentials(ast_ptr a)
@@ -216,7 +269,7 @@ typing_context::pos typing_context::lookup_ex(ast_ptr ex) const
 
 typing_context::pos typing_context::lookup_id(typing_context::pos begin, identifier::ptr id) const
 {
-  return std::find_if(begin, data.end(), [id = id->binding_occurence ? id->binding_occurence : id]
+  return std::find_if(begin, data.end(), [id]
       (auto& elem) { return eqb(elem.id_def, id) && elem.type != nullptr && elem.existential == nullptr; });
 }
 
@@ -264,6 +317,8 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
 
         if(!check(ctx, lam->rhs, pi->rhs))
           return false;
+        lam->lhs->type = ctx.subst(pi->lhs->type);
+        lam->rhs->type = ctx.subst(pi->rhs->type);
         ctx.data.erase(ctx.lookup_id(std::static_pointer_cast<identifier>(lam->lhs)), ctx.data.end());
         return true;
       }
@@ -366,9 +421,10 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         return nullptr;
       ctx.data.erase(ctx.lookup_id(std::static_pointer_cast<identifier>(lam->lhs)), ctx.data.end());
 
-      auto lamid = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
-      lamid->type = ctx.subst(alpha1);
-      return what->type = std::make_shared<lambda>(lamid, ctx.subst(alpha2));
+      lam->lhs->type = ctx.subst(alpha1);
+      lam->rhs->type = ctx.subst(alpha2);
+
+      return what->type = std::make_shared<lambda>(lam->lhs, lam->rhs->type);
     } break;
 
   // S-Assign
@@ -445,7 +501,10 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
 
       if(!check(ctx, e, lam->lhs->type))
         return nullptr;
-      return lam->rhs;
+
+      // TODO: make substitution/execution more efficient.
+      // TODO: reduce e to a value.....?
+      return subst(lam->lhs, e, lam->rhs);
     } break;
 
   default: {
@@ -606,15 +665,12 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
       alpha_it = ctx.data.insert(alpha_it, alpha1);
       alpha_it = ctx.data.insert(alpha_it, alpha2);
 
-      auto lamid = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
-      lamid->type = alpha1;
-      alpha->solution = std::make_shared<lambda>(lamid, alpha2);
 
       bool fst = is_subtype(ctx, lam->lhs->type, alpha1);
-      lamid->type = ctx.subst(alpha1);
       bool snd = is_subtype(ctx, alpha2, ctx.subst(lam->rhs));
-      std::static_pointer_cast<lambda>(alpha->solution)->rhs = ctx.subst(alpha2);
-
+      
+      lam->lhs->type = ctx.subst(alpha1);
+      alpha->solution = std::make_shared<lambda>(lam->lhs, ctx.subst(alpha2));
       return fst && snd;
     } break;
   // <=L-Solve
@@ -673,14 +729,12 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
       alpha_it = ctx.data.insert(alpha_it, alpha1);
       alpha_it = ctx.data.insert(alpha_it, alpha2);
 
-      auto lamid = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
-      lamid->type = alpha1;
-      alpha->solution = std::make_shared<lambda>(lamid, alpha2);
 
       bool fst = is_subtype(ctx, lam->lhs->type, alpha1);
-      lamid->type = alpha1;
       bool snd = is_subtype(ctx, alpha2, ctx.subst(lam->rhs));
-      std::static_pointer_cast<lambda>(alpha->solution)->rhs = ctx.subst(alpha2);
+
+      lam->lhs->type = ctx.subst(alpha1);
+      alpha->solution = std::make_shared<lambda>(lam->lhs, ctx.subst(alpha2));
 
       return fst && snd;
     } break;

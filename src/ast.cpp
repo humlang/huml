@@ -143,26 +143,14 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
       if(id->symb == symbol("_"))
         return false;  // always just ignore the underscore
 
-      if(id->binding_occurence)
+      if(what->kind != ASTNodeKind::identifier)
+        ret = false;
+      else
       {
-        assert(id->binding_occurence->kind == ASTNodeKind::identifier && "Bug in parser.");
-
-        if(what->kind != ASTNodeKind::identifier)
-          ret = false;
         identifier::ptr whatid = std::static_pointer_cast<identifier>(what);
 
         // Variable is only used if the context hasn't seen its binder before
-        ret = whatid->symb == id->symb && !binders.contains(std::static_pointer_cast<identifier>(id->binding_occurence));
-      }
-      else
-      {
-        // id is not bound
-        if(what->kind == ASTNodeKind::identifier)
-        {
-          identifier::ptr other = std::static_pointer_cast<identifier>(what);
-
-          ret = id->symb == other->symb;
-        }
+        ret = whatid->symb == id->symb && !binders.contains(std::static_pointer_cast<identifier>(id));
       }
     } break;
   case ASTNodeKind::lambda:      {
@@ -209,3 +197,65 @@ bool hx_ast::type_checks() const
   return type_checks;
 }
 
+void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
+{
+  if(node == nullptr)
+  {
+    os << "NULL";
+    return;
+  }
+  if(node->type != nullptr)
+    os << "((";
+  switch(node->kind)
+  {
+  case ASTNodeKind::exist: os << "EXIST"; break;
+  case ASTNodeKind::Kind: os << "Kind"; break;
+  case ASTNodeKind::Type: os << "Type"; break;
+  case ASTNodeKind::Prop: os << "Prop"; break;
+  case ASTNodeKind::unit: os << "()"; break;
+
+  case ASTNodeKind::assign:
+  case ASTNodeKind::assign_data:
+  case ASTNodeKind::assign_type:
+  case ASTNodeKind::expr_stmt:
+                          assert(false && "Statements are no types."); break;
+
+  case ASTNodeKind::identifier:  {
+      identifier::ptr id = std::static_pointer_cast<identifier>(node);
+      os << id->symb.get_string();
+    } break;
+  case ASTNodeKind::lambda:      {
+      lambda::ptr lam = std::static_pointer_cast<lambda>(node);
+
+      if(lam->lhs->type != nullptr && !hx_ast::used(lam->lhs, lam->rhs))
+      {
+        os << "(";
+        print_as_type(os, lam->lhs->type);
+        os << " -> ";
+        print_as_type(os, lam->rhs);
+        os << ")";
+      }
+      else
+      {
+        os << "\\";
+        print_as_type(os, lam->lhs);
+        os << ". ";
+        print_as_type(os, lam->rhs);
+      }
+    } break;
+  case ASTNodeKind::app:         {
+      app::ptr ap = std::static_pointer_cast<app>(node);
+      os << "((";
+      print_as_type(os, ap->lhs);
+      os << ") (";
+      print_as_type(os, ap->rhs);
+      os << "))";
+    } break;                                  
+  }
+  if(node->type != nullptr)
+  {
+    os << ") : (";
+    print_as_type(os, node->type);
+    os << "))";
+  }
+}

@@ -1,6 +1,7 @@
 #include <compiler.hpp>
 #include <reader.hpp>
 #include <token.hpp>
+#include <repl.hpp>
 #include <ast.hpp>
 
 #include <iostream>
@@ -32,6 +33,12 @@ void printer<print_newline>::indent(std::size_t depth)
 static const std::map<emit_classes, std::function<void(std::string_view)>> emitter =
 {
   { emit_classes::help, [](auto){ assert(false); } },
+  { emit_classes::repl, [](std::string_view t)
+    {
+      hx::REPL repl(t);
+
+      repl.run();
+    } },
   { emit_classes::ast_print, [](std::string_view t)
     {
       auto w = hx_reader::read<hx_ast>(t);

@@ -60,8 +60,8 @@ EOF
 
   echo "$output" > /tmp/hx_lang_test_out1
   cat <<EOF > /tmp/hx_lang_test_out2
-\((A) : (Type)). \((f) : (((A -> A) -> A))). ((f) (\((x) : (A)). x));
-\((A) : (Type)). \((f) : ((A -> (A -> A)))). ((f) (\((x) : (A)). x));
+\((A) : (Type)). \((f) : (((((A) : (Type)) -> ((A) : (Type))) -> ((A) : (Type))))). ((((f) : (((((A) : (Type)) -> ((A) : (Type))) -> ((A) : (Type)))))) (\((x) : (((A) : (Type)))). ((x) : (((A) : (Type))))));
+\((A) : (Type)). \((f) : ((((A) : (Type)) -> (((A) : (Type)) -> ((A) : (Type)))))). ((((f) : ((((A) : (Type)) -> (((A) : (Type)) -> ((A) : (Type))))))) (\((x) : (((A) : (Type)))). ((x) : (((A) : (Type))))));
 EOF
 
   diff /tmp/hx_lang_test_out1 /tmp/hx_lang_test_out2

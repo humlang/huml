@@ -10,7 +10,7 @@ struct CTXElement
   {  }
 
   CTXElement(identifier::ptr id, ast_ptr type)
-    : id_def(id->binding_occurence ? std::static_pointer_cast<identifier>(id->binding_occurence) : id), type(type)
+    : id_def(id), type(type)
   {  }
 
   std::shared_ptr<exist> existential { nullptr }; 

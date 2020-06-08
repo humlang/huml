@@ -19,12 +19,11 @@ struct identifier : ast_base
 {
   using ptr = std::shared_ptr<identifier>;
 
-  identifier(symbol symb, ast_ptr binding_occurence = nullptr)
-    : ast_base(ASTNodeKind::identifier), symb(symb), binding_occurence(binding_occurence)
+  identifier(symbol symb)
+    : ast_base(ASTNodeKind::identifier), symb(symb)
   {  }
 
   symbol symb;
-  ast_ptr binding_occurence;
 };
 
 struct unit : ast_base
@@ -108,6 +107,7 @@ struct hx_ast
 {
   void print(std::ostream& os) const;
   static void print(std::ostream& os, ast_ptr node);
+  static void print_as_type(std::ostream& os, ast_ptr node);
 
   static bool used(ast_ptr what, ast_ptr in)
   { tsl::robin_set<identifier::ptr> binders; return used(what, in, binders); }

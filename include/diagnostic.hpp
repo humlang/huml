@@ -63,8 +63,6 @@ struct diagnostics_manager
 private:
   diagnostics_manager()  {  }
 public:
-  ~diagnostics_manager();
-
   static diagnostics_manager& make()
   {
     static diagnostics_manager diag;
@@ -85,12 +83,6 @@ private:
   int err { 0 };
   bool _print_codes { true };
   std::mutex mut;
-
-#ifndef H_LANG_TESTING
-  bool printed { false };
-#else
-  bool printed { true  };
-#endif
 };
 
 inline diagnostics_manager& diagnostic = diagnostics_manager::make();

@@ -37,6 +37,12 @@ private:
 
 /// HX_READER
 
+struct scoping_context
+{
+  bool is_binding { false };
+  std::vector<std::pair<symbol, ast_ptr>> binder_stack;
+};
+
 class hx_reader : base_reader
 {
 public:
@@ -45,8 +51,23 @@ public:
 
   template<typename T>
   static std::vector<T> read(std::string_view module) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
+
+  template<typename T>
+  static std::vector<std::pair<T, scoping_context>> read_with_ctx(std::string_view module, scoping_context&& ctx)
+  { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
+
+  static std::pair<hx_ast, scoping_context> read_text(const std::string& str, scoping_context&& ctx);
 private:
   hx_reader(std::string_view module) : base_reader(module)
+  {
+    for(std::size_t i = 0; i < next_toks.size(); ++i)
+      consume();
+
+    // need one additional consume to initialize `current`
+    consume(); 
+  }
+
+  hx_reader(std::istream& is) : base_reader(is)
   {
     for(std::size_t i = 0; i < next_toks.size(); ++i)
       consume();
@@ -86,12 +107,6 @@ private:
   token old;
   token current;
   std::array<token, lookahead_size> next_toks;
-
-  struct scoping_context
-  {
-    bool is_binding { false };
-    std::vector<std::pair<symbol, ast_ptr>> binder_stack;
-  };
   scoping_context scoping_ctx;
 
   bool parsing_pattern { false };
