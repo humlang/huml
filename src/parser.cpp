@@ -275,7 +275,10 @@ ast_ptr hx_reader::parse_assign()
 
     return mk_error();
   }
-  return std::make_shared<assign>(var, arg);
+  auto ass = std::make_shared<assign>(var, arg);
+  ass->lhs->annot = arg->annot;
+
+  return ass;
 }
 
 ast_ptr hx_reader::parse_expr_stmt()

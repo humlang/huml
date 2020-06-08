@@ -152,6 +152,7 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
           a->lhs->type = subst(what, for_, a->lhs->type);
         if(a->lhs->annot != nullptr)
           a->lhs->annot = subst(what, for_, a->lhs->annot);
+
         auto y = subst(what, for_, a->rhs);
 
         to_ret = std::make_shared<lambda>(a->lhs, y);
@@ -181,6 +182,7 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
     to_ret->type = subst(what, for_, in->type);
   if(in->annot != nullptr)
     to_ret->annot = subst(what, for_, in->annot);
+
   return to_ret;
 }
 
@@ -255,6 +257,9 @@ ast_ptr hx_ast_type_checking::find_type(typing_context& ctx, ast_ptr of)
 
 ast_ptr typing_context::subst(ast_ptr what)
 {
+  if(what == nullptr)
+    return nullptr;
+
   if(what->type != nullptr)
     what->type = subst(what->type);
   switch(what->kind)
@@ -460,7 +465,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       return nullptr;
     // TODO: check wellformedness
 
-    return what->annot = annot;
+    return what->type = what->annot = annot;
   }
 
   switch(what->kind)
@@ -544,9 +549,19 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       return A;
     } break;
 
-  // S-Assign
+  // S-Assign   /   S-OracleAssign
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(what);
+
+      if(as->lhs->annot != nullptr)
+      {
+        // TODO: check if annotation is wellformed
+        ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), as->lhs->annot);
+
+        if(!check(ctx, as->rhs, as->lhs->annot))
+          return nullptr;
+        return as->lhs->annot;
+      }
 
       auto A = synthesize(ctx, as->rhs);
       if(A == nullptr)
