@@ -182,20 +182,49 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
       
       if(used(what, lam->rhs, binders))
         ret = true;
-      assert(!binders.empty());
-      binders.erase(binders.find(std::static_pointer_cast<identifier>(lam->lhs)));
+      else
+      {
+        assert(!binders.empty());
+        binders.erase(binders.find(std::static_pointer_cast<identifier>(lam->lhs)));
 
-      if(lam->lhs->annot)
-        ret = ret || used(what, lam->lhs->annot, binders);
+        if(lam->lhs->annot)
+          ret = used(what, lam->lhs->annot, binders);
+      }
     } break;
   case ASTNodeKind::app:         {
       app::ptr ap = std::static_pointer_cast<app>(in);
 
       if(used(what, ap->lhs, binders))
         ret = true;
-      if(used(what, ap->rhs, binders))
+      else if(used(what, ap->rhs, binders))
         ret = true;
     } break;                                  
+  case ASTNodeKind::pattern_matcher: {
+      pattern_matcher::ptr pm = std::static_pointer_cast<pattern_matcher>(in);
+
+      if(used(what, pm->to_match))
+        ret = true;
+      else
+      {
+        for(auto& p : pm->data)
+        {
+          if(used(what, p))
+          {
+            ret = true;
+            break;
+          }
+        }
+      }
+    } break;
+  case ASTNodeKind::match: {
+      match::ptr mm = std::static_pointer_cast<match>(in);
+
+      // TODO: FIX. This messes up things, since to_match might bind identifiers
+      if(used(what, mm->pat))
+        ret = true;
+      else
+        ret = used(what, mm->exp);
+    } break;
   }
   return ret || (in->annot ? used(what, in->annot, binders) : false);
 }
@@ -271,6 +300,26 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
       print_as_type(os, ap->rhs);
       os << "))";
     } break;                                  
+  case ASTNodeKind::match: {
+      match::ptr mm = std::static_pointer_cast<match>(node);
+      
+      print_as_type(os, mm->pat);
+      os << " => ";
+      print_as_type(os, mm->exp);
+    } break;
+  case ASTNodeKind::pattern_matcher: {
+      pattern_matcher::ptr pm = std::static_pointer_cast<pattern_matcher>(node);
+
+      os << "case (";
+      print_as_type(os, pm->to_match);
+      os << ") [";
+      for(auto it = pm->data.begin(); it != pm->data.end(); ++it)
+      {
+        print_as_type(os, *it);
+        if(std::next(it) != pm->data.end())
+          os << " | ";
+      }
+    } break;
   }
   if(node->type != nullptr)
   {

@@ -61,6 +61,27 @@ bool eqb(ast_ptr A, ast_ptr B)
       return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
     } break;
 
+  case ASTNodeKind::pattern_matcher: {
+      pattern_matcher::ptr a = std::static_pointer_cast<pattern_matcher>(A);
+      pattern_matcher::ptr b = std::static_pointer_cast<pattern_matcher>(B);
+
+      if(!eqb(a->to_match, b->to_match))
+        return false;
+      if(a->data.size() != b->data.size())
+        return false;
+      for(std::size_t i = 0; i < a->data.size(); ++i)
+        if(!eqb(a->data[i], b->data[i]))
+          return false;
+      return true;
+    } break;
+
+  case ASTNodeKind::match: {
+      match::ptr a = std::static_pointer_cast<match>(A);
+      match::ptr b = std::static_pointer_cast<match>(B);
+
+      return eqb(a->pat, b->pat) && eqb(a->exp, b->exp);
+    } break;
+
 
   case ASTNodeKind::expr_stmt: {
       expr_stmt::ptr a = std::static_pointer_cast<expr_stmt>(A);
@@ -136,6 +157,14 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
         to_ret = std::make_shared<lambda>(a->lhs, y);
       } break;
 
+    case ASTNodeKind::pattern_matcher: {
+        assert(false && "TODO: Make sure the binding works as expected.");
+      } break;
+
+    case ASTNodeKind::match: {
+        assert(false && "TODO: Make sure the binding works as expected.");
+      } break;
+
 
     case ASTNodeKind::exist: {
         exist::ptr a = std::static_pointer_cast<exist>(in);
@@ -171,6 +200,20 @@ bool has_existentials(ast_ptr a)
   case ASTNodeKind::lambda: {
     lambda::ptr al = std::static_pointer_cast<lambda>(a);
     return has_existentials(al->lhs) || has_existentials(al->rhs);
+  } break;
+  case ASTNodeKind::pattern_matcher: {
+    pattern_matcher::ptr pm = std::static_pointer_cast<pattern_matcher>(a);
+    if(has_existentials(pm->to_match))
+      return true;
+    for(auto& r : pm->data)
+      if(has_existentials(r))
+        return true;
+    return false;
+  } break;
+  case ASTNodeKind::match: {
+    match::ptr am = std::static_pointer_cast<match>(a);
+
+    return has_existentials(am->pat) || has_existentials(am->exp);
   } break;
 
   case ASTNodeKind::expr_stmt: {
@@ -239,6 +282,27 @@ ast_ptr typing_context::subst(ast_ptr what)
       auto rhs = subst(lam->rhs);
 
       return std::make_shared<lambda>(lhs, rhs);
+    } break;
+
+  case ASTNodeKind::pattern_matcher: {
+      pattern_matcher::ptr pm = std::static_pointer_cast<pattern_matcher>(what);
+
+      auto p = subst(pm->to_match);
+
+      std::vector<ast_ptr> arms;
+      for(auto& r : pm->data)
+        arms.emplace_back(subst(r));
+
+      return std::make_shared<pattern_matcher>(p, arms);
+    } break;
+  
+  case ASTNodeKind::match: {
+      match::ptr am = std::static_pointer_cast<match>(what);
+
+      auto lhs = subst(am->pat);
+      auto rhs = subst(am->exp);
+
+      return std::make_shared<match>(lhs, rhs);
     } break;
 
   case ASTNodeKind::exist: {
