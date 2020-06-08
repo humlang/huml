@@ -60,6 +60,29 @@ struct lambda : ast_base
   ast_ptr rhs;
 };
 
+struct match : ast_base
+{
+  using ptr = std::shared_ptr<match>;
+
+  match(ast_ptr pat, ast_ptr exp) : ast_base(ASTNodeKind::match), pat(pat), exp(exp)
+  {  }
+
+  ast_ptr pat;
+  ast_ptr exp;
+};
+
+struct pattern_matcher : ast_base
+{
+  using ptr = std::shared_ptr<pattern_matcher>;
+
+  pattern_matcher(ast_ptr to_match, std::vector<ast_ptr> patterns)
+    : ast_base(ASTNodeKind::pattern_matcher), to_match(to_match), data(patterns)
+  {  }
+
+  ast_ptr to_match;
+  std::vector<ast_ptr> data;
+};
+
 struct assign : ast_base
 {
   using ptr = std::shared_ptr<assign>;

@@ -88,6 +88,7 @@ private:
   ast_ptr parse_type_ctor();
   ast_ptr parse_data_ctor();
 
+  ast_ptr parse_case();
   ast_ptr parse_with_parentheses();
   ast_ptr parse_type_check(ast_ptr left);
   ast_ptr parse_identifier();

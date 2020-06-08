@@ -13,7 +13,6 @@ enum class ASTNodeKind : std::int_fast8_t
   unit,
   app,
   lambda,
-  pattern,
   match,
   pattern_matcher,
   identifier,

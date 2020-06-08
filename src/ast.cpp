@@ -80,6 +80,26 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
       print(os, ap->rhs);
       os << "))";
     } break;                                  
+  case ASTNodeKind::match: {
+      match::ptr mm = std::static_pointer_cast<match>(node);
+      
+      print(os, mm->pat);
+      os << " => ";
+      print(os, mm->exp);
+    } break;
+  case ASTNodeKind::pattern_matcher: {
+      pattern_matcher::ptr pm = std::static_pointer_cast<pattern_matcher>(node);
+
+      os << "case (";
+      print(os, pm->to_match);
+      os << ") [";
+      for(auto it = pm->data.begin(); it != pm->data.end(); ++it)
+      {
+        print(os, *it);
+        if(std::next(it) != pm->data.end())
+          os << " | ";
+      }
+    } break;
   }
   if(node->annot != nullptr)
   {

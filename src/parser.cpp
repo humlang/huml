@@ -67,7 +67,7 @@ ast_ptr hx_reader::parse_identifier()
   auto present = std::find_if(scoping_ctx.binder_stack.rbegin(), scoping_ctx.binder_stack.rend(),
         [&id](auto x) { return x.first == id; });
 
-  if(present != scoping_ctx.binder_stack.rend())
+  if(present != scoping_ctx.binder_stack.rend() && !scoping_ctx.is_binding)
   {
     if(id == symbol("_"))
     {
@@ -319,9 +319,46 @@ ast_ptr hx_reader::parse_keyword()
   case hash_string("Type"): return parse_Type();
   case hash_string("Kind"): return parse_Kind();
   case hash_string("Prop"): return parse_Prop();
+  case hash_string("case"): return parse_case();
   }
   assert(false && "bug in lexer, we would not see a keyword token otherwise");
   return mk_error();
+}
+
+// e := `case` e `[` p1 `=>` e1 `|` ... `|` pN `=>` eN `]`
+ast_ptr hx_reader::parse_case()
+{
+  assert(expect(token_kind::Keyword, diagnostic_db::parser::case_expects_keyword));
+
+  auto what_to_match = parse_expression();
+
+  if(!expect('[', diagnostic_db::parser::case_expects_lbracket))
+    return mk_error();
+
+  std::vector<ast_ptr> match_arms;
+  if(current.kind != token_kind::LBracket)
+  {
+    // we actually have match arms
+    do
+    {
+      parsing_pattern = true;
+      scoping_ctx.is_binding = true;
+      auto pat = parse_expression();
+      scoping_ctx.is_binding = false;
+      parsing_pattern = false;
+
+      if(!expect(token_kind::Doublearrow, diagnostic_db::parser::pattern_expects_double_arrow))
+        return mk_error();
+
+      auto expr = parse_expression();
+
+      match_arms.emplace_back(std::make_shared<match>(pat, expr));
+    } while(accept('|'));
+  }
+  if(!expect(']', diagnostic_db::parser::case_expects_rbracket))
+    return mk_error();
+
+  return std::make_shared<pattern_matcher>(what_to_match, match_arms);
 }
 
 ast_ptr hx_reader::parse_with_parentheses()
