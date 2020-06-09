@@ -240,7 +240,7 @@ bool has_existentials(ast_ptr a)
 
 ast_ptr hx_ast_type_checking::find_type(typing_context& ctx, ast_ptr of)
 {
-  auto A = synthesize(ctx, of); //cleanup(ctx, synthesize(ctx, of));
+  auto A = synthesize(ctx, of); 
 
   if(A != nullptr && has_existentials(A))
   {

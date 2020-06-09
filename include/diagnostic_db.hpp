@@ -81,6 +81,7 @@ db_entry_arg(error, pi_requires_explicit_domain, "Pi type requires a domain intr
 
 namespace sema
 {
+db_entry_arg(error, disallow_recursion, "\"{}\" was seen before and must not occur in this statement again.");
 db_entry_arg(error, id_not_in_context, "\"{}\" was never seen before.");
 db_entry_arg2(error, not_a_subtype, "\"{}\" is not a subtype of \"{}\".");
 db_entry_arg2(error, free_var_in_type, "\"{}\" must not occur in \"{}\".");

@@ -178,7 +178,7 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
       assert(lam->lhs->kind == ASTNodeKind::identifier && "Bug in parser.");
 
       auto itp = binders.insert(std::static_pointer_cast<identifier>(lam->lhs));
-      assert(itp.second && "Insertion must succeed, we can't have \"\\x. \\x. x\"");
+      assert(itp.second && "Insertion must succeed, we can't have \"\\x. \\x. x\" where all x are the same thing");
       
       if(used(what, lam->rhs, binders))
         ret = true;

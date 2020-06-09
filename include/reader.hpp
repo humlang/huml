@@ -40,6 +40,7 @@ private:
 struct scoping_context
 {
   bool is_binding { false };
+  ast_ptr disallow_recursion { nullptr };
   std::vector<std::pair<symbol, ast_ptr>> binder_stack;
 };
 

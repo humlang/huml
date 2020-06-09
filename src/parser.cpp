@@ -62,7 +62,6 @@ ast_ptr hx_reader::parse_identifier()
                                                                        {"how", "id"} });
     return mk_error();
   }
-
   auto id = old.data;
   auto present = std::find_if(scoping_ctx.binder_stack.rbegin(), scoping_ctx.binder_stack.rend(),
         [&id](auto x) { return x.first == id; });
@@ -76,6 +75,11 @@ ast_ptr hx_reader::parse_identifier()
     }
     else
     {
+      if(scoping_ctx.disallow_recursion == present->second)
+      {
+        diagnostic <<= diagnostic_db::sema::disallow_recursion(old.loc, old.data.get_string());
+        return mk_error();
+      }
       // literally use the binding as reference
       return present->second;
     }
@@ -105,6 +109,7 @@ ast_ptr hx_reader::parse_app(ast_ptr lhs)
 //                                         parantheses are needed to distinguish between pi and tuple access
 ast_ptr hx_reader::parse_lambda()
 {
+  bool error = false;
   if(current.kind == token_kind::Identifier)
   {
     /// Shorthand for \_:A.B
@@ -114,11 +119,16 @@ ast_ptr hx_reader::parse_lambda()
     parsing_pattern = false;
     auto psymb = old.data;
 
-    if(!expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow))
-      return mk_error();
+    if(!expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow) || param == error_ref)
+      error = true;
 
     // No scoping, the argument implicitly is "_" so there is nothing to bind!
     auto expr = parse_expression();
+    if(expr == error_ref)
+      error = true;
+
+    if(error)
+      return mk_error();
 
     auto id = std::make_shared<identifier>("_");
     id->annot = param;
@@ -127,7 +137,7 @@ ast_ptr hx_reader::parse_lambda()
   // We require a lambda
   auto lam_tok = current;
   if(!expect('\\', diagnostic_db::parser::lambda_expects_lambda))
-    return mk_error();
+    error = true;
 
   bool type_checking_mode = accept('(');
   std::size_t parentheses = 0;
@@ -140,12 +150,15 @@ ast_ptr hx_reader::parse_lambda()
   auto psymb = old.data;
 
   if(param == error_ref)
-    return mk_error();
+    error = true;
 
   while(parentheses-- > 0)
   {
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
-      return mk_error();
+    {
+      error = true;
+      break;
+    }
   }
 
   if(accept(':'))
@@ -153,26 +166,30 @@ ast_ptr hx_reader::parse_lambda()
     if(!type_checking_mode)
     {
       // TODO: emit diagnostic
-      return mk_error();
+      error = true;
     }
 
     auto typ = parse_expression();
 
-    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
-      return mk_error();
+    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected) || typ == error_ref)
+      error = true;
 
     param->annot = typ;
   }
-
   if(!expect('.', diagnostic_db::parser::lambda_expects_dot))
-    return mk_error();
+    error = true;
   scoping_ctx.binder_stack.emplace_back(psymb, param);
   auto expr = parse_expression();
   scoping_ctx.binder_stack.pop_back();
 
+  if(expr == error_ref)
+    error = true;
+
+  if(error)
+    return mk_error();
+
   lam_tok.loc += old.loc;
 // TODO:  global_scope.dbg_data[to_ret].loc = lam_tok;
-
   return std::make_shared<lambda>(param, expr);
 }
 
@@ -204,18 +221,26 @@ ast_ptr hx_reader::parse_Prop()
 ast_ptr hx_reader::parse_data_ctor()
 {
   auto old_loc = current.loc;
+  bool error = false;
   if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
-    return mk_error();
+    error = false;
 
   scoping_ctx.is_binding = true;
   auto type_name = parse_identifier();
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  if(!expect(':', diagnostic_db::parser::type_assign_expects_equal))
-    return mk_error();
+  if(!expect(':', diagnostic_db::parser::type_assign_expects_equal) || type_name == error_ref)
+    error = true;
+
+  scoping_ctx.disallow_recursion = type_name;
   auto tail = parse_expression();
-  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+  scoping_ctx.disallow_recursion = nullptr;
+
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || tail == error_ref)
+    error = true;
+
+  if(error)
     return mk_error();
 
   scoping_ctx.binder_stack.emplace_back(type_name_id, type_name);
@@ -228,23 +253,27 @@ ast_ptr hx_reader::parse_data_ctor()
 ast_ptr hx_reader::parse_type_ctor()
 {
   auto old_loc = current.loc;
+  bool error = false;
   if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
-    return mk_error();
+    error = true;
 
   scoping_ctx.is_binding = true;
   auto type_name = parse_identifier();
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  if(!expect(':', diagnostic_db::parser::type_assign_expects_equal))
-    return mk_error();
+  if(!expect(':', diagnostic_db::parser::type_assign_expects_equal) || type_name == error_ref)
+    error = true;
+
+  scoping_ctx.disallow_recursion = type_name;
   auto tail = parse_expression();
+  scoping_ctx.disallow_recursion = nullptr;
 
-  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || tail == error_ref)
+    error = true;
+
+  if(error)
     return mk_error();
-
-  scoping_ctx.binder_stack.emplace_back(type_name_id, type_name);
-
   type_name->annot = tail;
   return std::make_shared<assign_type>(type_name, tail);
 }
@@ -256,12 +285,19 @@ ast_ptr hx_reader::parse_assign()
   scoping_ctx.is_binding = true;
   auto var = parse_identifier();
   scoping_ctx.is_binding = false;
+
+  bool error = false;
+  if(var == error_ref)
+    error = true;
+
   auto var_symb = old.data;
   if(!expect('=', diagnostic_db::parser::assign_expects_equal))
-    return mk_error();
+    error = true;
   auto arg = parse_expression();
 
-  scoping_ctx.binder_stack.emplace_back(var_symb, var);
+  if(arg == error_ref)
+    error = true;
+
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
   {
     source_range loc = {};
@@ -273,8 +309,10 @@ ast_ptr hx_reader::parse_assign()
 
     diagnostic <<= mk_diag::fixit(current_source_loc + loc, fixits_stack.back());
 
-    return mk_error();
+    error = true;
   }
+  if(error)
+    return mk_error();
   auto ass = std::make_shared<assign>(var, arg);
   ass->lhs->annot = arg->annot;
 
@@ -286,6 +324,10 @@ ast_ptr hx_reader::parse_expr_stmt()
   auto current_source_loc = current.loc;
 
   auto expr = parse_expression();
+
+  bool error = false;
+  if(expr == error_ref)
+    error = true;
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
   {
     source_range loc = source_range {};
@@ -297,9 +339,11 @@ ast_ptr hx_reader::parse_expr_stmt()
 
     diagnostic <<= mk_diag::fixit(current_source_loc + loc, fixits_stack.back());
 
-    return mk_error();
+    error = true;
   }
-  //TODO: fix data
+  if(error)
+    return mk_error();
+
   return std::make_shared<expr_stmt>(expr);
 }
 
@@ -338,10 +382,13 @@ ast_ptr hx_reader::parse_case()
 {
   assert(expect(token_kind::Keyword, diagnostic_db::parser::case_expects_keyword));
 
+  bool error = false;
   auto what_to_match = parse_expression();
+  if(what_to_match == error_ref)
+    error = true;
 
   if(!expect('[', diagnostic_db::parser::case_expects_lbracket))
-    return mk_error();
+    error = true;
 
   std::vector<ast_ptr> match_arms;
   if(current.kind != token_kind::LBracket)
@@ -355,40 +402,48 @@ ast_ptr hx_reader::parse_case()
       scoping_ctx.is_binding = false;
       parsing_pattern = false;
 
-      if(!expect(token_kind::Doublearrow, diagnostic_db::parser::pattern_expects_double_arrow))
-        return mk_error();
+      if(!expect(token_kind::Doublearrow, diagnostic_db::parser::pattern_expects_double_arrow) || pat == error_ref)
+        error = true;
 
       auto expr = parse_expression();
 
+      if(expr == error_ref)
+        error = true;
       match_arms.emplace_back(std::make_shared<match>(pat, expr));
     } while(accept('|'));
   }
   if(!expect(']', diagnostic_db::parser::case_expects_rbracket))
-    return mk_error();
+    error = true;
 
+  if(error)
+    return mk_error();
   return std::make_shared<pattern_matcher>(what_to_match, match_arms);
 }
 
 ast_ptr hx_reader::parse_with_parentheses()
 {
+  bool error = false;
   if(!expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen))
-    return mk_error();
+    error = true;
 
   if(accept(')'))
-    return std::make_shared<unit>();
+    return error ? mk_error() : std::make_shared<unit>();
 
   if(current.kind == token_kind::Identifier && next_toks[0].kind == token_kind::Colon)
   {
     // type checking or lambda
-
     auto id = parse_identifier();
+
+    if(id == error_ref)
+      error = true;
     auto psymb = old.data;
 
     if(!expect(':', diagnostic_db::parser::type_ctor_param_expects_colon))
-      return mk_error();
-
+      error = true;
     auto typ = parse_expression();
 
+    if(typ == error_ref)
+      error = true;
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       return mk_error();
 
@@ -401,20 +456,30 @@ ast_ptr hx_reader::parse_with_parentheses()
       auto body = parse_expression();
       scoping_ctx.binder_stack.pop_back();
 
+      if(body == error_ref)
+        error = true;
+
+      if(error)
+        return mk_error();
       return std::make_shared<lambda>(id, body);
     }
     // just an identifier with a type annotation
+    if(error)
+      return mk_error();
     return id;
   }
   else
   {
     // type checking or parenthesized expression
-
     auto expr = parse_expression();
 
+    if(expr == error_ref)
+      error = true;
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
-      return mk_error();
+      error = true;
 
+    if(error)
+      return mk_error();
     return expr;
   }
 }
@@ -445,20 +510,10 @@ ast_ptr hx_reader::parse_prefix()
     }
     case token_kind::Keyword:
     {
-      if(parsing_constructor)
-      {
-        diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
-        return mk_error();
-      }
       return parse_keyword();
     }
     case token_kind::Backslash:
     {
-      if(parsing_constructor)
-      {
-        diagnostic <<= diagnostic_db::parser::constructor_expected(current.loc, current.data.get_string());
-        return mk_error();
-      }
       return parse_lambda();
     }
   }
@@ -558,7 +613,9 @@ std::vector<hx_ast> hx_reader::read(std::string_view module)
     auto stmt = r.parse_statement();
 
     if(stmt == r.error_ref)
+    {
       continue; // please fix it, user
+    }
 
     ast.data.push_back(stmt);
   }
