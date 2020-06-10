@@ -112,7 +112,6 @@ private:
   scoping_context scoping_ctx;
 
   bool parsing_pattern { false };
-  bool parsing_constructor { false };
 
   std::vector<fixit_info> fixits_stack;
 };

@@ -80,6 +80,7 @@ ast_ptr hx_reader::parse_identifier()
         diagnostic <<= diagnostic_db::sema::disallow_recursion(old.loc, old.data.get_string());
         return mk_error();
       }
+
       // literally use the binding as reference
       return present->second;
     }
@@ -359,7 +360,6 @@ ast_ptr hx_reader::parse_statement()
     to_ret = parse_assign();
   else
     to_ret = parse_expr_stmt();
-
   fixits_stack.pop_back();
   return to_ret;
 }

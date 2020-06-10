@@ -54,6 +54,10 @@ private:
   bool inst_l(typing_context& ctx, std::shared_ptr<exist> alpha, ast_ptr A);
   bool inst_r(typing_context& ctx, ast_ptr A, std::shared_ptr<exist> alpha);
 
+
+  bool is_wellformed(typing_context& ctx, ast_ptr A);
+
+
   bool checking_pattern { false };
 
   const hx_ast& ast;

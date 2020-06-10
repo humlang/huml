@@ -118,7 +118,7 @@ void hx_ast::print(std::ostream& os) const
   }
 }
 
-bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders)
+bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders, bool ign_type)
 {
   bool ret = false;
   switch(in->kind)
@@ -132,13 +132,13 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
 
       auto itp = binders.insert(std::static_pointer_cast<identifier>(as->lhs));
       assert(itp.second && "Binder already inserted before.");
-      if(used(what, as->rhs, binders))
+      if(used(what, as->rhs, binders, ign_type))
         ret = true;
     } break;
   case ASTNodeKind::assign_data: {
       assign_data::ptr as = std::static_pointer_cast<assign_data>(in);
 
-      if(used(what, as->rhs, binders))
+      if(used(what, as->rhs, binders, ign_type))
         ret = true;
       auto itp = binders.insert(std::static_pointer_cast<identifier>(as->lhs));
       assert(itp.second && "Binder already inserted before.");
@@ -148,13 +148,13 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
 
       auto itp = binders.insert(std::static_pointer_cast<identifier>(as->lhs));
       assert(itp.second && "Binder already inserted before.");
-      if(used(what, as->rhs, binders))
+      if(used(what, as->rhs, binders, ign_type))
         ret = true;
     } break;
   case ASTNodeKind::expr_stmt:   {
       expr_stmt::ptr ex = std::static_pointer_cast<expr_stmt>(in);
 
-      if(used(what, ex->lhs, binders))
+      if(used(what, ex->lhs, binders, ign_type))
         ret = true;
     } break;
   case ASTNodeKind::identifier:  {
@@ -180,7 +180,7 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
       auto itp = binders.insert(std::static_pointer_cast<identifier>(lam->lhs));
       assert(itp.second && "Insertion must succeed, we can't have \"\\x. \\x. x\" where all x are the same thing");
       
-      if(used(what, lam->rhs, binders))
+      if(used(what, lam->rhs, binders, ign_type))
         ret = true;
       else
       {
@@ -188,15 +188,15 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
         binders.erase(binders.find(std::static_pointer_cast<identifier>(lam->lhs)));
 
         if(lam->lhs->annot)
-          ret = used(what, lam->lhs->annot, binders);
+          ret = used(what, lam->lhs->annot, binders, ign_type);
       }
     } break;
   case ASTNodeKind::app:         {
       app::ptr ap = std::static_pointer_cast<app>(in);
 
-      if(used(what, ap->lhs, binders))
+      if(used(what, ap->lhs, binders, ign_type))
         ret = true;
-      else if(used(what, ap->rhs, binders))
+      else if(used(what, ap->rhs, binders, ign_type))
         ret = true;
     } break;                                  
   case ASTNodeKind::pattern_matcher: {
@@ -226,7 +226,7 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
         ret = used(what, mm->exp);
     } break;
   }
-  return ret || (in->annot ? used(what, in->annot, binders) : false);
+  return ret || (in->annot && !ign_type ? used(what, in->annot, binders, ign_type) : false);
 }
 
 bool hx_ast::type_checks() const

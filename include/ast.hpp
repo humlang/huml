@@ -132,9 +132,9 @@ struct hx_ast
   static void print(std::ostream& os, ast_ptr node);
   static void print_as_type(std::ostream& os, ast_ptr node);
 
-  static bool used(ast_ptr what, ast_ptr in)
-  { tsl::robin_set<identifier::ptr> binders; return used(what, in, binders); }
-  static bool used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders);
+  static bool used(ast_ptr what, ast_ptr in, bool ign_type = false)
+  { tsl::robin_set<identifier::ptr> binders; return used(what, in, binders, ign_type); }
+  static bool used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders, bool ign_type);
 
   bool type_checks() const;
 

@@ -632,6 +632,15 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
       if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
         lam->lhs->type = lam->lhs->annot;
 
+      /* TODO
+      if(!hx_ast::used(lam->lhs, lam->rhs))
+      {
+        hx_ast::print(std::cout, lam->lhs);
+        std::cout << "   Implicit typing with e = \n";
+        hx_ast::print(std::cout, e);
+      }
+      */
+
       if(!check(ctx, e, lam->lhs->type))
         return nullptr;
 
@@ -883,5 +892,51 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
       return true;
     } break;
   }
+}
+
+bool hx_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
+{
+  switch(A->kind)
+  {
+  case ASTNodeKind::Kind:
+  case ASTNodeKind::Prop:
+  case ASTNodeKind::Type:
+  case ASTNodeKind::unit:
+    return (A->annot ? is_wellformed(ctx, A->annot) : true);
+
+  case ASTNodeKind::exist:
+    return ctx.lookup_ex(A) != ctx.data.end();
+
+  case ASTNodeKind::identifier:
+    return ctx.lookup_id(std::static_pointer_cast<identifier>(A)) != ctx.data.end()
+        && (A->annot ? is_wellformed(ctx, A->annot) : true);
+
+  case ASTNodeKind::app: {
+      app::ptr a = std::static_pointer_cast<app>(A);
+
+      if(!is_wellformed(ctx, a->lhs) || !is_wellformed(ctx, a->rhs))
+        return false;
+
+      if(a->annot)
+        return is_wellformed(ctx, a->annot);
+    } break;
+
+  case ASTNodeKind::lambda: {
+      lambda::ptr lam = std::static_pointer_cast<lambda>(A);
+
+      // No need to add a type
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), nullptr); 
+
+      bool ret = true;
+      if(!is_wellformed(ctx, lam->rhs))
+        ret = false;
+      ctx.data.erase(ctx.lookup_id(std::static_pointer_cast<identifier>(lam->lhs)), ctx.data.end());
+
+      return ret;
+    } break;
+
+  default: assert(false && "Unimplemented.");
+  }
+  return false;
 }
 
