@@ -186,6 +186,40 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
   return to_ret;
 }
 
+lambda::ptr truncate_implicit_arguments(typing_context& ctx, lambda::ptr lam)
+{
+  // Check if we can potentially reduce
+  if(lam->rhs->kind != ASTNodeKind::lambda)
+    return lam;
+
+  bool appears_in_parameter_list = false;
+  ast_ptr bdy = lam->rhs;
+  while(bdy->kind == ASTNodeKind::lambda && !appears_in_parameter_list)
+  {
+    auto sublam = std::static_pointer_cast<lambda>(bdy);
+
+    appears_in_parameter_list = appears_in_parameter_list || hx_ast::used(lam->lhs, sublam->lhs);
+
+    bdy = sublam->rhs;
+  }
+
+  if(appears_in_parameter_list)
+  {
+    // lam->lhs is implicit, so replace it with an existential
+    auto alpha = std::make_shared<exist>("α" + std::to_string(exist_counter++));
+
+    assert(lam->lhs->kind == ASTNodeKind::identifier && "Bug in parser.");
+    ctx.data.emplace_back(alpha);
+    ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), alpha);
+
+    auto rhs = subst(lam->lhs, alpha, lam->rhs);
+    assert(rhs->kind == ASTNodeKind::lambda && "Bug in truncate_implicit_arguments.");
+
+    return truncate_implicit_arguments(ctx, std::static_pointer_cast<lambda>(rhs));
+  }
+  return lam;
+}
+
 bool has_existentials(ast_ptr a)
 {
   bool has_ex = (a->type == nullptr ? false : has_existentials(a->type));
@@ -702,20 +736,28 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return nullptr;
       }
-      /* TODO
-      if(!hx_ast::used(lam->lhs, lam->rhs))
-      {
-        hx_ast::print(std::cout, lam->lhs);
-        std::cout << "   Implicit typing with e = \n";
-        hx_ast::print(std::cout, e);
-      }
-      */
 
-      if(!check(ctx, e, lam->lhs->type))
+      std::cout << "Befor trunc: \"";
+      hx_ast::print(std::cout, lam);
+      lambda::ptr lm = truncate_implicit_arguments(ctx, lam);
+      std::cout << "\" after trunc: \"";
+      hx_ast::print(std::cout, lm);
+      std::cout << "\"\n\n";
+
+      if(!check(ctx, e, lm->lhs->type))
         return nullptr;
       // TODO: make substitution/execution more efficient.
       // TODO: reduce e to a value.....?
-      return subst(lam->lhs, e, lam->rhs);
+      
+      auto ret = subst(lm->lhs, e, lm->rhs);
+
+      std::cout << "\tlm->rhs before subst: \"";
+      hx_ast::print(std::cout, lm->rhs);
+      std::cout << "\"  lm->rhs after subst: \"";
+      hx_ast::print(std::cout, ret);
+      std::cout << "\"\n\n";
+
+      return ret;
     } break;
 
   default: {
