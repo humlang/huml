@@ -83,6 +83,7 @@ namespace sema
 {
 db_entry_arg(error, disallow_recursion, "\"{}\" was seen before and must not occur in this statement again.");
 db_entry_arg(error, id_not_in_context, "\"{}\" was never seen before.");
+db_entry_arg(error, not_wellformed, "\"{}\" is not wellformed.");
 db_entry_arg2(error, not_a_subtype, "\"{}\" is not a subtype of \"{}\".");
 db_entry_arg2(error, free_var_in_type, "\"{}\" must not occur in \"{}\".");
 db_entry_arg2(error, cannot_unify_existentials, "\"{}\" and \"{}\" are different, cannot unify them.");

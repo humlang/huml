@@ -407,15 +407,35 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
         if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
           lam->lhs->type = lam->lhs->annot;
 
-        // TODO: check if lhs->type is wellformed
-        if(lam->lhs->type && !is_subtype(ctx, lam->lhs->type, pi->lhs->type))
+        if(lam->lhs->type)
         {
-          std::stringstream a, b;
-          hx_ast::print(a, lam->lhs->type);
-          hx_ast::print(b, pi->lhs->type);
+          if(!is_wellformed(ctx, lam->lhs->type))
+          {
+            std::stringstream a;
+            hx_ast::print(a, lam->lhs->type);
 
-          // TODO: fix diagnostic location
-          diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
+            // TODO: fix diagnostic location
+            diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+            return false;
+          }
+          if(!is_subtype(ctx, lam->lhs->type, pi->lhs->type))
+          {
+            std::stringstream a, b;
+            hx_ast::print(a, lam->lhs->type);
+            hx_ast::print(b, pi->lhs->type);
+
+            // TODO: fix diagnostic location
+            diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
+
+            return false;
+          }
+        }
+        if(!is_wellformed(ctx, pi->lhs->type))
+        {
+          std::stringstream a;
+          hx_ast::print(a, pi->lhs->type);
+
+          diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
 
           return false;
         }
@@ -459,11 +479,20 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   if(what->annot != nullptr)
   {
     // S-Annot
+    if(!is_wellformed(ctx, what->annot))
+    {
+      std::stringstream a;
+      hx_ast::print(a, what->annot);
+
+      diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+
+      return nullptr;
+    }
+
     auto annot = what->annot;
     what->annot = nullptr;
     if(!check(ctx, what, annot))
       return nullptr;
-    // TODO: check wellformedness
 
     return what->type = what->annot = annot;
   }
@@ -514,17 +543,27 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         lam->lhs->type = lam->lhs->annot;
 
       // Check for type annotations
-      if(lam->lhs->type != nullptr && !is_subtype(ctx, lam->lhs->type, alpha1))
+      if(lam->lhs->type != nullptr)
       {
-        std::stringstream a, b;
-        hx_ast::print(a, alpha1);
-        hx_ast::print(b, lam->lhs->type);
+        if(!is_wellformed(ctx, lam->lhs->type))
+        {
+          std::stringstream a;
+          hx_ast::print(a, lam->lhs->type);
 
-        // TODO: fix diagnostic location
-        diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
-        return nullptr;
+          diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+          return nullptr;
+        }
+        if(!is_subtype(ctx, lam->lhs->type, alpha1))
+        {
+          std::stringstream a, b;
+          hx_ast::print(a, alpha1);
+          hx_ast::print(b, lam->lhs->type);
+
+          // TODO: fix diagnostic location
+          diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
+          return nullptr;
+        }
       }
-
       if(!check(ctx, lam->rhs, alpha2))
         return nullptr;
       ctx.data.erase(ctx.lookup_id(std::static_pointer_cast<identifier>(lam->lhs)), ctx.data.end());
@@ -555,7 +594,14 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
       if(as->lhs->annot != nullptr)
       {
-        // TODO: check if annotation is wellformed
+        if(!is_wellformed(ctx, as->lhs->annot))
+        {
+          std::stringstream a;
+          hx_ast::print(a, as->lhs->annot);
+
+          diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+          return nullptr;
+        }
         ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), as->lhs->annot);
 
         if(!check(ctx, as->rhs, as->lhs->annot))
@@ -573,14 +619,30 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   // S-AssignData
   case ASTNodeKind::assign_data: {
       assign_data::ptr as = std::static_pointer_cast<assign_data>(what);
-      // TODO: check wellformedness
+      
+      if(!is_wellformed(ctx, as->rhs))
+      {
+        std::stringstream a;
+        hx_ast::print(a, as->rhs);
+
+        diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        return nullptr;
+      }
       ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), as->rhs);
       return what->type = as->rhs;
     } break;
   // S-AssignType
   case ASTNodeKind::assign_type: {
       assign_type::ptr as = std::static_pointer_cast<assign_type>(what);
-      // TODO: check wellformedness
+
+      if(!is_wellformed(ctx, as->rhs))
+      {
+        std::stringstream a;
+        hx_ast::print(a, as->rhs);
+
+        diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        return nullptr;
+      }
       ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), as->rhs);
       return what->type = as->rhs;
     } break;
@@ -632,6 +694,14 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
       if(lam->lhs->annot != nullptr && lam->lhs->type == nullptr)
         lam->lhs->type = lam->lhs->annot;
 
+      if(!is_wellformed(ctx, lam->lhs->type))
+      {
+        std::stringstream a;
+        hx_ast::print(a, lam->lhs->type);
+
+        diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        return nullptr;
+      }
       /* TODO
       if(!hx_ast::used(lam->lhs, lam->rhs))
       {
@@ -643,7 +713,6 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
 
       if(!check(ctx, e, lam->lhs->type))
         return nullptr;
-
       // TODO: make substitution/execution more efficient.
       // TODO: reduce e to a value.....?
       return subst(lam->lhs, e, lam->rhs);
@@ -823,6 +892,14 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
+      if(!is_wellformed(ctx, A))
+      {
+        std::stringstream a;
+        hx_ast::print(a, A);
+
+        diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        return false;
+      }
       alpha->solution = A;
       return true;
     } break;
@@ -888,6 +965,14 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range{}, alpha->symb.get_string());
         return false;
       }
+      if(!is_wellformed(ctx, A))
+      {
+        std::stringstream a;
+        hx_ast::print(a, A);
+
+        diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        return false;
+      }
       alpha->solution = A;
       return true;
     } break;
@@ -919,13 +1004,19 @@ bool hx_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
 
       if(a->annot)
         return is_wellformed(ctx, a->annot);
+      return true;
     } break;
 
   case ASTNodeKind::lambda: {
       lambda::ptr lam = std::static_pointer_cast<lambda>(A);
 
-      // No need to add a type
-      ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), nullptr); 
+      if(lam->lhs->type == nullptr && lam->lhs->annot != nullptr)
+      {
+        if(!is_wellformed(ctx, lam->lhs->annot))
+          return false;
+        lam->lhs->type = lam->lhs->annot;
+      }
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), lam->lhs->type); 
 
       bool ret = true;
       if(!is_wellformed(ctx, lam->rhs))
