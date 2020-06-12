@@ -83,8 +83,6 @@ namespace hx
       diagnostic.print(stdout);
       diagnostic.reset();
     }
-
-    hx_ast_type_checking checker(global_ir);
     for(auto& r : global_ir.data)
     {
       auto typ = checker.find_type(tctx, r);
@@ -146,6 +144,9 @@ R"(
     }
     else
     {
+      // Split according to ;
+      // move those with ; down and process them, otherwise store in buf_upto_semi until we get the next semicolon.
+      // TODO
       if(line.empty())
         return;
       auto [global_ir, new_sctx] = hx_reader::read_text(line, std::move(sctx));
@@ -166,8 +167,6 @@ R"(
         diagnostic.print(stdout);
         diagnostic.reset();
       }
-      hx_ast_type_checking checker(global_ir);
-
       for(auto& r : global_ir.data)
       {
         if(r == nullptr)

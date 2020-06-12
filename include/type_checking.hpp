@@ -46,12 +46,10 @@ struct typing_context
 
 struct hx_ast_type_checking
 {
-  hx_ast_type_checking(const hx_ast& nodes)
-    : ast(nodes)
+  hx_ast_type_checking()
   {  }
 
   ast_ptr find_type(typing_context& ctx, ast_ptr of);
-
 private:
   bool check(typing_context& ctx, ast_ptr what, ast_ptr type);
   ast_ptr synthesize(typing_context& ctx, ast_ptr what);
@@ -68,7 +66,5 @@ private:
 
   bool checking_pattern { false };
   bool implicit { false };
-
-  const hx_ast& ast;
 };
 

@@ -242,7 +242,7 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
 
 bool hx_ast::type_checks() const
 {
-  hx_ast_type_checking checker(*this);
+  hx_ast_type_checking checker;
   bool type_checks = true;
 
   typing_context ctx;
@@ -253,7 +253,6 @@ bool hx_ast::type_checks() const
     if(typ == nullptr)
       type_checks = false;
   }
-
   return type_checks;
 }
 

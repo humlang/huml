@@ -42,6 +42,9 @@ namespace hx
   private:
     typing_context tctx;
     scoping_context sctx;
+    hx_ast_type_checking checker;
+
+    std::string buf_upto_semi;
 
     std::size_t failed_inputs { 0 };
   };
