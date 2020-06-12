@@ -9,6 +9,7 @@
 #include <iostream>
 
 thread_local std::size_t exist_counter = 0;
+thread_local std::size_t marker_counter = 0;
 
 struct exist : ast_base
 {
@@ -186,6 +187,80 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
   return to_ret;
 }
 
+ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& cloned_ids)
+{
+  ast_ptr ret = nullptr;
+  switch(what->kind)
+  {
+  case ASTNodeKind::Kind: ret = std::make_shared<kind>(); break;
+  case ASTNodeKind::Prop: ret = std::make_shared<prop>(); break;
+  case ASTNodeKind::Type: ret = std::make_shared<type>(); break;
+  case ASTNodeKind::unit: ret = std::make_shared<unit>(); break;
+
+  case ASTNodeKind::identifier: {
+    identifier::ptr id = std::static_pointer_cast<identifier>(what);
+
+    if(cloned_ids.contains(id))
+      ret = cloned_ids.find(id)->second;
+    else
+    {
+      // free variables stay free!
+      ret = id;
+    }
+  } break;
+
+  case ASTNodeKind::app: {
+    app::ptr ap = std::static_pointer_cast<app>(what);
+
+    auto lhs = clone_ast_part_graph(ap->lhs, cloned_ids);
+    auto rhs = clone_ast_part_graph(ap->rhs, cloned_ids);
+
+    ret = std::make_shared<app>(lhs, rhs);
+  } break;
+
+  case ASTNodeKind::lambda: {
+    lambda::ptr lam = std::static_pointer_cast<lambda>(what);
+
+    // New binding!
+    auto lhs = std::make_shared<identifier>(std::static_pointer_cast<identifier>(lam->lhs)->symb);
+    if(lam->lhs->annot != nullptr)
+      lhs->annot = clone_ast_part_graph(lam->lhs->annot, cloned_ids);
+    if(lam->lhs->type != nullptr)
+      lhs->type = clone_ast_part_graph(lam->lhs->type, cloned_ids);
+
+    cloned_ids.emplace(lam->lhs, lhs);
+    auto rhs = clone_ast_part_graph(lam->rhs, cloned_ids);
+
+    ret = std::make_shared<lambda>(lhs, rhs);
+  } break;
+
+  case ASTNodeKind::exist: {
+    exist::ptr ex = std::static_pointer_cast<exist>(what);
+    if(ex->is_solved())
+      return clone_ast_part_graph(ex->solution, cloned_ids);
+    return ex;
+  } break;
+
+  case ASTNodeKind::assign:
+  case ASTNodeKind::assign_data:
+  case ASTNodeKind::assign_type:
+  case ASTNodeKind::expr_stmt: assert(false && "Cannot clone statements."); return nullptr;
+  }
+
+  if(what->type != nullptr)
+    ret->type = clone_ast_part_graph(what->type, cloned_ids);
+  if(what->annot != nullptr)
+    ret->annot = clone_ast_part_graph(what->annot, cloned_ids);
+
+  return ret;
+}
+
+ast_ptr clone_ast_part_graph(ast_ptr what)
+{
+  tsl::robin_map<ast_ptr, ast_ptr> ids;
+  return clone_ast_part_graph(what, ids);
+}
+
 lambda::ptr truncate_implicit_arguments(typing_context& ctx, lambda::ptr lam)
 {
   // Check if we can potentially reduce
@@ -212,7 +287,9 @@ lambda::ptr truncate_implicit_arguments(typing_context& ctx, lambda::ptr lam)
     ctx.data.emplace_back(alpha);
     ctx.data.emplace_back(std::static_pointer_cast<identifier>(lam->lhs), alpha);
 
-    auto rhs = subst(lam->lhs, alpha, lam->rhs);
+    auto lamcpy = std::make_shared<lambda>(lam->lhs, lam->rhs);
+    auto rhs = subst(lamcpy->lhs, alpha, lamcpy->rhs);
+
     assert(rhs->kind == ASTNodeKind::lambda && "Bug in truncate_implicit_arguments.");
 
     return truncate_implicit_arguments(ctx, std::static_pointer_cast<lambda>(rhs));
@@ -287,6 +364,37 @@ ast_ptr hx_ast_type_checking::find_type(typing_context& ctx, ast_ptr of)
   }
 
   return A;
+}
+
+void typing_context::print(std::ostream& os)
+{
+  os << "[";
+  for(auto it = data.begin(); it != data.end(); ++it)
+  {
+    auto& root = *it;
+    if(root.existential != nullptr)
+    {
+      os << root.existential->symb;
+      if(root.existential->is_solved())
+      {
+        os << " = ";
+        hx_ast::print(os, root.existential->solution);
+      }
+    }
+    else if(root.marker != static_cast<std::size_t>(-1))
+    {
+      os << "<" << root.marker << ">";
+    }
+    else if(root.id_def != nullptr && root.type != nullptr)
+    {
+      hx_ast::print(os, root.id_def);
+      os << " : ";
+      hx_ast::print(os, root.type);
+    }
+    if(std::next(it) != data.end())
+      os << ", ";
+  }
+  os << "]";
 }
 
 ast_ptr typing_context::subst(ast_ptr what)
@@ -369,6 +477,12 @@ typing_context::pos typing_context::lookup_type(ast_ptr type) const
 
 typing_context::pos typing_context::lookup_ex(ast_ptr ex) const
 { return lookup_ex(data.begin(), ex); }
+
+typing_context::pos typing_context::lookup_marker(std::size_t marker_id) const
+{
+  return std::find_if(data.begin(), data.end(), [marker_id]
+      (auto& elem) { return elem.existential == nullptr && elem.id_def == nullptr && elem.type == nullptr && elem.marker == marker_id; });
+}
 
 typing_context::pos typing_context::lookup_id(typing_context::pos begin, identifier::ptr id) const
 {
@@ -459,6 +573,7 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
             hx_ast::print(b, pi->lhs->type);
 
             // TODO: fix diagnostic location
+            //assert(false);
             diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
             return false;
@@ -498,6 +613,7 @@ c_sub:
         hx_ast::print(b, type);
 
         // TODO: fix diagnostic location
+        //assert(false);
         diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
         return false;
@@ -594,6 +710,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
           hx_ast::print(b, lam->lhs->type);
 
           // TODO: fix diagnostic location
+          //assert(false);
           diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
           return nullptr;
         }
@@ -705,7 +822,6 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
         diagnostic <<= diagnostic_db::sema::existential_not_in_context(source_range {  }, ex->symb.get_string());
         return nullptr;
       }
-
       exist::ptr alpha1 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
       exist::ptr alpha2 = std::make_shared<exist>("α" + std::to_string(exist_counter++));
 
@@ -736,28 +852,14 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return nullptr;
       }
-
-      std::cout << "Befor trunc: \"";
-      hx_ast::print(std::cout, lam);
-      lambda::ptr lm = truncate_implicit_arguments(ctx, lam);
-      std::cout << "\" after trunc: \"";
-      hx_ast::print(std::cout, lm);
-      std::cout << "\"\n\n";
+      lambda::ptr lm = truncate_implicit_arguments(ctx, std::static_pointer_cast<lambda>(clone_ast_part_graph(lam)));
 
       if(!check(ctx, e, lm->lhs->type))
         return nullptr;
+
       // TODO: make substitution/execution more efficient.
       // TODO: reduce e to a value.....?
-      
-      auto ret = subst(lm->lhs, e, lm->rhs);
-
-      std::cout << "\tlm->rhs before subst: \"";
-      hx_ast::print(std::cout, lm->rhs);
-      std::cout << "\"  lm->rhs after subst: \"";
-      hx_ast::print(std::cout, ret);
-      std::cout << "\"\n\n";
-
-      return ret;
+      return ctx.subst(subst(lm->lhs, e, lm->rhs));
     } break;
 
   default: {

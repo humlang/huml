@@ -13,9 +13,14 @@ struct CTXElement
     : id_def(id), type(type)
   {  }
 
+  CTXElement(std::size_t marker) : marker(marker)
+  {  }
+
   std::shared_ptr<exist> existential { nullptr }; 
   identifier::ptr id_def             { nullptr }; // <- absolute position of the binding occurence of id
   ast_ptr type                       { nullptr }; // <- absolute position of a type
+
+  std::size_t marker { static_cast<std::size_t>(-1) };
 };
 
 
@@ -25,9 +30,12 @@ struct typing_context
 
   ast_ptr subst(ast_ptr what);
 
+  void print(std::ostream& os);
+
   pos lookup_id(identifier::ptr id) const;
   pos lookup_type(ast_ptr type) const;
   pos lookup_ex(ast_ptr ex) const;
+  pos lookup_marker(std::size_t marker_id) const;
 
   pos lookup_id(pos begin, identifier::ptr id) const;
   pos lookup_type(pos begin, ast_ptr type) const;
