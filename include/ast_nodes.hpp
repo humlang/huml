@@ -20,6 +20,7 @@ enum class ASTNodeKind : std::int_fast8_t
   assign_type,
   assign_data,
   expr_stmt,
+  directive,
 };
 
 struct ASTData

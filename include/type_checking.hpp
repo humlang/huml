@@ -67,6 +67,7 @@ private:
 
 
   bool checking_pattern { false };
+  bool implicit { false };
 
   const hx_ast& ast;
 };

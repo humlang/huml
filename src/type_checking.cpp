@@ -108,6 +108,12 @@ bool eqb(ast_ptr A, ast_ptr B)
 
       return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
     } break;
+  case ASTNodeKind::directive: {
+      directive::ptr a = std::static_pointer_cast<directive>(A);
+      directive::ptr b = std::static_pointer_cast<directive>(B);
+
+      return a->implicit_typing == b->implicit_typing;
+    } break;
 
   case ASTNodeKind::exist: {
       exist::ptr a = std::static_pointer_cast<exist>(A);
@@ -242,6 +248,7 @@ ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& clo
   } break;
 
   case ASTNodeKind::assign:
+  case ASTNodeKind::directive:
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
   case ASTNodeKind::expr_stmt: assert(false && "Cannot clone statements."); return nullptr;
@@ -344,6 +351,9 @@ bool has_existentials(ast_ptr a)
   case ASTNodeKind::assign_type: {
     assign_type::ptr al = std::static_pointer_cast<assign_type>(a);
     return has_existentials(al->lhs) || has_existentials(al->rhs);
+  } break;
+  case ASTNodeKind::directive: {
+    return false;
   } break;
   }
 }
@@ -461,6 +471,7 @@ ast_ptr typing_context::subst(ast_ptr what)
     } break;
 
   case ASTNodeKind::assign:
+  case ASTNodeKind::directive:
   case ASTNodeKind::expr_stmt:
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
@@ -803,6 +814,10 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
       return what->type = synthesize(ctx, ex->lhs);
     } break;
+  case ASTNodeKind::directive: {
+      implicit = std::static_pointer_cast<directive>(what)->implicit_typing;
+      return what; // <- directive is basically its own type
+    } break;
   }
   assert(false && "Unimplemented synthesis.");
   return nullptr;
@@ -852,7 +867,10 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return nullptr;
       }
-      lambda::ptr lm = truncate_implicit_arguments(ctx, std::static_pointer_cast<lambda>(clone_ast_part_graph(lam)));
+      lambda::ptr lm = implicit
+        ? truncate_implicit_arguments(ctx, std::static_pointer_cast<lambda>(clone_ast_part_graph(lam)))
+         :
+          std::static_pointer_cast<lambda>(clone_ast_part_graph(lam));
 
       if(!check(ctx, e, lm->lhs->type))
         return nullptr;

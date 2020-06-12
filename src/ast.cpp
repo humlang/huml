@@ -49,6 +49,14 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
       print(os, ex->lhs);
       os << ";";
     } break;
+  case ASTNodeKind::directive: {
+      directive::ptr dir = std::static_pointer_cast<directive>(node);
+
+      if(dir->implicit_typing)
+        os << "#Implicit Type;";
+      else
+        os << "#Explicit Type;";
+    } break;
   case ASTNodeKind::identifier:  {
       identifier::ptr id = std::static_pointer_cast<identifier>(node);
       os << id->symb.get_string();
@@ -156,6 +164,9 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
 
       if(used(what, ex->lhs, binders, ign_type))
         ret = true;
+    } break;
+  case ASTNodeKind::directive:   {
+      ret = false;
     } break;
   case ASTNodeKind::identifier:  {
       identifier::ptr id = std::static_pointer_cast<identifier>(in);
@@ -267,6 +278,7 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
   case ASTNodeKind::expr_stmt:
+  case ASTNodeKind::directive:
                           assert(false && "Statements are no types."); break;
 
   case ASTNodeKind::identifier:  {

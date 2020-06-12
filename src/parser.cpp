@@ -45,6 +45,33 @@ void hx_reader::consume()
 ast_ptr hx_reader::mk_error()
 { return error_ref; }
 
+ast_ptr hx_reader::parse_directive()
+{
+  assert(expect('#', diagnostic_db::parser::directive_expects_hashtag));
+
+  parse_identifier();
+  auto symb = old.data;
+  auto oldloc = old.loc;
+
+  auto type = parse_Type();
+
+  bool error = false;
+
+  bool implicit = false;
+  if(symb == symbol("Implicit"))
+    implicit = true;
+  else if(symb == symbol("Explicit"))
+    implicit = false;
+  else
+  {
+    diagnostic <<= diagnostic_db::parser::implicit_or_explicit_expected(oldloc, symb.get_string());
+    error = true;
+  }
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || error)
+    return mk_error();
+  return std::make_shared<directive>(implicit);
+}
+
 // id  or special identifier "_" if pattern parsing is enabled
 ast_ptr hx_reader::parse_identifier()
 {
@@ -358,6 +385,8 @@ ast_ptr hx_reader::parse_statement()
     to_ret = parse_data_ctor();
   else if(next_toks[0].kind == token_kind::Equal)
     to_ret = parse_assign();
+  else if(current.kind == token_kind::Hash)
+    to_ret = parse_directive();
   else
     to_ret = parse_expr_stmt();
   fixits_stack.pop_back();

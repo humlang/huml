@@ -235,13 +235,11 @@ restart_get:
       data = "=";
     }
   } break;
-  /*
-  case '_':
+  case '#':
   {
-    kind = token_kind::Underscore;
-    data = "_";
+    kind = token_kind::Hash;
+    data = "#";
   } break;
-  */
   case '|':
   {
     kind = token_kind::Pipe;

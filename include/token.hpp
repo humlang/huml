@@ -48,7 +48,7 @@ enum class token_kind : std::int8_t
     LBracket = '[',
     RBracket = ']',
     Comma = ',',
-    Underscore = '_',
+    Hash = '#',
     Undef = 0,
     EndOfFile = EOF
 };

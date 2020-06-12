@@ -15,6 +15,17 @@ struct ast_base
 };
 using ast_ptr = std::shared_ptr<ast_base>;
 
+struct directive : ast_base
+{
+  using ptr = std::shared_ptr<directive>;
+
+  directive(bool typing)
+    : ast_base(ASTNodeKind::directive), implicit_typing(typing)
+  {  }
+
+  bool implicit_typing;
+};
+
 struct identifier : ast_base
 {
   using ptr = std::shared_ptr<identifier>;

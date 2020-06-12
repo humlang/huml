@@ -32,6 +32,8 @@ namespace parser
 {
 
 db_entry(error, empty_module, "Module must not be empty.");
+db_entry_arg(error, directive_expects_hashtag, "Directive expects \"#\", instead got \"{}\".");
+db_entry_arg(error, implicit_or_explicit_expected, "\"Implicit\" or \"Explicit\" expected, instead got \"{}\".");
 db_entry_arg(error, assign_expects_equal, "Assign statment expects an equal here, instead got \"{}\".");
 db_entry_arg(error, unknown_token, "Can not tokenize \"{}\".");
 db_entry_arg(error, not_a_prefix, "Token \"{}\" is not a prefix.");
