@@ -1,4 +1,5 @@
 #include <type_checking.hpp>
+#include "exist.hpp" //<- stored under src/
 
 #include <diagnostic_db.hpp>
 #include <diagnostic.hpp>
@@ -10,20 +11,6 @@
 
 thread_local std::size_t exist_counter = 0;
 thread_local std::size_t marker_counter = 0;
-
-struct exist : ast_base
-{
-  using ptr = std::shared_ptr<exist>;
-
-  exist(symbol symb) : ast_base(ASTNodeKind::exist), symb(symb)
-  {  }
-
-  bool is_solved() const
-  { return solution != nullptr; }
-
-  ast_ptr solution { nullptr };
-  symbol symb;
-};
 
 // ast equality
 bool eqb(ast_ptr A, ast_ptr B)
@@ -814,6 +801,11 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
       return what->type = synthesize(ctx, ex->lhs);
     } break;
+  // S-MapImpl
+  case ASTNodeKind::map_impl: {
+      return what;
+    } break;
+  // S-Directive
   case ASTNodeKind::directive: {
       implicit = std::static_pointer_cast<directive>(what)->implicit_typing;
       return what; // <- directive is basically its own type

@@ -88,6 +88,7 @@ private:
   ast_ptr parse_expr_stmt();
   ast_ptr parse_type_ctor();
   ast_ptr parse_data_ctor();
+  ast_ptr parse_map_impl();
 
   ast_ptr parse_directive();
 

@@ -375,6 +375,19 @@ ast_ptr hx_reader::parse_expr_stmt()
   return std::make_shared<expr_stmt>(expr);
 }
 
+ast_ptr hx_reader::parse_map_impl()
+{
+  assert(expect(token_kind::Keyword, diagnostic_db::parser::map_impl_expected));
+
+  auto constructor_name = parse_identifier();
+  auto ffi_name = parse_identifier();
+
+  if(constructor_name == error_ref || ffi_name == error_ref)
+    return mk_error();
+
+  return std::make_shared<map_impl>(constructor_name, ffi_name);
+}
+
 ast_ptr hx_reader::parse_statement()
 {
   ast_ptr to_ret = nullptr;
@@ -383,6 +396,8 @@ ast_ptr hx_reader::parse_statement()
     to_ret = parse_type_ctor();
   else if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("data").get_hash())
     to_ret = parse_data_ctor();
+  else if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("map_impl").get_hash())
+    to_ret = parse_map_impl();
   else if(next_toks[0].kind == token_kind::Equal)
     to_ret = parse_assign();
   else if(current.kind == token_kind::Hash)

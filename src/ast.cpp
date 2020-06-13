@@ -1,9 +1,17 @@
 #include <ast.hpp>
 #include <type_checking.hpp>
+#include "exist.hpp" //<- stored under src/
+#include <backend.hpp>
 
 #include <iterator>
 
 #include <iostream>
+#include <queue>
+
+void hx_ast::simple_cpp_gen(std::ostream& os)
+{
+  gen_cpp(*this, os);
+}
 
 void hx_ast::print(std::ostream& os, ast_ptr node)
 {
@@ -16,7 +24,14 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
     os << "((";
   switch(node->kind)
   {
-  case ASTNodeKind::exist: os << "EXIST"; break;
+  case ASTNodeKind::exist: {
+      exist::ptr ex = std::static_pointer_cast<exist>(node);
+
+      if(ex->is_solved())
+        print(os, ex->solution);
+
+      os << ex->symb.get_string();
+    } break;
   case ASTNodeKind::Kind: os << "Kind"; break;
   case ASTNodeKind::Type: os << "Type"; break;
   case ASTNodeKind::Prop: os << "Prop"; break;
@@ -56,6 +71,15 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
         os << "#Implicit Type;";
       else
         os << "#Explicit Type;";
+    } break;
+  case ASTNodeKind::map_impl: {
+      map_impl::ptr map = std::static_pointer_cast<map_impl>(node);
+
+      os << "map_impl ";
+      print(os, map->lhs);
+      os << " ";
+      print(os, map->rhs);
+      os << ";";
     } break;
   case ASTNodeKind::identifier:  {
       identifier::ptr id = std::static_pointer_cast<identifier>(node);
@@ -267,7 +291,14 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
     os << "((";
   switch(node->kind)
   {
-  case ASTNodeKind::exist: os << "EXIST"; break;
+  case ASTNodeKind::exist: {
+      exist::ptr ex = std::static_pointer_cast<exist>(node);
+
+      if(ex->is_solved())
+        print(os, ex->solution);
+
+      os << ex->symb.get_string();
+    } break;
   case ASTNodeKind::Kind: os << "Kind"; break;
   case ASTNodeKind::Type: os << "Type"; break;
   case ASTNodeKind::Prop: os << "Prop"; break;

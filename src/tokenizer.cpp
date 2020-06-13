@@ -43,7 +43,8 @@ auto keyword_set = tsl::robin_set<std::string_view>({
   "Prop"sv,
   "type"sv,
   "data"sv,
-  "case"sv
+  "case"sv,
+  "map_impl"sv
 });
 
 auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({

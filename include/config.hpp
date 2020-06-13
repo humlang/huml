@@ -14,6 +14,7 @@ enum class emit_classes
   tokens,
   ast_print,
   ast_typecheck,
+  ast_to_cpp
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM( emit_classes, {
@@ -23,6 +24,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM( emit_classes, {
   { emit_classes::tokens, "tokens" },
   { emit_classes::ast_print, "ast-print" },
   { emit_classes::ast_typecheck, "ast-typecheck" },
+  { emit_classes::ast_to_cpp, "ast-to-cpp" },
 })
 
 const static auto emit_classes_list = {
@@ -31,6 +33,7 @@ const static auto emit_classes_list = {
   emit_classes::tokens,
   emit_classes::ast_print,
   emit_classes::ast_typecheck,
+  emit_classes::ast_to_cpp,
 };
 
 void print_emit_classes(std::FILE* f);

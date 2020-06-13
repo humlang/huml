@@ -137,11 +137,24 @@ struct expr_stmt : ast_base
   ast_ptr lhs;
 };
 
+struct map_impl : ast_base
+{
+  using ptr = std::shared_ptr<map_impl>;
+
+  map_impl(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::map_impl), lhs(lhs), rhs(rhs)
+  {  }
+
+  ast_ptr lhs;
+  ast_ptr rhs;
+};
+
 struct hx_ast
 {
   void print(std::ostream& os) const;
   static void print(std::ostream& os, ast_ptr node);
   static void print_as_type(std::ostream& os, ast_ptr node);
+
+  void simple_cpp_gen(std::ostream& os);
 
   static bool used(ast_ptr what, ast_ptr in, bool ign_type = false)
   { tsl::robin_set<identifier::ptr> binders; return used(what, in, binders, ign_type); }
