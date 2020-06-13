@@ -112,7 +112,10 @@ R"(
 
     while(!stopped)
     {
-      std::cout << "><(typ-c)°> ";
+      if(!buf_upto_semi.empty())
+        std::cout << "><(need;)°> ";
+      else
+        std::cout << "><(typ-c)°> ";
 
       std::string line;
       std::getline(std::cin, line);
@@ -147,9 +150,26 @@ R"(
       // Split according to ;
       // move those with ; down and process them, otherwise store in buf_upto_semi until we get the next semicolon.
       // TODO
-      if(line.empty())
+      std::string to_compute = buf_upto_semi + " ";
+      for(std::size_t it = 0; it != std::string::npos;)
+      {
+        auto next = line.find(';', it + 1);
+
+        if(next != std::string::npos)
+        {
+          buf_upto_semi.clear();
+          to_compute += line.substr(it, next - it + 1);
+          next++;
+        }
+        else
+          buf_upto_semi += line.substr(it, line.size());
+
+        it = next;
+      }
+      if(to_compute.empty())
         return;
-      auto [global_ir, new_sctx] = hx_reader::read_text(line, std::move(sctx));
+
+      auto [global_ir, new_sctx] = hx_reader::read_text(to_compute, std::move(sctx));
       sctx = std::move(new_sctx);
 
       if(global_ir.data.empty())
