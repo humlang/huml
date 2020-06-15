@@ -2,9 +2,7 @@
 
 #include <ostream>
 #include <string>
-
-std::atomic_size_t ir::NodeHasher::param_count = std::atomic_size_t(1) << 63;
-std::atomic_size_t ir::NodeHasher::lam_count = std::atomic_size_t(1) << 62;
+#include <queue>
 
 std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 {
@@ -12,9 +10,14 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
   std::size_t param_count = 0;
   std::size_t fn_count = 0;
 
-  auto y = [&os, &ns, &param_count, &fn_count](Node::Ref ref) -> std::ostream&
+  std::uint_fast16_t defining = 0;
+
+  std::queue<Node::Ref> defs_to_print;
+  defs_to_print.push(ref);
+
+  auto y = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](Node::Ref ref) -> std::ostream&
   {
-    auto inner = [&os, &ns, &param_count, &fn_count](auto&& y, Node::Ref ref) -> std::ostream&
+    auto inner = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](auto&& y, Node::Ref ref) -> std::ostream&
     {
       switch(ref->kind)
       {
@@ -46,15 +49,28 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
       case NodeKind::Fn: {
           Fn::Ref lm = static_cast<Fn::Ref>(ref);
 
-          if(auto it = ns.find(lm); it != ns.end())
+          auto it = ns.find(lm);
+          if(it != ns.end() && defining > 0)
             return os << it->second;
+          auto name = it != ns.end() ? it->second : "f" + std::to_string(fn_count++);
 
-          auto name = "f" + std::to_string(fn_count++);
-          ns.emplace(ref, name);
+          if(it == ns.end())
+            ns.emplace(ref, name);
+
+          if(defining > 0)
+          {
+            defs_to_print.push(ref);
+            return os << "goto " << name;
+          }
+
+          defining++;
 
           os << name << " = \\(";
           y(y, lm->arg()) << "). ";
-          return y(y, lm->bdy());
+          auto& ret = y(y, lm->bdy());
+
+          defining--;
+          return ret;
         } break;
       }
       assert(false && "Unhandled case.");
@@ -63,6 +79,12 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 
     return inner(inner, ref);
   };
-  return y(ref);
+
+  while(!defs_to_print.empty())
+  {
+    y(defs_to_print.front()) << ";\n";
+    defs_to_print.pop();
+  }
+  return os;
 }
 

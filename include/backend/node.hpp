@@ -127,9 +127,6 @@ struct Prop : Node
 
 struct NodeHasher
 {
-  static std::atomic_size_t lam_count;
-  static std::atomic_size_t param_count;
-
   std::size_t operator()(const Node::Store& str) const
   { return (*this)(str.get()); }
   std::size_t operator()(const Node::cRef ref) const
@@ -139,14 +136,14 @@ struct NodeHasher
     case NodeKind::Kind: return 1;
     case NodeKind::Prop: return 2;
     case NodeKind::Type: return 3;
-    case NodeKind::Param: return param_count++;
+    case NodeKind::Param: return reinterpret_cast<std::size_t>(&*ref) << 7;
     case NodeKind::App: {
         const App::cRef app = static_cast<App::cRef>(ref);
 
         std::size_t seed = 4 + (*this)(app->me()[0]);
         return (*this)(app->me()[1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
       } break;
-    case NodeKind::Fn: return lam_count++;
+    case NodeKind::Fn: return reinterpret_cast<std::size_t>(&*ref) << 13;
     }
     assert(false && "Unhandled case.");
     return 0;
