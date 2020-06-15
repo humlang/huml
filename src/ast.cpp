@@ -1,17 +1,11 @@
 #include <ast.hpp>
 #include <type_checking.hpp>
 #include "exist.hpp" //<- stored under src/
-#include <backend.hpp>
 
 #include <iterator>
 
 #include <iostream>
 #include <queue>
-
-void hx_ast::simple_cpp_gen(std::ostream& os)
-{
-  gen_cpp(*this, os);
-}
 
 void hx_ast::print(std::ostream& os, ast_ptr node)
 {

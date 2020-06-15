@@ -62,19 +62,6 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
       else
         std::cout << "~~~> Does typecheck. <~~~\n";
     } },
-  { emit_classes::ast_to_cpp, [](std::string_view t)
-    {
-      auto w = hx_reader::read<hx_ast>(t);
-
-      if(w.empty())
-        return; // <- diagnostic will contain an error
-      auto& global_ir = w.back();
-
-      if(!global_ir.type_checks())
-        std::cout << "// ~~~> Does not typecheck. <~~~\n";
-      else
-        global_ir.simple_cpp_gen(std::cout);
-    } },
   { emit_classes::tokens, [](std::string_view t)
     {
       auto w = hx_reader::read<token>(t);
