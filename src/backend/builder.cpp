@@ -4,6 +4,50 @@
 #include <string>
 #include <queue>
 
+
+ir::Node::Ref ir::builder::kind()
+{ return lookup_or_emplace(Node::mk_node<Kind>()); }
+
+ir::Node::Ref ir::builder::type()
+{ return lookup_or_emplace(Node::mk_node<Type>()); }
+
+ir::Node::Ref ir::builder::prop()
+{ return lookup_or_emplace(Node::mk_node<Prop>()); }
+
+ir::Node::Ref ir::builder::id(symbol symb, Node::Ref type)
+{
+  assert(type != Node::no_ref && "Type must exist.");
+  return lookup_or_emplace(Node::mk_node<Identifier>(symb, type));
+}
+
+ir::Node::Ref ir::builder::param(Node::Ref type)
+{ return lookup_or_emplace(Node::mk_node<Param>(type)); }
+
+ir::Fn::Ref ir::builder::fn(Node::Ref domain, Node::Ref codomain)
+{
+  assert(domain != nullptr && codomain != nullptr && "(co-)domain must stay valid.");
+  return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>(domain, codomain)));
+}
+
+ir::Fn::Ref ir::builder::fn()
+{ return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>())); }
+
+ir::Node::Ref ir::builder::app(Node::Ref caller, Node::Ref callee)
+{
+  assert(caller != nullptr && callee != nullptr && "(co-)domain must stay valid.");
+  return lookup_or_emplace(Node::mk_node<App>(caller, callee));
+}
+
+ir::Node::Ref ir::builder::destruct(Node::Ref of, std::vector<std::pair<Node::Ref, Node::Ref>> match_arms)
+{ return lookup_or_emplace(Node::mk_node<Case>(of, match_arms)); }
+
+ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
+{
+  if(auto it = nodes.find(store); it != nodes.end())
+      return it->get(); // <- might be different pointer
+  return nodes.emplace(std::move(store)).first->get();
+}
+
 std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 {
   NodeMap<std::string> ns;
