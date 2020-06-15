@@ -12,11 +12,12 @@ ir::builder::builder()
 
   auto bot = id("⊤", type());
 
-  // "main" function's exit     () -> BOT
+  // "main" function's exit     () -> TOP
   world_exit = fn(unit(), bot);
 
-  // "main" function's entry    (() -> BOT) -> BOT // TODO: add arc and argv
+  // "main" function's entry    (() -> TOP) -> TOP // TODO: add arc and argv
   world_entry = fn(world_exit, bot);
+  world_entry->set_type(fn(world_exit, bot));
 }
 
 ir::Node::Ref ir::builder::kind()
@@ -55,10 +56,10 @@ ir::Fn::Ref ir::builder::fn(Node::Ref codomain, Node::Ref domain)
 ir::Fn::Ref ir::builder::fn()
 { return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>())); }
 
-ir::Node::Ref ir::builder::app(Node::Ref caller, Node::Ref callee)
+ir::Node::Ref ir::builder::app(Node::Ref caller, Node::Ref arg)
 {
-  assert(caller != nullptr && callee != nullptr && "(co-)domain must stay valid.");
-  return lookup_or_emplace(Node::mk_node<App>(caller, callee));
+  assert(caller != nullptr && arg != nullptr && "caller and arg must stay valid.");
+  return lookup_or_emplace(Node::mk_node<App>(caller, arg));
 }
 
 ir::Node::Ref ir::builder::destruct(Node::Ref of, std::vector<std::pair<Node::Ref, Node::Ref>> match_arms)
@@ -136,7 +137,7 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 
           os << "(";
           y(y, app->caller()) << " ";
-          return y(y, app->callee()) << ")";
+          return y(y, app->arg()) << ")";
         } break;
 
       case NodeKind::Fn: {
@@ -144,7 +145,7 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 
           auto it = ns.find(lm);
           if(it != ns.end() && defining > 0)
-            return os << "goto " << it->second;
+            return os << (!!(defining & 1) ? "goto " : "") << it->second;
           auto name = it != ns.end() ? it->second : "f" + std::to_string(fn_count++);
 
           if(it == ns.end())
@@ -153,14 +154,15 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
           if(defining > 0)
           {
             defs_to_print.push(ref);
-            return os << "goto " << name;
+            return os << (!!(defining & 1) ? "goto " : "") << name;
           }
-          defining++;
-
           os << name << "(";
-          y(y, lm->arg()) << "): \n    ";
-          auto& ret = y(y, lm->bdy());
 
+          defining += 2;
+          y(y, lm->arg()) << "): \n    ";
+
+          defining--;
+          auto& ret = y(y, lm->bdy());
           defining--;
           return ret;
         } break;
@@ -179,4 +181,105 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
   }
   return os;
 }
+
+ir::Node::Ref ir::builder::exec()
+{ return exec(app(entry(), exit())); }
+
+ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
+{
+  auto inner = [this](auto&& y, Node::Ref ref) -> ir::Node::Ref
+  {
+    switch(ref->kind)
+    {
+    case NodeKind::Kind: return ref; break;
+    case NodeKind::Type: return ref; break;
+    case NodeKind::Prop: return ref; break;
+    case NodeKind::Unit: return ref; break;
+
+    case NodeKind::Ctr:  return ref; break;
+
+    case NodeKind::Case: assert(false && "Unimplemented."); return nullptr; break;
+
+    case NodeKind::Param: return ref; break;
+
+    case NodeKind::App: {
+        App::Ref app = static_cast<App::Ref>(ref);
+
+        auto f = y(y, app->caller());
+        auto v = y(y, app->arg());
+
+        if(f->kind == NodeKind::Ctr)
+          return this->app(f, v);
+        assert(f->kind == NodeKind::Fn && "Callable must be a function.");
+        return this->subst(v, static_cast<Fn::Ref>(f)->arg(), static_cast<Fn::Ref>(f)->bdy());
+      } break;
+
+    case NodeKind::Fn: {
+        // functions don't compute anything
+        return ref;
+      } break;
+    }
+    assert(false && "Unhandled case.");
+    return nullptr;
+  };
+  auto res = inner(inner, ref);
+
+  Node::Ref tmp = Node::no_ref;
+  while(res != (tmp = inner(inner, res)))
+    res = tmp;
+  return res;
+}
+
+ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Node::Ref in)
+{
+  if(what == for_)
+    return in; // no-op
+
+  ir::Node::Ref ret = ir::Node::no_ref;
+  if(what == in)
+    ret = for_;
+  else
+  {
+    switch(in->kind)
+    {
+    case NodeKind::Kind:
+    case NodeKind::Type:
+    case NodeKind::Prop:
+    case NodeKind::Unit:
+    case NodeKind::Param:
+    case NodeKind::Ctr:
+      ret = in; break;
+
+    case NodeKind::Fn: {
+      Fn::Ref fn = static_cast<Fn::Ref>(in);
+      if(fn->arg()->type != nullptr)
+        fn->arg()->set_type(subst(what, for_, fn->arg()->type));
+
+      // TODO: Fix pointer of nominals in case of recursion. perhaps we need a function that checks if fn is free in fn->bdy()
+      auto b = subst(what, for_, fn->bdy());
+
+      ret = this->fn(fn->arg(), b);
+    } break;
+
+    case NodeKind::App: {
+      App::Ref app = static_cast<App::Ref>(in);
+
+      auto a = subst(what, for_, app->caller());
+      auto b = subst(what, for_, app->arg());
+
+      ret = this->app(a, b);
+    } break;
+
+    case NodeKind::Case: {
+        assert(false && "Unimplemented.");
+        ret = nullptr;
+      } break;
+    }
+  }
+  if(in->type != nullptr)
+    ret->type = subst(what, for_, in->type);
+
+  return ret;
+}
+
 

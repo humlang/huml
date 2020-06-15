@@ -115,7 +115,7 @@ struct App : Node
   { children.emplace_back(fn); children.emplace_back(param); }
 
   Node::Ref caller() const { return children.front(); }
-  Node::Ref callee() const { return children.back(); }
+  Node::Ref arg() const { return children.back(); }
 };
 
 struct Case : Node
