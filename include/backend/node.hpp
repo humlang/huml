@@ -20,7 +20,7 @@ enum class NodeKind
   Type,
   Prop,
   Kind,
-  Id,
+  Ctr,
 };
 
 struct Node
@@ -72,13 +72,13 @@ struct Param : Node
 };
 
 // Only used for types, i.e. Nat, Vec, etc.
-struct Identifier : Node
+struct Constructor : Node
 {
-  using Ref = Identifier*;
-  using cRef = const Identifier*;
+  using Ref = Constructor*;
+  using cRef = const Constructor*;
 
-  Identifier(symbol name, Node::Ref type)
-    : Node(NodeKind::Id, {}), name(name)
+  Constructor(symbol name, Node::Ref type)
+    : Node(NodeKind::Ctr, {}), name(name)
   { set_type(type); }
 
   symbol name;
@@ -180,8 +180,8 @@ struct NodeHasher
     case NodeKind::Prop: return 2;
     case NodeKind::Type: return 3;
     case NodeKind::Param: return (reinterpret_cast<std::size_t>(&*ref) << 7) + 0x9e3779b9;
-    case NodeKind::Id:
-      return static_cast<Identifier::cRef>(ref)->name.get_hash();
+    case NodeKind::Ctr:
+      return static_cast<Constructor::cRef>(ref)->name.get_hash();
 
     case NodeKind::App: {
         const App::cRef app = static_cast<App::cRef>(ref);
@@ -223,8 +223,8 @@ struct NodeComparator
     case NodeKind::Param:
       return lhs == rhs; 
 
-    case NodeKind::Id:
-      return static_cast<Identifier::cRef>(lhs)->name.get_hash() == static_cast<Identifier::cRef>(rhs)->name.get_hash();
+    case NodeKind::Ctr:
+      return static_cast<Constructor::cRef>(lhs)->name.get_hash() == static_cast<Constructor::cRef>(rhs)->name.get_hash();
     
     case NodeKind::Case: {
         if(lhs->argc != rhs->argc)

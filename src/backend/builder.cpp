@@ -17,7 +17,7 @@ ir::Node::Ref ir::builder::prop()
 ir::Node::Ref ir::builder::id(symbol symb, Node::Ref type)
 {
   assert(type != Node::no_ref && "Type must exist.");
-  return lookup_or_emplace(Node::mk_node<Identifier>(symb, type));
+  return lookup_or_emplace(Node::mk_node<Constructor>(symb, type));
 }
 
 ir::Node::Ref ir::builder::param(Node::Ref type)
@@ -69,8 +69,8 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
       case NodeKind::Type: return os << "Type"; break;
       case NodeKind::Prop: return os << "Prop"; break;
 
-      case NodeKind::Id: {
-          return os << static_cast<Identifier::Ref>(ref)->name.get_string();
+      case NodeKind::Ctr: {
+          return os << static_cast<Constructor::Ref>(ref)->name.get_string();
         } break;
 
       case NodeKind::Case: {
