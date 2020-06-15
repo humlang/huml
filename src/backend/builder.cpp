@@ -25,6 +25,26 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
       case NodeKind::Type: return os << "Type"; break;
       case NodeKind::Prop: return os << "Prop"; break;
 
+      case NodeKind::Id: {
+          return os << static_cast<Identifier::Ref>(ref)->name.get_string();
+        } break;
+
+      case NodeKind::Case: {
+          Case::Ref cs = static_cast<Case::Ref>(ref);
+          os << "case (";
+          y(y, cs->of()) << ") [ ";
+
+          const auto& arms = cs->match_arms();
+          for(auto it = arms.begin(); it != arms.end(); ++it)
+          {
+            y(y, it->first) << " => ";
+            y(y, it->second);
+            if(std::next(it) != arms.end())
+              os << " | ";
+          }
+          return os << " ]";
+        } break;
+
       case NodeKind::Param: {
           if(auto it = ns.find(ref); it != ns.end())
             return os << it->second;
@@ -62,7 +82,6 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
             defs_to_print.push(ref);
             return os << "goto " << name;
           }
-
           defining++;
 
           os << name << " = \\(";

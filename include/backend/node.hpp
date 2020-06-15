@@ -2,6 +2,7 @@
 
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
+#include <symbol.hpp>
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -14,9 +15,12 @@ enum class NodeKind
   Fn,
   Param,
   App,
+  Case,
+
   Type,
   Prop,
   Kind,
+  Id,
 };
 
 struct Node
@@ -33,7 +37,7 @@ struct Node
 
   Node(NodeKind kind, std::size_t argc)
     : kind(kind), nominal_(true), argc(argc)
-  {  }
+  { children.resize(argc, nullptr); }
 
   Node(NodeKind kind, std::vector<Node::Ref> children)
     : kind(kind), nominal_(false), argc(children.size()), children(children)
@@ -62,9 +66,22 @@ struct Param : Node
 {
   using Ref = Param*;
 
-  Param()
+  Param(Node::Ref type)
     : Node(NodeKind::Param, {})
-  {  }
+  { set_type(type); }
+};
+
+// Only used for types, i.e. Nat, Vec, etc.
+struct Identifier : Node
+{
+  using Ref = Identifier*;
+  using cRef = const Identifier*;
+
+  Identifier(symbol name, Node::Ref type)
+    : Node(NodeKind::Id, {}), name(name)
+  { set_type(type); }
+
+  symbol name;
 };
 
 struct Fn : Node
@@ -75,8 +92,8 @@ struct Fn : Node
     : Node(NodeKind::Fn, {domain, codomain})
   {  }
 
-  Fn(std::size_t argc)
-    : Node(NodeKind::Fn, argc)
+  Fn()
+    : Node(NodeKind::Fn, 2)
   {  }
 
   Node::Ref arg()  { return me()[0]; }
@@ -96,6 +113,32 @@ struct App : Node
 
   Node::Ref caller() const { return children.front(); }
   Node::Ref callee() const { return children.back(); }
+};
+
+struct Case : Node
+{
+  using Ref = Case*;
+
+  Case(Node::Ref of, std::vector<std::pair<Node::Ref, Node::Ref>> match_arms)
+    : Node(NodeKind::Case, { of })
+  {
+    for(auto&& p : match_arms)
+    {
+      children.emplace_back(std::move(p.first));
+      children.emplace_back(std::move(p.second));
+    }
+    argc = children.size();
+  }
+
+  Node::Ref of() { return me()[0]; }
+  std::vector<std::pair<Node::Ref, Node::Ref>> match_arms()
+  {
+    std::vector<std::pair<Node::Ref, Node::Ref>> v;
+    v.reserve(argc - 1);
+    for(std::size_t i = 1; i < argc - 1; i += 2)
+      v.emplace_back(me()[i], me()[i + 1]);
+    return v;
+  }
 };
 
 struct Kind : Node
@@ -136,14 +179,25 @@ struct NodeHasher
     case NodeKind::Kind: return 1;
     case NodeKind::Prop: return 2;
     case NodeKind::Type: return 3;
-    case NodeKind::Param: return reinterpret_cast<std::size_t>(&*ref) << 7;
+    case NodeKind::Param: return (reinterpret_cast<std::size_t>(&*ref) << 7) + 0x9e3779b9;
+    case NodeKind::Id:
+      return static_cast<Identifier::cRef>(ref)->name.get_hash();
+
     case NodeKind::App: {
         const App::cRef app = static_cast<App::cRef>(ref);
 
         std::size_t seed = 4 + (*this)(app->me()[0]);
         return (*this)(app->me()[1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
       } break;
+
     case NodeKind::Fn: return reinterpret_cast<std::size_t>(&*ref) << 13;
+    
+    case NodeKind::Case: {
+        std::size_t hash = 4 + 0x9e3779b9 + ((*this)(ref->me()[0]) << 6);
+        for(std::size_t i = 1; i < ref->argc; ++i)
+          hash = (*this)(ref->me()[i]) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        return hash;
+      } break;
     }
     assert(false && "Unhandled case.");
     return 0;
@@ -169,8 +223,20 @@ struct NodeComparator
     case NodeKind::Param:
       return lhs == rhs; 
 
+    case NodeKind::Id:
+      return static_cast<Identifier::cRef>(lhs)->name.get_hash() == static_cast<Identifier::cRef>(rhs)->name.get_hash();
+    
+    case NodeKind::Case: {
+        if(lhs->argc != rhs->argc)
+          return false;
+        for(std::size_t i = 0; i < lhs->argc; ++i)
+          if(!((*this)(lhs->me()[i], rhs->me()[i])))
+            return false;
+        return true;
+      } break;
+
+    case NodeKind::Fn: return lhs->me()[0] == rhs->me()[0] && lhs->me()[1] == rhs->me()[1];
     case NodeKind::App:
-    case NodeKind::Fn:
         return (*this)(lhs->me()[0], rhs->me()[0]) && (*this)(lhs->me()[1], rhs->me()[1]);
     }
     assert(false && "Unhandled case.");
