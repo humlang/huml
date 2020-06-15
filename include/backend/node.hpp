@@ -17,10 +17,12 @@ enum class NodeKind
   App,
   Case,
 
+  Ctr,
+
   Type,
   Prop,
   Kind,
-  Ctr,
+  Unit,
 };
 
 struct Node
@@ -84,12 +86,13 @@ struct Constructor : Node
   symbol name;
 };
 
+// Implicitly returns BOT
 struct Fn : Node
 {
   using Ref = Fn*;
 
-  Fn(Node::Ref domain, Node::Ref codomain)
-    : Node(NodeKind::Fn, {domain, codomain})
+  Fn(Node::Ref codomain, Node::Ref domain)
+    : Node(NodeKind::Fn, {codomain, domain})
   {  }
 
   Fn()
@@ -99,8 +102,8 @@ struct Fn : Node
   Node::Ref arg()  { return me()[0]; }
   Node::Ref bdy() { return me()[1]; }
 
-  void set_domain(Node::Ref domain) { me()[0] = domain; }
-  void set_codomain(Node::Ref codomain) { me()[1] = codomain; }
+  Node::Ref set_arg(Node::Ref arg) { return me()[0] = arg; }
+  Node::Ref set_bdy(Node::Ref bdy) { return me()[1] = bdy; }
 };
 
 struct App : Node
@@ -168,6 +171,15 @@ struct Prop : Node
   {  }
 };
 
+struct Unit : Node
+{
+  using Ref = Unit*;
+
+  Unit()
+    : Node(NodeKind::Unit, {})
+  {  }
+};
+
 struct NodeHasher
 {
   std::size_t operator()(const Node::Store& str) const
@@ -179,6 +191,7 @@ struct NodeHasher
     case NodeKind::Kind: return 1;
     case NodeKind::Prop: return 2;
     case NodeKind::Type: return 3;
+    case NodeKind::Unit: return 4;
     case NodeKind::Param: return (reinterpret_cast<std::size_t>(&*ref) << 7) + 0x9e3779b9;
     case NodeKind::Ctr:
       return static_cast<Constructor::cRef>(ref)->name.get_hash();
@@ -186,7 +199,7 @@ struct NodeHasher
     case NodeKind::App: {
         const App::cRef app = static_cast<App::cRef>(ref);
 
-        std::size_t seed = 4 + (*this)(app->me()[0]);
+        std::size_t seed = 5 + (*this)(app->me()[0]);
         return (*this)(app->me()[1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
       } break;
 
@@ -217,6 +230,7 @@ struct NodeComparator
     case NodeKind::Kind:
     case NodeKind::Type:
     case NodeKind::Prop:
+    case NodeKind::Unit:
       return true;
 
       // Same pointer is same binding

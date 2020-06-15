@@ -4,6 +4,20 @@
 #include <string>
 #include <queue>
 
+ir::builder::builder()
+{
+  // Bootstrap
+  kind(); type(); prop();
+  unit();
+
+  auto bot = id("⊤", type());
+
+  // "main" function's exit     () -> BOT
+  world_exit = fn(unit(), bot);
+
+  // "main" function's entry    (() -> BOT) -> BOT // TODO: add arc and argv
+  world_entry = fn(world_exit, bot);
+}
 
 ir::Node::Ref ir::builder::kind()
 { return lookup_or_emplace(Node::mk_node<Kind>()); }
@@ -14,6 +28,15 @@ ir::Node::Ref ir::builder::type()
 ir::Node::Ref ir::builder::prop()
 { return lookup_or_emplace(Node::mk_node<Prop>()); }
 
+ir::Node::Ref ir::builder::unit()
+{ return lookup_or_emplace(Node::mk_node<Unit>()); }
+
+ir::Fn::Ref ir::builder::entry()
+{ return world_entry; }
+
+ir::Fn::Ref ir::builder::exit()
+{ return world_exit; }
+
 ir::Node::Ref ir::builder::id(symbol symb, Node::Ref type)
 {
   assert(type != Node::no_ref && "Type must exist.");
@@ -23,10 +46,10 @@ ir::Node::Ref ir::builder::id(symbol symb, Node::Ref type)
 ir::Node::Ref ir::builder::param(Node::Ref type)
 { return lookup_or_emplace(Node::mk_node<Param>(type)); }
 
-ir::Fn::Ref ir::builder::fn(Node::Ref domain, Node::Ref codomain)
+ir::Fn::Ref ir::builder::fn(Node::Ref codomain, Node::Ref domain)
 {
-  assert(domain != nullptr && codomain != nullptr && "(co-)domain must stay valid.");
-  return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>(domain, codomain)));
+  assert(codomain != nullptr && "codomain must stay valid.");
+  return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>(codomain, domain)));
 }
 
 ir::Fn::Ref ir::builder::fn()
@@ -46,6 +69,11 @@ ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
   if(auto it = nodes.find(store); it != nodes.end())
       return it->get(); // <- might be different pointer
   return nodes.emplace(std::move(store)).first->get();
+}
+
+void ir::builder::print(std::ostream& os)
+{
+  print(os, world_entry);
 }
 
 std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
@@ -68,6 +96,7 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
       case NodeKind::Kind: return os << "Kind"; break;
       case NodeKind::Type: return os << "Type"; break;
       case NodeKind::Prop: return os << "Prop"; break;
+      case NodeKind::Unit: return os << "()"; break;
 
       case NodeKind::Ctr: {
           return os << static_cast<Constructor::Ref>(ref)->name.get_string();
@@ -115,7 +144,7 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 
           auto it = ns.find(lm);
           if(it != ns.end() && defining > 0)
-            return os << it->second;
+            return os << "goto " << it->second;
           auto name = it != ns.end() ? it->second : "f" + std::to_string(fn_count++);
 
           if(it == ns.end())
@@ -128,8 +157,8 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
           }
           defining++;
 
-          os << name << " = \\(";
-          y(y, lm->arg()) << "). ";
+          os << name << "(";
+          y(y, lm->arg()) << "): \n    ";
           auto& ret = y(y, lm->bdy());
 
           defining--;
