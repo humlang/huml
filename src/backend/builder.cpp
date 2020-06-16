@@ -4,6 +4,8 @@
 #include <string>
 #include <queue>
 
+#include <iostream>
+
 ir::builder::builder()
 {
   // Bootstrap
@@ -232,11 +234,7 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
 
           if(arm_ctor == of_ctor)
           {
-            // This arm must be chosen. Now subst all params of this arm_ctor with the params of the of_ctor
             assert(of_params.size() == arm_params.size() && "Constructors must have the same number of arguments.");
-
-            // match.second contains free variables that are bound in match.first.
-            // We need to replace all of them with the ones from of_ctor
 
             Node::Ref result = match.second;
             for(std::size_t i = 0; i < of_params.size(); ++i)
@@ -257,7 +255,14 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
         auto v = y(y, app->arg());
 
         if(f->kind == NodeKind::Ctr)
+        {
+          if(static_cast<Constructor::Ref>(f)->name.get_hash() == symbol("print").get_hash())
+          {
+            print(std::cout, v);
+            return unit();
+          }
           return this->app(f, v);
+        }
         assert(f->kind == NodeKind::Fn && "Callable must be a function.");
         return this->subst(static_cast<Fn::Ref>(f)->arg(), v, static_cast<Fn::Ref>(f)->bdy());
       } break;
