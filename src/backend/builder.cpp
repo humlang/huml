@@ -185,6 +185,24 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 ir::Node::Ref ir::builder::exec()
 { return exec(app(entry(), exit())); }
 
+
+ir::Node::Ref find_ctor_and_collect_params(ir::Node::Ref ref, std::vector<ir::Node::Ref>& params)
+{
+  switch(ref->kind)
+  {
+    case ir::NodeKind::Ctr: return ref;
+    case ir::NodeKind::App: {
+      ir::App::Ref app = static_cast<ir::App::Ref>(ref);
+      
+      params.emplace_back(app->arg());
+      return find_ctor_and_collect_params(app->caller(), params);
+    } break;
+  }
+  // Not a constructor or an application using a constructor
+  params.clear();
+  return nullptr;
+}
+
 ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
 {
   auto inner = [this](auto&& y, Node::Ref ref) -> ir::Node::Ref
@@ -198,7 +216,37 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
 
     case NodeKind::Ctr:  return ref; break;
 
-    case NodeKind::Case: assert(false && "Unimplemented."); return nullptr; break;
+    case NodeKind::Case: {
+        Case::Ref cs = static_cast<Case::Ref>(ref);
+
+        auto of_v = exec(cs->of());
+
+        std::vector<Node::Ref> of_params;
+        auto of_ctor = find_ctor_and_collect_params(of_v, of_params);
+
+        for(auto& match : cs->match_arms())
+        {
+          std::vector<Node::Ref> arm_params;
+          auto arm_ctor = find_ctor_and_collect_params(match.first, arm_params);
+          assert(arm_ctor != nullptr && "Match arms must use constructors.");
+
+          if(arm_ctor == of_ctor)
+          {
+            // This arm must be chosen. Now subst all params of this arm_ctor with the params of the of_ctor
+            assert(of_params.size() == arm_params.size() && "Constructors must have the same number of arguments.");
+
+            // match.second contains free variables that are bound in match.first.
+            // We need to replace all of them with the ones from of_ctor
+
+            Node::Ref result = match.second;
+            for(std::size_t i = 0; i < of_params.size(); ++i)
+              result = subst(arm_params[i], of_params[i], result);
+            return result;
+          }
+        }
+        // no constructor chosen             // TODO: Add some special casing for BOTTOM
+        return nullptr;
+      } break;
 
     case NodeKind::Param: return ref; break;
 
@@ -211,7 +259,7 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
         if(f->kind == NodeKind::Ctr)
           return this->app(f, v);
         assert(f->kind == NodeKind::Fn && "Callable must be a function.");
-        return this->subst(v, static_cast<Fn::Ref>(f)->arg(), static_cast<Fn::Ref>(f)->bdy());
+        return this->subst(static_cast<Fn::Ref>(f)->arg(), v, static_cast<Fn::Ref>(f)->bdy());
       } break;
 
     case NodeKind::Fn: {
@@ -224,13 +272,20 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
   };
   auto res = inner(inner, ref);
 
-  Node::Ref tmp = Node::no_ref;
+  Node::Ref tmp = res;
   while(res != (tmp = inner(inner, res)))
     res = tmp;
   return res;
 }
 
+
 ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Node::Ref in)
+{
+  tsl::robin_set<Node::Ref> seen;
+  return subst(what, for_, in, seen);
+}
+
+ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Node::Ref in, tsl::robin_set<Node::Ref>& seen)
 {
   if(what == for_)
     return in; // no-op
@@ -253,10 +308,13 @@ ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Nod
     case NodeKind::Fn: {
       Fn::Ref fn = static_cast<Fn::Ref>(in);
       if(fn->arg()->type != nullptr)
-        fn->arg()->set_type(subst(what, for_, fn->arg()->type));
+        fn->arg()->set_type(subst(what, for_, fn->arg()->type, seen));
+
+      bool contains = seen.contains(in);
+      seen.insert(in);
 
       // TODO: Fix pointer of nominals in case of recursion. perhaps we need a function that checks if fn is free in fn->bdy()
-      auto b = subst(what, for_, fn->bdy());
+      auto b = contains ? fn->bdy() : subst(what, for_, fn->bdy(), seen);
 
       ret = this->fn(fn->arg(), b);
     } break;
@@ -264,20 +322,29 @@ ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Nod
     case NodeKind::App: {
       App::Ref app = static_cast<App::Ref>(in);
 
-      auto a = subst(what, for_, app->caller());
-      auto b = subst(what, for_, app->arg());
+      auto a = subst(what, for_, app->caller(), seen);
+      auto b = subst(what, for_, app->arg(), seen);
 
       ret = this->app(a, b);
     } break;
 
     case NodeKind::Case: {
-        assert(false && "Unimplemented.");
-        ret = nullptr;
-      } break;
+      Case::Ref cs = static_cast<Case::Ref>(in);
+
+      auto of = subst(what, for_, cs->of(), seen);
+      auto arms = cs->match_arms();
+      for(auto& match : arms)
+      {
+        if(match.first->type != nullptr)
+          match.first->set_type(subst(what, for_, match.first->type, seen));
+        match.second = subst(what, for_, match.second, seen);
+      }
+      ret = this->destruct(of, arms);
+    } break;
     }
   }
   if(in->type != nullptr)
-    ret->type = subst(what, for_, in->type);
+    ret->type = subst(what, for_, in->type, seen);
 
   return ret;
 }

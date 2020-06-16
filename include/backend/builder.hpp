@@ -35,6 +35,7 @@ struct builder
   Node::Ref exec();
 private:
   Node::Ref exec(Node::Ref ref);
+  Node::Ref subst(Node::Ref what, Node::Ref for_, Node::Ref in, tsl::robin_set<Node::Ref>& seen);
   Node::Ref subst(Node::Ref what, Node::Ref for_, Node::Ref in);
 private:
   Node::Ref lookup_or_emplace(Node::Store store);
