@@ -13,9 +13,15 @@ struct builder
   Node::Ref type();
   Node::Ref prop();  
   Node::Ref unit();
+  Node::Ref i(bool no_sign, Node::Ref size);
+
   Node::Ref id(symbol symb, Node::Ref type);
+  Node::Ref ignore();
 
   Node::Ref param(Node::Ref type = Node::no_ref);
+
+  Node::Ref lit(std::uint_fast64_t value);
+  Node::Ref binop(BinaryKind op, Node::Ref lhs, Node::Ref rhs);
 
   Fn::Ref fn(Node::Ref codomain, Node::Ref domain);
   Fn::Ref fn();

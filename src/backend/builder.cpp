@@ -46,8 +46,20 @@ ir::Node::Ref ir::builder::id(symbol symb, Node::Ref type)
   return lookup_or_emplace(Node::mk_node<Constructor>(symb, type));
 }
 
+ir::Node::Ref ir::builder::ignore() // TODO: replace nullptr with existential
+{ return lookup_or_emplace(Node::mk_node<Constructor>("_", nullptr)); }
+
 ir::Node::Ref ir::builder::param(Node::Ref type)
 { return lookup_or_emplace(Node::mk_node<Param>(type)); }
+
+ir::Node::Ref ir::builder::lit(std::uint_fast64_t value)
+{ return lookup_or_emplace(Node::mk_node<Literal>(value)); }
+
+ir::Node::Ref ir::builder::binop(ir::BinaryKind op, Node::Ref lhs, Node::Ref rhs)
+{ return lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs)); }
+
+ir::Node::Ref ir::builder::i(bool no_sign, Node::Ref size)
+{ return lookup_or_emplace(Node::mk_node<Int>(no_sign, size)); }
 
 ir::Fn::Ref ir::builder::fn(Node::Ref codomain, Node::Ref domain)
 {
@@ -103,6 +115,30 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 
       case NodeKind::Ctr: {
           return os << static_cast<Constructor::Ref>(ref)->name.get_string();
+        } break;
+
+      case NodeKind::Int: {
+          os << (static_cast<Int::Ref>(ref)->is_unsigned() ? "uint " : "int ");
+          return y(y, static_cast<Int::Ref>(ref)->size());
+        } break;
+
+      case NodeKind::Literal: {
+          return os << static_cast<Literal::Ref>(ref)->literal;
+        } break;
+
+      case NodeKind::Binary: {
+          auto binop = static_cast<Binary::Ref>(ref);
+          os << "(";
+          y(y, binop->lhs()) << ")";
+
+          switch(binop->op)
+          {
+          case ir::BinaryKind::Minus: os << " - "; break;
+          case ir::BinaryKind::Plus:  os << " + "; break;
+          case ir::BinaryKind::Mult:  os << " * "; break;
+          }
+          os << "(";
+          return y(y, binop->rhs()) << ")";
         } break;
 
       case NodeKind::Case: {
@@ -218,28 +254,67 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
 
     case NodeKind::Ctr:  return ref; break;
 
+    case NodeKind::Int:  return ref; break;
+    case NodeKind::Literal: return ref; break;
+
+    case NodeKind::Binary: {
+      Binary::Ref br = static_cast<Binary::Ref>(ref);
+
+      auto l = exec(br->lhs());
+      auto r = exec(br->rhs());
+
+      if(l->kind != NodeKind::Literal || r->kind != NodeKind::Literal)
+        return this->binop(br->op, l, r);
+
+      auto ll = static_cast<Literal::Ref>(l);
+      auto lr = static_cast<Literal::Ref>(r);
+      switch (br->op)
+      {
+      case BinaryKind::Minus: return this->lit(ll->literal - lr->literal);
+      case BinaryKind::Plus:  return this->lit(ll->literal + lr->literal);
+      case BinaryKind::Mult:  return this->lit(ll->literal * lr->literal);
+      }
+    } break;
+
     case NodeKind::Case: {
         Case::Ref cs = static_cast<Case::Ref>(ref);
 
         auto of_v = exec(cs->of());
 
-        std::vector<Node::Ref> of_params;
-        auto of_ctor = find_ctor_and_collect_params(of_v, of_params);
-
-        for(auto& match : cs->match_arms())
+        if(of_v->kind != NodeKind::Literal)
         {
-          std::vector<Node::Ref> arm_params;
-          auto arm_ctor = find_ctor_and_collect_params(match.first, arm_params);
-          assert(arm_ctor != nullptr && "Match arms must use constructors.");
+          std::vector<Node::Ref> of_params;
+          auto of_ctor = find_ctor_and_collect_params(of_v, of_params);
 
-          if(arm_ctor == of_ctor)
+          for(auto& match : cs->match_arms())
           {
-            assert(of_params.size() == arm_params.size() && "Constructors must have the same number of arguments.");
+            std::vector<Node::Ref> arm_params;
+            auto arm_ctor = find_ctor_and_collect_params(match.first, arm_params);
+            assert(arm_ctor != nullptr && "Match arms must use constructors.");
 
-            Node::Ref result = match.second;
-            for(std::size_t i = 0; i < of_params.size(); ++i)
-              result = subst(arm_params[i], of_params[i], result);
-            return result;
+            if(arm_ctor == of_ctor)
+            {
+              assert(of_params.size() == arm_params.size() && "Constructors must have the same number of arguments.");
+
+              Node::Ref result = match.second;
+              for(std::size_t i = 0; i < of_params.size(); ++i)
+                result = subst(arm_params[i], of_params[i], result);
+              return result;
+            }
+          }
+        }
+        else
+        {
+          for(auto& match : cs->match_arms())
+          {
+            if(of_v == match.first || (match.first->kind == NodeKind::Ctr && static_cast<Constructor::Ref>(match.first)->name == symbol("_")))
+            {
+              return match.second; // if literal matches exactly or pattern is ignore, we don't have to subst anything
+            }
+            else if(match.first->kind == NodeKind::Param) // want to bind this under new name
+            {
+              return subst(match.first, of_v, match.second);
+            }
           }
         }
         // no constructor chosen             // TODO: Add some special casing for BOTTOM
@@ -279,7 +354,9 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
 
   Node::Ref tmp = res;
   while(res != (tmp = inner(inner, res)))
+  {
     res = tmp;
+  }
   return res;
 }
 
@@ -308,6 +385,8 @@ ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Nod
     case NodeKind::Unit:
     case NodeKind::Param:
     case NodeKind::Ctr:
+    case NodeKind::Int:
+    case NodeKind::Literal:
       ret = in; break;
 
     case NodeKind::Fn: {
@@ -324,6 +403,14 @@ ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Nod
       ret = this->fn(fn->arg(), b);
     } break;
 
+    case NodeKind::Binary: {
+      Binary::Ref bin = static_cast<Binary::Ref>(in);
+
+      auto a = subst(what, for_, bin->lhs(), seen);
+      auto b = subst(what, for_, bin->rhs(), seen);
+
+      ret = this->binop(bin->op, a, b);
+    } break;
     case NodeKind::App: {
       App::Ref app = static_cast<App::Ref>(in);
 

@@ -16,8 +16,12 @@ enum class NodeKind
   Param,
   App,
   Case,
+  Binary,
 
+  Int,
   Ctr,
+
+  Literal,
 
   Type,
   Prop,
@@ -67,10 +71,59 @@ struct Node
 struct Param : Node
 {
   using Ref = Param*;
+  using cRef = Param*;
 
   Param(Node::Ref type)
     : Node(NodeKind::Param, {})
   { set_type(type); }
+};
+
+struct Int : Node
+{
+  using Ref = Int*;
+  using cRef = const Int*;
+
+  Int(bool no_sign, Node::Ref size)
+    : Node(NodeKind::Int, {size}), no_sign(no_sign)
+  {  }
+
+  Node::Ref size() { return me()[0]; }
+  bool is_unsigned() const { return no_sign; }
+
+  bool no_sign;
+};
+
+struct Literal : Node
+{
+  using Ref = Literal*;
+  using cRef = const Literal*;
+
+  Literal(std::uint_fast64_t literal)
+    : Node(NodeKind::Literal, {}), literal(literal)
+  {  }
+
+  std::uint_fast64_t literal;
+};
+
+enum class BinaryKind : std::int_fast8_t
+{
+  Plus  = '+',
+  Minus = '-',
+  Mult  = '*',
+};
+struct Binary : Node
+{
+  using Ref = Binary*;
+  using cRef = const Binary*;
+
+  Binary(BinaryKind op, Node::Ref lhs, Node::Ref rhs)
+    : Node(NodeKind::Binary, {lhs, rhs}), op(op)
+  {  }
+
+  Node::Ref lhs() { return me()[0]; }
+  Node::Ref rhs() { return me()[1]; }
+
+  BinaryKind op;
 };
 
 // Only used for types, i.e. Nat, Vec, etc.
@@ -86,10 +139,14 @@ struct Constructor : Node
   symbol name;
 };
 
+
+//thread_local std::size_t fn_count = 0;
+
 // Implicitly returns BOT
 struct Fn : Node
 {
   using Ref = Fn*;
+  using cRef = const Fn*;
 
   Fn(Node::Ref codomain, Node::Ref domain)
     : Node(NodeKind::Fn, {codomain, domain})
@@ -109,6 +166,7 @@ struct Fn : Node
 struct App : Node
 {
   using Ref = App*;
+  using cRef = const App*;
 
   App(Node::Ref fn, Node::Ref param)
     : Node(NodeKind::App, {fn, param})
@@ -121,6 +179,7 @@ struct App : Node
 struct Case : Node
 {
   using Ref = Case*;
+  using cRef = const Case*;
 
   Case(Node::Ref of, std::vector<std::pair<Node::Ref, Node::Ref>> match_arms)
     : Node(NodeKind::Case, { of })
@@ -147,6 +206,7 @@ struct Case : Node
 struct Kind : Node
 {
   using Ref = Kind*;
+  using cRef = const Kind*;
 
   Kind()
     : Node(NodeKind::Kind, {})
@@ -156,6 +216,7 @@ struct Kind : Node
 struct Type : Node
 {
   using Ref = Type*;
+  using cRef = const Type*;
 
   Type()
     : Node(NodeKind::Type, {})
@@ -165,6 +226,7 @@ struct Type : Node
 struct Prop : Node
 {
   using Ref = Prop*;
+  using cRef = const Prop*;
 
   Prop()
     : Node(NodeKind::Prop, {})
@@ -174,6 +236,7 @@ struct Prop : Node
 struct Unit : Node
 {
   using Ref = Unit*;
+  using cRef = const Unit*;
 
   Unit()
     : Node(NodeKind::Unit, {})
@@ -196,11 +259,24 @@ struct NodeHasher
     case NodeKind::Ctr:
       return static_cast<Constructor::cRef>(ref)->name.get_hash();
 
+    case NodeKind::Int: return (8 << 8) + (*this)(static_cast<Int::cRef>(ref)->me()[0]);
+    case NodeKind::Literal: return 0x9e3779b9 ^ static_cast<Literal::cRef>(ref)->literal;
+
+    case NodeKind::Binary: {
+        auto r = static_cast<Binary::cRef>(ref);
+
+        auto lh = (*this)(r->me()[0]);
+        auto rh = (*this)(r->me()[1]);
+
+        return 11 + lh + 0x9e3779b9 + (rh << 6) + (rh >> 2);
+      } break;
+
+
     case NodeKind::App: {
         const App::cRef app = static_cast<App::cRef>(ref);
 
         std::size_t seed = 5 + (*this)(app->me()[0]);
-        return (*this)(app->me()[1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return 3301 + (*this)(app->me()[1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
       } break;
 
     case NodeKind::Fn: return reinterpret_cast<std::size_t>(&*ref) << 13;
@@ -233,6 +309,18 @@ struct NodeComparator
     case NodeKind::Unit:
       return true;
 
+    case NodeKind::Int:
+      return (*this)(static_cast<Int::cRef>(lhs)->me()[0], static_cast<Int::cRef>(rhs)->me()[0]);
+    case NodeKind::Literal:
+      return static_cast<Literal::cRef>(lhs)->literal == static_cast<Literal::cRef>(rhs)->literal;
+
+    case NodeKind::Binary: {
+        auto l = static_cast<Binary::cRef>(lhs);
+        auto r = static_cast<Binary::cRef>(rhs);
+
+        return (*this)(l->me()[0], r->me()[0]) && (*this)(l->me()[1], r->me()[1]);
+      } break;
+
       // Same pointer is same binding
     case NodeKind::Param:
       return lhs == rhs; 
@@ -249,7 +337,10 @@ struct NodeComparator
         return true;
       } break;
 
-    case NodeKind::Fn: return lhs->me()[0] == rhs->me()[0] && lhs->me()[1] == rhs->me()[1];
+    case NodeKind::Fn:
+      if(lhs == rhs)
+        return true;
+      return !lhs->nominal() && !rhs->nominal() && lhs->me()[0] == rhs->me()[0] && lhs->me()[1] == rhs->me()[1];
     case NodeKind::App:
         return (*this)(lhs->me()[0], rhs->me()[0]) && (*this)(lhs->me()[1], rhs->me()[1]);
     }
