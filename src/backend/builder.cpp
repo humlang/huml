@@ -93,89 +93,91 @@ void ir::builder::print_graph(std::ostream& os)
   os << "}\n";
 }
 
-static std::size_t param_count = 0;
-static std::size_t fn_count = 0;
-static ir::NodeSet defs_printed = {};
 
 std::ostream& ir::builder::print_graph(std::ostream& os, Node::Ref ref)
 {
-  switch(ref->kind())
+  ir::NodeSet defs_printed = {};
+
+  auto internal = [&os, &defs_printed](auto internal, Node::Ref ref) -> std::ostream&
   {
-  case NodeKind::Kind: os << "Kind"; break;
-  case NodeKind::Type: os << "Type"; break;
-  case NodeKind::Prop: os << "Prop"; break;
-  case NodeKind::Ctr:  os << static_cast<Constructor::Ref>(ref)->name.get_string(); break;
-  case NodeKind::Literal: os << static_cast<Literal::Ref>(ref)->literal; break;
-  case NodeKind::Int:  os << "int"; break;
-  case NodeKind::Param: os << "p" << ++param_count; break;
-  case NodeKind::Unit: os << "UNIT"; break;
-  case NodeKind::Binary: {
-      auto bin = static_cast<Binary::Ref>(ref);
+    switch(ref->kind())
+    {
+    case NodeKind::Kind: os << "Kind"; break;
+    case NodeKind::Type: os << "Type"; break;
+    case NodeKind::Prop: os << "Prop"; break;
+    case NodeKind::Ctr:  os << static_cast<Constructor::Ref>(ref)->name.get_string(); break;
+    case NodeKind::Literal: os << static_cast<Literal::Ref>(ref)->literal; break;
+    case NodeKind::Int:  os << "int"; break;
+    case NodeKind::Param: os << "p" << ref->gid(); break;
+    case NodeKind::Unit: os << "UNIT"; break;
+    case NodeKind::Binary: {
+        auto bin = static_cast<Binary::Ref>(ref);
 
-      std::string op;
-      switch(bin->op)
-      {
-      case BinaryKind::Mult:  op = "mul"; break;
-      case BinaryKind::Plus:  op = "pls"; break;
-      case BinaryKind::Minus: op = "min"; break;
-      }
-      op += std::to_string(bin->gid());
-
-      if(!defs_printed.contains(ref))
-      {
-        print_graph(os, bin->lhs()) << " -> " << op << ";\n";
-        print_graph(os, bin->rhs()) << " -> " << op << ";\n";
-
-        defs_printed.insert(ref);
-      }
-      os << op;
-    } break;
-  case NodeKind::App: {
-      auto ap = static_cast<App::Ref>(ref);
-
-      std::string op = "app_" + std::to_string(ap->gid());
-      if(!defs_printed.contains(ref))
-      {
-        print_graph(os, ap->caller()) << " -> " << op << ";\n";
-        print_graph(os, ap->arg()) << " -> " << op << ";\n";
-
-        defs_printed.insert(ref);
-      }
-      os << op;
-    } break;
-  case NodeKind::Fn: {
-      auto fn = static_cast<Fn::Ref>(ref);
-
-      std::string op = "fn_" + std::to_string(fn->gid());
-      if(!defs_printed.contains(ref))
-      {
-        print_graph(os, fn->arg()) << " -> " << op << ";\n";
-        print_graph(os, fn->bdy()) << " -> " << op << ";\n";
-
-        defs_printed.insert(ref);
-      }
-      os << op;
-    } break;
-  case NodeKind::Case: {
-      auto cs = static_cast<Case::Ref>(ref);
-
-      std::string op = "case_" + std::to_string(cs->gid());
-      if(!defs_printed.contains(ref))
-      {
-        auto vals = cs->match_arms();
-        print_graph(os, cs->of()) << " -> " << op << ";\n";
-        for(auto& v : vals)
+        std::string op;
+        switch(bin->op)
         {
-          print_graph(os, v.first)  << " -> " << op << ";\n";
-          print_graph(os, v.second) << " -> " << op << ";\n";
+        case BinaryKind::Mult:  op = "mul"; break;
+        case BinaryKind::Plus:  op = "pls"; break;
+        case BinaryKind::Minus: op = "min"; break;
         }
+        op += std::to_string(bin->gid());
 
-        defs_printed.insert(ref);
-      }
-      os << op;
-    } break;
-  }
+        if(!defs_printed.contains(ref))
+        {
+          internal(internal, bin->lhs()) << " -> " << op << ";\n";
+          internal(internal, bin->rhs()) << " -> " << op << ";\n";
 
-  return os;
+          defs_printed.insert(ref);
+        }
+        os << op;
+      } break;
+    case NodeKind::App: {
+        auto ap = static_cast<App::Ref>(ref);
+
+        std::string op = "app_" + std::to_string(ap->gid());
+        if(!defs_printed.contains(ref))
+        {
+          internal(internal, ap->caller()) << " -> " << op << ";\n";
+          internal(internal, ap->arg()) << " -> " << op << ";\n";
+
+          defs_printed.insert(ref);
+        }
+        os << op;
+      } break;
+    case NodeKind::Fn: {
+        auto fn = static_cast<Fn::Ref>(ref);
+
+        std::string op = "fn_" + std::to_string(fn->gid());
+        if(!defs_printed.contains(ref))
+        {
+          internal(internal, fn->arg()) << " -> " << op << ";\n";
+          internal(internal, fn->bdy()) << " -> " << op << ";\n";
+
+          defs_printed.insert(ref);
+        }
+        os << op;
+      } break;
+    case NodeKind::Case: {
+        auto cs = static_cast<Case::Ref>(ref);
+
+        std::string op = "case_" + std::to_string(cs->gid());
+        if(!defs_printed.contains(ref))
+        {
+          auto vals = cs->match_arms();
+          internal(internal, cs->of()) << " -> " << op << ";\n";
+          for(auto& v : vals)
+          {
+            internal(internal, v.first)  << " -> " << op << ";\n";
+            internal(internal, v.second) << " -> " << op << ";\n";
+          }
+
+          defs_printed.insert(ref);
+        }
+        os << op;
+      } break;
+    }
+    return os;
+  };
+  return internal(internal, ref);
 }
 
