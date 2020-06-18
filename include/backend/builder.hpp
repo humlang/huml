@@ -24,7 +24,6 @@ struct builder
   Node::Ref binop(BinaryKind op, Node::Ref lhs, Node::Ref rhs);
 
   Fn::Ref fn(Node::Ref codomain, Node::Ref domain);
-  Fn::Ref fn();
 
   Fn::Ref entry();
   Fn::Ref exit();
@@ -35,17 +34,11 @@ struct builder
 
 
   // Prints anything that is reachable from main function
-  void print(std::ostream& os);
-  std::ostream& print(std::ostream& os, Node::Ref ref);
+  void print_graph(std::ostream& os);
+  std::ostream& print_graph(std::ostream& os, Node::Ref ref);
 
-  Node::Ref exec();
-private:
-  Node::Ref exec(Node::Ref ref);
-  Node::Ref subst(Node::Ref what, Node::Ref for_, Node::Ref in, tsl::robin_set<Node::Ref>& seen);
-  Node::Ref subst(Node::Ref what, Node::Ref for_, Node::Ref in);
 private:
   Node::Ref lookup_or_emplace(Node::Store store);
-
 private:
   tsl::robin_set<Node::Store, NodeHasher, NodeComparator> nodes;
 

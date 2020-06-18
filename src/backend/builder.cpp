@@ -67,9 +67,6 @@ ir::Fn::Ref ir::builder::fn(Node::Ref codomain, Node::Ref domain)
   return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>(codomain, domain)));
 }
 
-ir::Fn::Ref ir::builder::fn()
-{ return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>())); }
-
 ir::Node::Ref ir::builder::app(Node::Ref caller, Node::Ref arg)
 {
   assert(caller != nullptr && arg != nullptr && "caller and arg must stay valid.");
@@ -89,359 +86,96 @@ ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
   return nodes.emplace(std::move(store)).first->get();
 }
 
-void ir::builder::print(std::ostream& os)
+void ir::builder::print_graph(std::ostream& os)
 {
-  print(os, world_entry);
+  os << "digraph iea {\n";
+  print_graph(os, world_entry);
+  os << "}\n";
 }
 
-std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
-{
-  NodeMap<std::string> ns;
-  std::size_t param_count = 0;
-  std::size_t fn_count = 0;
+static std::size_t param_count = 0;
+static std::size_t fn_count = 0;
+static ir::NodeSet defs_printed = {};
 
-  std::uint_fast16_t defining = 0;
-
-  std::queue<Node::cRef> defs_to_print;
-  defs_to_print.push(ref);
-
-  auto y = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](Node::cRef ref) -> std::ostream&
-  {
-    auto inner = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](auto&& y, Node::cRef ref) -> std::ostream&
-    {
-      switch(ref->kind())
-      {
-      case NodeKind::Kind: return os << "Kind"; break;
-      case NodeKind::Type: return os << "Type"; break;
-      case NodeKind::Prop: return os << "Prop"; break;
-      case NodeKind::Unit: return os << "()"; break;
-
-      case NodeKind::Ctr: {
-          return os << static_cast<Constructor::cRef>(ref)->name.get_string();
-        } break;
-
-      case NodeKind::Int: {
-          os << (static_cast<Int::cRef>(ref)->is_unsigned() ? "uint " : "int ");
-          return y(y, static_cast<Int::cRef>(ref)->size());
-        } break;
-
-      case NodeKind::Literal: {
-          return os << static_cast<Literal::cRef>(ref)->literal;
-        } break;
-
-      case NodeKind::Binary: {
-          auto binop = static_cast<Binary::cRef>(ref);
-          os << "(";
-          y(y, binop->lhs()) << ")";
-
-          switch(binop->op)
-          {
-          case ir::BinaryKind::Minus: os << " - "; break;
-          case ir::BinaryKind::Plus:  os << " + "; break;
-          case ir::BinaryKind::Mult:  os << " * "; break;
-          }
-          os << "(";
-          return y(y, binop->rhs()) << ")";
-        } break;
-
-      case NodeKind::Case: {
-          auto cs = static_cast<Case::cRef>(ref);
-          os << "case (";
-          y(y, cs->of()) << ") [ ";
-
-          const auto& arms = cs->match_arms();
-          for(auto it = arms.begin(); it != arms.end(); ++it)
-          {
-            y(y, it->first) << " => ";
-            y(y, it->second);
-            if(std::next(it) != arms.end())
-              os << " | ";
-          }
-          return os << " ]";
-        } break;
-
-      case NodeKind::Param: {
-          if(auto it = ns.find(ref); it != ns.end())
-            return os << it->second;
-
-          auto name = "p" + std::to_string(param_count++);
-          ns.emplace(ref, name);
-
-          if(ref->type() == Node::no_ref)
-            return os << name;
-          os << "(" << name << ") : ";
-          return y(y, ref->type());
-        } break;
-
-      case NodeKind::App: {
-          App::cRef app = static_cast<App::cRef>(ref);
-
-          os << "(";
-          y(y, app->caller()) << " ";
-          return y(y, app->arg()) << ")";
-        } break;
-
-      case NodeKind::Fn: {
-          Fn::cRef lm = static_cast<Fn::cRef>(ref);
-
-          auto it = ns.find(lm);
-          if(it != ns.end() && defining > 0)
-            return os << (!!(defining & 1) ? "goto " : "") << it->second;
-          auto name = it != ns.end() ? it->second : "f" + std::to_string(fn_count++);
-
-          if(it == ns.end())
-            ns.emplace(ref, name);
-
-          if(defining > 0)
-          {
-            defs_to_print.push(ref);
-            return os << (!!(defining & 1) ? "goto " : "") << name;
-          }
-          os << name << "(";
-
-          defining += 2;
-          y(y, lm->arg()) << "): \n    ";
-
-          defining--;
-          auto& ret = y(y, lm->bdy());
-          defining--;
-          return ret;
-        } break;
-      }
-      assert(false && "Unhandled case.");
-      return os;
-    };
-
-    return inner(inner, ref);
-  };
-
-  while(!defs_to_print.empty())
-  {
-    y(defs_to_print.front()) << ";\n";
-    defs_to_print.pop();
-  }
-  return os;
-}
-
-ir::Node::Ref ir::builder::exec()
-{ return exec(app(entry(), exit())); }
-
-
-ir::Node::Ref find_ctor_and_collect_params(ir::Node::Ref ref, std::vector<ir::Node::Ref>& params)
+std::ostream& ir::builder::print_graph(std::ostream& os, Node::Ref ref)
 {
   switch(ref->kind())
   {
-    case ir::NodeKind::Ctr: return ref;
-    case ir::NodeKind::App: {
-      ir::App::Ref app = static_cast<ir::App::Ref>(ref);
-      
-      params.emplace_back(app->arg());
-      return find_ctor_and_collect_params(app->caller(), params);
-    } break;
-  }
-  // Not a constructor or an application using a constructor
-  params.clear();
-  return nullptr;
-}
+  case NodeKind::Kind: os << "Kind"; break;
+  case NodeKind::Type: os << "Type"; break;
+  case NodeKind::Prop: os << "Prop"; break;
+  case NodeKind::Ctr:  os << static_cast<Constructor::Ref>(ref)->name.get_string(); break;
+  case NodeKind::Literal: os << static_cast<Literal::Ref>(ref)->literal; break;
+  case NodeKind::Int:  os << "int"; break;
+  case NodeKind::Param: os << "p" << ++param_count; break;
+  case NodeKind::Unit: os << "UNIT"; break;
+  case NodeKind::Binary: {
+      auto bin = static_cast<Binary::Ref>(ref);
 
-ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
-{
-  auto inner = [this](auto&& y, Node::Ref ref) -> ir::Node::Ref
-  {
-    switch(ref->kind())
-    {
-    case NodeKind::Kind: return ref; break;
-    case NodeKind::Type: return ref; break;
-    case NodeKind::Prop: return ref; break;
-    case NodeKind::Unit: return ref; break;
-
-    case NodeKind::Ctr:  return ref; break;
-
-    case NodeKind::Int:  return ref; break;
-    case NodeKind::Literal: return ref; break;
-
-    case NodeKind::Binary: {
-      Binary::Ref br = static_cast<Binary::Ref>(ref);
-
-      auto l = exec(br->lhs());
-      auto r = exec(br->rhs());
-
-      if(l->kind() != NodeKind::Literal || r->kind() != NodeKind::Literal)
-        return this->binop(br->op, l, r);
-
-      auto ll = static_cast<Literal::Ref>(l);
-      auto lr = static_cast<Literal::Ref>(r);
-      switch (br->op)
+      std::string op;
+      switch(bin->op)
       {
-      case BinaryKind::Minus: return this->lit(ll->literal - lr->literal);
-      case BinaryKind::Plus:  return this->lit(ll->literal + lr->literal);
-      case BinaryKind::Mult:  return this->lit(ll->literal * lr->literal);
+      case BinaryKind::Mult:  op = "mul"; break;
+      case BinaryKind::Plus:  op = "pls"; break;
+      case BinaryKind::Minus: op = "min"; break;
       }
-    } break;
+      op += std::to_string(bin->gid());
 
-    case NodeKind::Case: {
-        Case::Ref cs = static_cast<Case::Ref>(ref);
-
-        auto of_v = exec(cs->of());
-
-        if(of_v->kind() != NodeKind::Literal)
-        {
-          std::vector<Node::Ref> of_params;
-          auto of_ctor = find_ctor_and_collect_params(of_v, of_params);
-
-          for(auto& match : cs->match_arms())
-          {
-            std::vector<Node::Ref> arm_params;
-            auto arm_ctor = find_ctor_and_collect_params(match.first, arm_params);
-            assert(arm_ctor != nullptr && "Match arms must use constructors.");
-
-            if(arm_ctor == of_ctor)
-            {
-              assert(of_params.size() == arm_params.size() && "Constructors must have the same number of arguments.");
-
-              Node::Ref result = match.second;
-              for(std::size_t i = 0; i < of_params.size(); ++i)
-                result = subst(arm_params[i], of_params[i], result);
-              return result;
-            }
-          }
-        }
-        else
-        {
-          for(auto& match : cs->match_arms())
-          {
-            if(of_v == match.first || (match.first->kind() == NodeKind::Ctr && static_cast<Constructor::Ref>(match.first)->name == symbol("_")))
-            {
-              return match.second; // if literal matches exactly or pattern is ignore, we don't have to subst anything
-            }
-            else if(match.first->kind() == NodeKind::Param) // want to bind this under new name
-            {
-              return subst(match.first, of_v, match.second);
-            }
-          }
-        }
-        // no constructor chosen             // TODO: Add some special casing for BOTTOM
-        return nullptr;
-      } break;
-
-    case NodeKind::Param: return ref; break;
-
-    case NodeKind::App: {
-        App::Ref app = static_cast<App::Ref>(ref);
-
-        auto f = y(y, app->caller());
-        auto v = y(y, app->arg());
-
-        if(f->kind() == NodeKind::Ctr)
-        {
-          if(static_cast<Constructor::Ref>(f)->name.get_hash() == symbol("print").get_hash())
-          {
-            print(std::cout, v);
-            return unit();
-          }
-          return this->app(f, v);
-        }
-        assert(f->kind() == NodeKind::Fn && "Callable must be a function.");
-        return this->subst(static_cast<Fn::Ref>(f)->arg(), v, static_cast<Fn::Ref>(f)->bdy());
-      } break;
-
-    case NodeKind::Fn: {
-        // functions don't compute anything
-        return ref;
-      } break;
-    }
-    assert(false && "Unhandled case.");
-    return nullptr;
-  };
-  auto res = inner(inner, ref);
-
-  Node::Ref tmp = res;
-  while(res != (tmp = inner(inner, res)))
-  {
-    res = tmp;
-  }
-  return res;
-}
-
-
-ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Node::Ref in)
-{
-  tsl::robin_set<Node::Ref> seen;
-  return subst(what, for_, in, seen);
-}
-
-ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Node::Ref in, tsl::robin_set<Node::Ref>& seen)
-{
-  if(what == for_)
-    return in; // no-op
-
-  ir::Node::Ref ret = ir::Node::no_ref;
-  if(what == in)
-    ret = for_;
-  else
-  {
-    switch(in->kind())
-    {
-    case NodeKind::Kind:
-    case NodeKind::Type:
-    case NodeKind::Prop:
-    case NodeKind::Unit:
-    case NodeKind::Param:
-    case NodeKind::Ctr:
-    case NodeKind::Int:
-    case NodeKind::Literal:
-      ret = in; break;
-
-    case NodeKind::Fn: {
-      Fn::Ref fn = static_cast<Fn::Ref>(in);
-      if(fn->arg()->type() != nullptr)
-        fn->arg()->set_type(subst(what, for_, fn->arg()->type(), seen));
-
-      bool contains = seen.contains(in);
-      seen.insert(in);
-
-      // TODO: Fix pointer of nominals in case of recursion. perhaps we need a function that checks if fn is free in fn->bdy()
-      auto b = contains ? fn->bdy() : subst(what, for_, fn->bdy(), seen);
-
-      ret = this->fn(fn->arg(), b);
-    } break;
-
-    case NodeKind::Binary: {
-      Binary::Ref bin = static_cast<Binary::Ref>(in);
-
-      auto a = subst(what, for_, bin->lhs(), seen);
-      auto b = subst(what, for_, bin->rhs(), seen);
-
-      ret = this->binop(bin->op, a, b);
-    } break;
-    case NodeKind::App: {
-      App::Ref app = static_cast<App::Ref>(in);
-
-      auto a = subst(what, for_, app->caller(), seen);
-      auto b = subst(what, for_, app->arg(), seen);
-
-      ret = this->app(a, b);
-    } break;
-
-    case NodeKind::Case: {
-      Case::Ref cs = static_cast<Case::Ref>(in);
-
-      auto of = subst(what, for_, cs->of(), seen);
-      auto arms = cs->match_arms();
-      for(auto& match : arms)
+      if(!defs_printed.contains(ref))
       {
-        if(match.first->type() != nullptr)
-          match.first->set_type(subst(what, for_, match.first->type(), seen));
-        match.second = subst(what, for_, match.second, seen);
+        print_graph(os, bin->lhs()) << " -> " << op << ";\n";
+        print_graph(os, bin->rhs()) << " -> " << op << ";\n";
+
+        defs_printed.insert(ref);
       }
-      ret = this->destruct(of, arms);
+      os << op;
     } break;
-    }
+  case NodeKind::App: {
+      auto ap = static_cast<App::Ref>(ref);
+
+      std::string op = "app_" + std::to_string(ap->gid());
+      if(!defs_printed.contains(ref))
+      {
+        print_graph(os, ap->caller()) << " -> " << op << ";\n";
+        print_graph(os, ap->arg()) << " -> " << op << ";\n";
+
+        defs_printed.insert(ref);
+      }
+      os << op;
+    } break;
+  case NodeKind::Fn: {
+      auto fn = static_cast<Fn::Ref>(ref);
+
+      std::string op = "fn_" + std::to_string(fn->gid());
+      if(!defs_printed.contains(ref))
+      {
+        print_graph(os, fn->arg()) << " -> " << op << ";\n";
+        print_graph(os, fn->bdy()) << " -> " << op << ";\n";
+
+        defs_printed.insert(ref);
+      }
+      os << op;
+    } break;
+  case NodeKind::Case: {
+      auto cs = static_cast<Case::Ref>(ref);
+
+      std::string op = "case_" + std::to_string(cs->gid());
+      if(!defs_printed.contains(ref))
+      {
+        auto vals = cs->match_arms();
+        print_graph(os, cs->of()) << " -> " << op << ";\n";
+        for(auto& v : vals)
+        {
+          print_graph(os, v.first)  << " -> " << op << ";\n";
+          print_graph(os, v.second) << " -> " << op << ";\n";
+        }
+
+        defs_printed.insert(ref);
+      }
+      os << op;
+    } break;
   }
-  if(in->type() != nullptr)
-    ret->set_type(subst(what, for_, in->type(), seen));
 
-  return ret;
+  return os;
 }
-
 

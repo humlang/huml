@@ -68,6 +68,7 @@ protected:
   std::size_t argc_;
   std::vector<Node::Ref> children_;
   Node::Ref type_ { no_ref };
+
   builder* mach_;
   std::uint_fast64_t gid_;
 };
@@ -155,11 +156,7 @@ struct Fn : Node
 
   Fn(Node::Ref codomain, Node::Ref domain)
     : Node(NodeKind::Fn, {codomain, domain})
-  {  }
-
-  Fn()
-    : Node(NodeKind::Fn, 2)
-  {  }
+  { this->nominal_ = true; }
 
   Node::cRef arg() const { return me()[0]; }
   Node::cRef bdy() const { return me()[1]; }
@@ -232,6 +229,8 @@ struct Kind : Node
   Kind()
     : Node(NodeKind::Kind, {})
   {  }
+
+  // TODO: add level to disallow Aczel Trees
 };
 
 struct Type : Node
@@ -267,9 +266,8 @@ struct Unit : Node
 struct NodeHasher
 {
   std::size_t operator()(const Node::Store& str) const
-  { return str->gid(); }
-  std::size_t operator()(const Node::cRef ref) const
-  { return ref->gid(); }
+  { return (*this)(str.get()); }
+  std::size_t operator()(const Node::cRef ref) const;
 };
 struct NodeComparator
 {
