@@ -4,6 +4,7 @@ project(hx-lang LANGUAGES CXX VERSION 0.0.1)
 
 set(hx-lang_files src/token.cpp
   src/backend/builder.cpp
+  src/backend/node.cpp
   src/parser.cpp
   src/tokenizer.cpp
   src/ast.cpp
@@ -22,6 +23,7 @@ set(hx-lang_files src/token.cpp
 
 set(hx-lang_vm_files src/vm.cpp
   src/backend/builder.cpp
+  src/backend/node.cpp
   src/repl.cpp
   src/parser.cpp
   src/tokenizer.cpp

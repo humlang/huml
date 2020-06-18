@@ -81,6 +81,9 @@ ir::Node::Ref ir::builder::destruct(Node::Ref of, std::vector<std::pair<Node::Re
 
 ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
 {
+  store->mach_ = this;
+  store->gid_ = gid++;
+
   if(auto it = nodes.find(store); it != nodes.end())
       return it->get(); // <- might be different pointer
   return nodes.emplace(std::move(store)).first->get();
@@ -99,14 +102,14 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
 
   std::uint_fast16_t defining = 0;
 
-  std::queue<Node::Ref> defs_to_print;
+  std::queue<Node::cRef> defs_to_print;
   defs_to_print.push(ref);
 
-  auto y = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](Node::Ref ref) -> std::ostream&
+  auto y = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](Node::cRef ref) -> std::ostream&
   {
-    auto inner = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](auto&& y, Node::Ref ref) -> std::ostream&
+    auto inner = [&os, &ns, &param_count, &fn_count, &defining, &defs_to_print](auto&& y, Node::cRef ref) -> std::ostream&
     {
-      switch(ref->kind)
+      switch(ref->kind())
       {
       case NodeKind::Kind: return os << "Kind"; break;
       case NodeKind::Type: return os << "Type"; break;
@@ -114,20 +117,20 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
       case NodeKind::Unit: return os << "()"; break;
 
       case NodeKind::Ctr: {
-          return os << static_cast<Constructor::Ref>(ref)->name.get_string();
+          return os << static_cast<Constructor::cRef>(ref)->name.get_string();
         } break;
 
       case NodeKind::Int: {
-          os << (static_cast<Int::Ref>(ref)->is_unsigned() ? "uint " : "int ");
-          return y(y, static_cast<Int::Ref>(ref)->size());
+          os << (static_cast<Int::cRef>(ref)->is_unsigned() ? "uint " : "int ");
+          return y(y, static_cast<Int::cRef>(ref)->size());
         } break;
 
       case NodeKind::Literal: {
-          return os << static_cast<Literal::Ref>(ref)->literal;
+          return os << static_cast<Literal::cRef>(ref)->literal;
         } break;
 
       case NodeKind::Binary: {
-          auto binop = static_cast<Binary::Ref>(ref);
+          auto binop = static_cast<Binary::cRef>(ref);
           os << "(";
           y(y, binop->lhs()) << ")";
 
@@ -142,7 +145,7 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
         } break;
 
       case NodeKind::Case: {
-          Case::Ref cs = static_cast<Case::Ref>(ref);
+          auto cs = static_cast<Case::cRef>(ref);
           os << "case (";
           y(y, cs->of()) << ") [ ";
 
@@ -164,14 +167,14 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
           auto name = "p" + std::to_string(param_count++);
           ns.emplace(ref, name);
 
-          if(ref->type == Node::no_ref)
+          if(ref->type() == Node::no_ref)
             return os << name;
           os << "(" << name << ") : ";
-          return y(y, ref->type);
+          return y(y, ref->type());
         } break;
 
       case NodeKind::App: {
-          App::Ref app = static_cast<App::Ref>(ref);
+          App::cRef app = static_cast<App::cRef>(ref);
 
           os << "(";
           y(y, app->caller()) << " ";
@@ -179,7 +182,7 @@ std::ostream& ir::builder::print(std::ostream& os, Node::Ref ref)
         } break;
 
       case NodeKind::Fn: {
-          Fn::Ref lm = static_cast<Fn::Ref>(ref);
+          Fn::cRef lm = static_cast<Fn::cRef>(ref);
 
           auto it = ns.find(lm);
           if(it != ns.end() && defining > 0)
@@ -226,7 +229,7 @@ ir::Node::Ref ir::builder::exec()
 
 ir::Node::Ref find_ctor_and_collect_params(ir::Node::Ref ref, std::vector<ir::Node::Ref>& params)
 {
-  switch(ref->kind)
+  switch(ref->kind())
   {
     case ir::NodeKind::Ctr: return ref;
     case ir::NodeKind::App: {
@@ -245,7 +248,7 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
 {
   auto inner = [this](auto&& y, Node::Ref ref) -> ir::Node::Ref
   {
-    switch(ref->kind)
+    switch(ref->kind())
     {
     case NodeKind::Kind: return ref; break;
     case NodeKind::Type: return ref; break;
@@ -263,7 +266,7 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
       auto l = exec(br->lhs());
       auto r = exec(br->rhs());
 
-      if(l->kind != NodeKind::Literal || r->kind != NodeKind::Literal)
+      if(l->kind() != NodeKind::Literal || r->kind() != NodeKind::Literal)
         return this->binop(br->op, l, r);
 
       auto ll = static_cast<Literal::Ref>(l);
@@ -281,7 +284,7 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
 
         auto of_v = exec(cs->of());
 
-        if(of_v->kind != NodeKind::Literal)
+        if(of_v->kind() != NodeKind::Literal)
         {
           std::vector<Node::Ref> of_params;
           auto of_ctor = find_ctor_and_collect_params(of_v, of_params);
@@ -307,11 +310,11 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
         {
           for(auto& match : cs->match_arms())
           {
-            if(of_v == match.first || (match.first->kind == NodeKind::Ctr && static_cast<Constructor::Ref>(match.first)->name == symbol("_")))
+            if(of_v == match.first || (match.first->kind() == NodeKind::Ctr && static_cast<Constructor::Ref>(match.first)->name == symbol("_")))
             {
               return match.second; // if literal matches exactly or pattern is ignore, we don't have to subst anything
             }
-            else if(match.first->kind == NodeKind::Param) // want to bind this under new name
+            else if(match.first->kind() == NodeKind::Param) // want to bind this under new name
             {
               return subst(match.first, of_v, match.second);
             }
@@ -329,7 +332,7 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
         auto f = y(y, app->caller());
         auto v = y(y, app->arg());
 
-        if(f->kind == NodeKind::Ctr)
+        if(f->kind() == NodeKind::Ctr)
         {
           if(static_cast<Constructor::Ref>(f)->name.get_hash() == symbol("print").get_hash())
           {
@@ -338,7 +341,7 @@ ir::Node::Ref ir::builder::exec(ir::Node::Ref ref)
           }
           return this->app(f, v);
         }
-        assert(f->kind == NodeKind::Fn && "Callable must be a function.");
+        assert(f->kind() == NodeKind::Fn && "Callable must be a function.");
         return this->subst(static_cast<Fn::Ref>(f)->arg(), v, static_cast<Fn::Ref>(f)->bdy());
       } break;
 
@@ -377,7 +380,7 @@ ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Nod
     ret = for_;
   else
   {
-    switch(in->kind)
+    switch(in->kind())
     {
     case NodeKind::Kind:
     case NodeKind::Type:
@@ -391,8 +394,8 @@ ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Nod
 
     case NodeKind::Fn: {
       Fn::Ref fn = static_cast<Fn::Ref>(in);
-      if(fn->arg()->type != nullptr)
-        fn->arg()->set_type(subst(what, for_, fn->arg()->type, seen));
+      if(fn->arg()->type() != nullptr)
+        fn->arg()->set_type(subst(what, for_, fn->arg()->type(), seen));
 
       bool contains = seen.contains(in);
       seen.insert(in);
@@ -427,16 +430,16 @@ ir::Node::Ref ir::builder::subst(ir::Node::Ref what, ir::Node::Ref for_, ir::Nod
       auto arms = cs->match_arms();
       for(auto& match : arms)
       {
-        if(match.first->type != nullptr)
-          match.first->set_type(subst(what, for_, match.first->type, seen));
+        if(match.first->type() != nullptr)
+          match.first->set_type(subst(what, for_, match.first->type(), seen));
         match.second = subst(what, for_, match.second, seen);
       }
       ret = this->destruct(of, arms);
     } break;
     }
   }
-  if(in->type != nullptr)
-    ret->type = subst(what, for_, in->type, seen);
+  if(in->type() != nullptr)
+    ret->set_type(subst(what, for_, in->type(), seen));
 
   return ret;
 }

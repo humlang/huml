@@ -46,10 +46,13 @@ private:
 private:
   Node::Ref lookup_or_emplace(Node::Store store);
 
+private:
   tsl::robin_set<Node::Store, NodeHasher, NodeComparator> nodes;
 
   Fn::Ref world_entry;
   Fn::Ref world_exit;
+
+  std::uint_fast64_t gid { 0 };
 };
 
 }

@@ -29,8 +29,12 @@ enum class NodeKind
   Unit,
 };
 
+struct builder;
+
 struct Node
 {
+  friend struct builder;
+
   using Ref  = Node*;
   using cRef = const Node*;
   using Store = std::unique_ptr<Node>;
@@ -41,31 +45,31 @@ struct Node
   static Store mk_node(Args&& ...args)
   { return std::make_unique<Type>(std::forward<Args>(args)...); }
 
-  Node(NodeKind kind, std::size_t argc)
-    : kind(kind), nominal_(true), argc(argc)
-  { children.resize(argc, nullptr); }
+  Node(NodeKind kind, std::size_t argc);
+  Node(NodeKind kind, std::vector<Node::Ref> children);
 
-  Node(NodeKind kind, std::vector<Node::Ref> children)
-    : kind(kind), nominal_(false), argc(children.size()), children(children)
-  {  }
+  NodeKind kind() const;
+  bool nominal() const;
+  std::size_t argc() const;
+  std::uint_fast64_t gid() const;
+  Node::Ref type() const;
 
-  bool nominal() const
-  { return nominal_; }
+  void set_type(Node::Ref typ) { type_ = typ; }
 
-  void set_type(Node::Ref typ) { type = typ; }
+  Node& me();
+  Node::Ref& operator[](std::size_t idx);
 
-  Node::Ref& operator[](std::size_t idx) { return children[idx]; }
-  const Node::cRef& operator[](std::size_t idx) const { return children[idx]; }
-
-  Node& me() { return *this; }
-  const Node& me() const { return *this; }
-
-  NodeKind kind;
+  const Node& me() const;
+  const Node::cRef& operator[](std::size_t idx) const;
+protected:
+  NodeKind kind_;
 
   bool nominal_ : 1;
-  std::size_t argc;
-  std::vector<Node::Ref> children;
-  Node::Ref type { no_ref };
+  std::size_t argc_;
+  std::vector<Node::Ref> children_;
+  Node::Ref type_ { no_ref };
+  builder* mach_;
+  std::uint_fast64_t gid_;
 };
 
 struct Param : Node
@@ -87,6 +91,7 @@ struct Int : Node
     : Node(NodeKind::Int, {size}), no_sign(no_sign)
   {  }
 
+  Node::cRef size() const { return me()[0]; }
   Node::Ref size() { return me()[0]; }
   bool is_unsigned() const { return no_sign; }
 
@@ -120,6 +125,9 @@ struct Binary : Node
     : Node(NodeKind::Binary, {lhs, rhs}), op(op)
   {  }
 
+  Node::cRef lhs() const { return me()[0]; }
+  Node::cRef rhs() const { return me()[1]; }
+
   Node::Ref lhs() { return me()[0]; }
   Node::Ref rhs() { return me()[1]; }
 
@@ -140,9 +148,6 @@ struct Constructor : Node
 };
 
 
-//thread_local std::size_t fn_count = 0;
-
-// Implicitly returns BOT
 struct Fn : Node
 {
   using Ref = Fn*;
@@ -156,7 +161,10 @@ struct Fn : Node
     : Node(NodeKind::Fn, 2)
   {  }
 
-  Node::Ref arg()  { return me()[0]; }
+  Node::cRef arg() const { return me()[0]; }
+  Node::cRef bdy() const { return me()[1]; }
+
+  Node::Ref arg() { return me()[0]; }
   Node::Ref bdy() { return me()[1]; }
 
   Node::Ref set_arg(Node::Ref arg) { return me()[0] = arg; }
@@ -170,10 +178,13 @@ struct App : Node
 
   App(Node::Ref fn, Node::Ref param)
     : Node(NodeKind::App, {fn, param})
-  { children.emplace_back(fn); children.emplace_back(param); }
+  {  }
 
-  Node::Ref caller() const { return children.front(); }
-  Node::Ref arg() const { return children.back(); }
+  Node::cRef caller() const { return me()[0]; }
+  Node::cRef arg() const { return me()[1]; }
+
+  Node::Ref caller() { return me()[0]; }
+  Node::Ref arg() { return me()[1]; }
 };
 
 struct Case : Node
@@ -186,18 +197,28 @@ struct Case : Node
   {
     for(auto&& p : match_arms)
     {
-      children.emplace_back(std::move(p.first));
-      children.emplace_back(std::move(p.second));
+      children_.emplace_back(std::move(p.first));
+      children_.emplace_back(std::move(p.second));
     }
-    argc = children.size();
+    argc_ = children_.size();
+  }
+
+  Node::cRef of() const { return me()[0]; }
+  std::vector<std::pair<Node::cRef, Node::cRef>> match_arms() const
+  {
+    std::vector<std::pair<Node::cRef, Node::cRef>> v;
+    v.reserve(argc() - 1);
+    for(std::size_t i = 1, e = argc(); i < e - 1; i += 2)
+      v.emplace_back(me()[i], me()[i + 1]);
+    return v;
   }
 
   Node::Ref of() { return me()[0]; }
   std::vector<std::pair<Node::Ref, Node::Ref>> match_arms()
   {
     std::vector<std::pair<Node::Ref, Node::Ref>> v;
-    v.reserve(argc - 1);
-    for(std::size_t i = 1; i < argc - 1; i += 2)
+    v.reserve(argc() - 1);
+    for(std::size_t i = 1, e = argc(); i < e - 1; i += 2)
       v.emplace_back(me()[i], me()[i + 1]);
     return v;
   }
@@ -246,112 +267,20 @@ struct Unit : Node
 struct NodeHasher
 {
   std::size_t operator()(const Node::Store& str) const
-  { return (*this)(str.get()); }
+  { return str->gid(); }
   std::size_t operator()(const Node::cRef ref) const
-  {
-    switch(ref->kind)
-    {
-    case NodeKind::Kind: return 1;
-    case NodeKind::Prop: return 2;
-    case NodeKind::Type: return 3;
-    case NodeKind::Unit: return 4;
-    case NodeKind::Param: return (reinterpret_cast<std::size_t>(&*ref) << 7) + 0x9e3779b9;
-    case NodeKind::Ctr:
-      return static_cast<Constructor::cRef>(ref)->name.get_hash();
-
-    case NodeKind::Int: return (8 << 8) + (*this)(static_cast<Int::cRef>(ref)->me()[0]);
-    case NodeKind::Literal: return 0x9e3779b9 ^ static_cast<Literal::cRef>(ref)->literal;
-
-    case NodeKind::Binary: {
-        auto r = static_cast<Binary::cRef>(ref);
-
-        auto lh = (*this)(r->me()[0]);
-        auto rh = (*this)(r->me()[1]);
-
-        return 11 + lh + 0x9e3779b9 + (rh << 6) + (rh >> 2);
-      } break;
-
-
-    case NodeKind::App: {
-        const App::cRef app = static_cast<App::cRef>(ref);
-
-        std::size_t seed = 5 + (*this)(app->me()[0]);
-        return 3301 + (*this)(app->me()[1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-      } break;
-
-    case NodeKind::Fn: return reinterpret_cast<std::size_t>(&*ref) << 13;
-    
-    case NodeKind::Case: {
-        std::size_t hash = 4 + 0x9e3779b9 + ((*this)(ref->me()[0]) << 6);
-        for(std::size_t i = 1; i < ref->argc; ++i)
-          hash = (*this)(ref->me()[i]) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        return hash;
-      } break;
-    }
-    assert(false && "Unhandled case.");
-    return 0;
-  }
+  { return ref->gid(); }
 };
 struct NodeComparator
 {
   bool operator()(const Node::Store& lhs, const Node::Store& rhs) const
   { return (*this)(lhs.get(), rhs.get()); }
-  bool operator()(const Node::cRef lhs, const Node::cRef rhs) const
-  {
-    if(lhs->kind != rhs->kind)
-      return false;
-
-    switch(lhs->kind)
-    {
-    case NodeKind::Kind:
-    case NodeKind::Type:
-    case NodeKind::Prop:
-    case NodeKind::Unit:
-      return true;
-
-    case NodeKind::Int:
-      return (*this)(static_cast<Int::cRef>(lhs)->me()[0], static_cast<Int::cRef>(rhs)->me()[0]);
-    case NodeKind::Literal:
-      return static_cast<Literal::cRef>(lhs)->literal == static_cast<Literal::cRef>(rhs)->literal;
-
-    case NodeKind::Binary: {
-        auto l = static_cast<Binary::cRef>(lhs);
-        auto r = static_cast<Binary::cRef>(rhs);
-
-        return (*this)(l->me()[0], r->me()[0]) && (*this)(l->me()[1], r->me()[1]);
-      } break;
-
-      // Same pointer is same binding
-    case NodeKind::Param:
-      return lhs == rhs; 
-
-    case NodeKind::Ctr:
-      return static_cast<Constructor::cRef>(lhs)->name.get_hash() == static_cast<Constructor::cRef>(rhs)->name.get_hash();
-    
-    case NodeKind::Case: {
-        if(lhs->argc != rhs->argc)
-          return false;
-        for(std::size_t i = 0; i < lhs->argc; ++i)
-          if(!((*this)(lhs->me()[i], rhs->me()[i])))
-            return false;
-        return true;
-      } break;
-
-    case NodeKind::Fn:
-      if(lhs == rhs)
-        return true;
-      return !lhs->nominal() && !rhs->nominal() && lhs->me()[0] == rhs->me()[0] && lhs->me()[1] == rhs->me()[1];
-    case NodeKind::App:
-        return (*this)(lhs->me()[0], rhs->me()[0]) && (*this)(lhs->me()[1], rhs->me()[1]);
-    }
-    assert(false && "Unhandled case.");
-    return false;
-  }
+  bool operator()(const Node::cRef lhs, const Node::cRef rhs) const;
 };
 using NodeSet = tsl::robin_set<Node::Ref, NodeHasher, NodeComparator>;
 
 template<typename T>
-using NodeMap = tsl::robin_map<Node::Ref, T, NodeHasher, NodeComparator>;
+using NodeMap = tsl::robin_map<Node::cRef, T, NodeHasher, NodeComparator>;
 
 }
 
