@@ -11,72 +11,107 @@ ir::builder::builder()
   // Bootstrap
   kind(); type(); prop();
   unit();
-
-  auto bot = id("⊤", type());
-
-  // "main" function's exit     () -> TOP
-  world_exit = fn(unit(), bot);
-
-  // "main" function's entry    (() -> TOP) -> TOP // TODO: add arc and argv
-  world_entry = fn(world_exit, bot);
-  world_entry->set_type(fn(world_exit, bot));
 }
 
-ir::Node::Ref ir::builder::kind()
+ir::Node::cRef ir::builder::kind()
 { return lookup_or_emplace(Node::mk_node<Kind>()); }
 
-ir::Node::Ref ir::builder::type()
+ir::Node::cRef ir::builder::type()
 { return lookup_or_emplace(Node::mk_node<Type>()); }
 
-ir::Node::Ref ir::builder::prop()
+ir::Node::cRef ir::builder::prop()
 { return lookup_or_emplace(Node::mk_node<Prop>()); }
 
-ir::Node::Ref ir::builder::unit()
+ir::Node::cRef ir::builder::unit()
 { return lookup_or_emplace(Node::mk_node<Unit>()); }
 
-ir::Fn::Ref ir::builder::entry()
-{ return world_entry; }
-
-ir::Fn::Ref ir::builder::exit()
-{ return world_exit; }
-
-ir::Node::Ref ir::builder::id(symbol symb, Node::Ref type)
+ir::Node::cRef ir::builder::id(symbol symb, Node::cRef type)
 {
   assert(type != Node::no_ref && "Type must exist.");
   return lookup_or_emplace(Node::mk_node<Constructor>(symb, type));
 }
 
-ir::Node::Ref ir::builder::ignore() // TODO: replace nullptr with existential
+ir::Node::cRef ir::builder::ignore() // TODO: replace nullptr with existential
 { return lookup_or_emplace(Node::mk_node<Constructor>("_", nullptr)); }
 
-ir::Node::Ref ir::builder::param(Node::Ref type)
+ir::Node::cRef ir::builder::param(Node::cRef type)
 { return lookup_or_emplace(Node::mk_node<Param>(type)); }
 
-ir::Node::Ref ir::builder::lit(std::uint_fast64_t value)
+ir::Node::cRef ir::builder::lit(std::uint_fast64_t value)
 { return lookup_or_emplace(Node::mk_node<Literal>(value)); }
 
-ir::Node::Ref ir::builder::binop(ir::BinaryKind op, Node::Ref lhs, Node::Ref rhs)
-{ return lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs)); }
-
-ir::Node::Ref ir::builder::i(bool no_sign, Node::Ref size)
-{ return lookup_or_emplace(Node::mk_node<Int>(no_sign, size)); }
-
-ir::Fn::Ref ir::builder::fn(Node::Ref codomain, Node::Ref domain)
+ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef rhs)
 {
-  assert(codomain != nullptr && "codomain must stay valid.");
-  return static_cast<Fn::Ref>(lookup_or_emplace(Node::mk_node<Fn>(codomain, domain)));
+  // Preserve a certain order
+  if(op != BinaryKind::Minus && lhs->kind() == NodeKind::Param && rhs->kind() != NodeKind::Param)
+    std::swap(lhs, rhs);
+
+  if(lhs->kind() == NodeKind::Literal)
+  {
+    auto li = static_cast<Literal::cRef>(lhs);
+    switch(op)
+    {
+    case BinaryKind::Mult: {
+        // 0 * n = 0
+        if(li->literal == 0)
+          return lit(0);
+        // 1 * n = n
+        else if(li->literal == 1)
+          return rhs;
+      } break;
+
+    case BinaryKind::Plus: {
+        // 0 + n = n
+        if(li->literal == 0)
+          return rhs;
+      } break;
+    }
+  }
+  else if(rhs->kind() == NodeKind::Literal)
+  {
+    auto ri = static_cast<Literal::cRef>(rhs);
+    switch(op)
+    {
+    case BinaryKind::Mult: {
+        // n * 0 = 0
+        if(ri->literal == 0)
+          return lit(0);
+        // n * 1 = n
+        else if(ri->literal == 1)
+          return lhs;
+      } break;
+
+    case BinaryKind::Minus:
+    case BinaryKind::Plus: {
+        // n + 0 = n
+        // n - 0 = n
+        if(ri->literal == 0)
+          return lhs;
+      } break;
+    }
+  }
+  return lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs));
 }
 
-ir::Node::Ref ir::builder::app(Node::Ref caller, Node::Ref arg)
+ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
+{ return lookup_or_emplace(Node::mk_node<Int>(no_sign, size)); }
+
+ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef domain)
+{
+  assert(codomain != nullptr && "codomain must stay valid.");
+  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, domain)));
+}
+
+ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)
 {
   assert(caller != nullptr && arg != nullptr && "caller and arg must stay valid.");
   return lookup_or_emplace(Node::mk_node<App>(caller, arg));
 }
 
-ir::Node::Ref ir::builder::destruct(Node::Ref of, std::vector<std::pair<Node::Ref, Node::Ref>> match_arms)
+ir::Node::cRef ir::builder::destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms)
 { return lookup_or_emplace(Node::mk_node<Case>(of, match_arms)); }
 
-ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
+ir::Node::cRef ir::builder::lookup_or_emplace(Node::Store store)
 {
   store->mach_ = this;
   store->gid_ = gid++;
@@ -86,32 +121,24 @@ ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
   return nodes.emplace(std::move(store)).first->get();
 }
 
-void ir::builder::print_graph(std::ostream& os)
-{
-  os << "digraph iea {\n";
-  print_graph(os, world_entry);
-  os << "}\n";
-}
-
-
-std::ostream& ir::builder::print_graph(std::ostream& os, Node::Ref ref)
+std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
 {
   ir::NodeSet defs_printed = {};
 
-  auto internal = [&os, &defs_printed](auto internal, Node::Ref ref) -> std::ostream&
+  auto internal = [&os, &defs_printed](auto internal, Node::cRef ref) -> std::ostream&
   {
     switch(ref->kind())
     {
     case NodeKind::Kind: os << "Kind"; break;
     case NodeKind::Type: os << "Type"; break;
     case NodeKind::Prop: os << "Prop"; break;
-    case NodeKind::Ctr:  os << static_cast<Constructor::Ref>(ref)->name.get_string(); break;
-    case NodeKind::Literal: os << static_cast<Literal::Ref>(ref)->literal; break;
+    case NodeKind::Ctr:  os << static_cast<Constructor::cRef>(ref)->name.get_string(); break;
+    case NodeKind::Literal: os << static_cast<Literal::cRef>(ref)->literal; break;
     case NodeKind::Int:  os << "int"; break;
     case NodeKind::Param: os << "p" << ref->gid(); break;
     case NodeKind::Unit: os << "UNIT"; break;
     case NodeKind::Binary: {
-        auto bin = static_cast<Binary::Ref>(ref);
+        auto bin = static_cast<Binary::cRef>(ref);
 
         std::string op;
         switch(bin->op)
@@ -132,7 +159,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::Ref ref)
         os << op;
       } break;
     case NodeKind::App: {
-        auto ap = static_cast<App::Ref>(ref);
+        auto ap = static_cast<App::cRef>(ref);
 
         std::string op = "app_" + std::to_string(ap->gid());
         if(!defs_printed.contains(ref))
@@ -145,7 +172,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::Ref ref)
         os << op;
       } break;
     case NodeKind::Fn: {
-        auto fn = static_cast<Fn::Ref>(ref);
+        auto fn = static_cast<Fn::cRef>(ref);
 
         std::string op = "fn_" + std::to_string(fn->gid());
         if(!defs_printed.contains(ref))
@@ -158,7 +185,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::Ref ref)
         os << op;
       } break;
     case NodeKind::Case: {
-        auto cs = static_cast<Case::Ref>(ref);
+        auto cs = static_cast<Case::cRef>(ref);
 
         std::string op = "case_" + std::to_string(cs->gid());
         if(!defs_printed.contains(ref))
@@ -178,6 +205,8 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::Ref ref)
     }
     return os;
   };
-  return internal(internal, ref);
+  os << "digraph iea {\n";
+  internal(internal, ref);
+  return os << "}\n";
 }
 

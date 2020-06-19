@@ -46,18 +46,18 @@ struct Node
   { return std::make_unique<Type>(std::forward<Args>(args)...); }
 
   Node(NodeKind kind, std::size_t argc);
-  Node(NodeKind kind, std::vector<Node::Ref> children);
+  Node(NodeKind kind, std::vector<Node::cRef> children);
 
   NodeKind kind() const;
   bool nominal() const;
   std::size_t argc() const;
   std::uint_fast64_t gid() const;
-  Node::Ref type() const;
+  Node::cRef type() const;
 
-  void set_type(Node::Ref typ) { type_ = typ; }
+  void set_type(Node::cRef typ) { type_ = typ; }
 
-  Node& me();
-  Node::Ref& operator[](std::size_t idx);
+  virtual Node::cRef clone(builder& b) const
+  { assert(false && "Cannot clone base node. Developer: Override this method!"); return nullptr; }
 
   const Node& me() const;
   const Node::cRef& operator[](std::size_t idx) const;
@@ -66,8 +66,8 @@ protected:
 
   bool nominal_ : 1;
   std::size_t argc_;
-  std::vector<Node::Ref> children_;
-  Node::Ref type_ { no_ref };
+  std::vector<Node::cRef> children_;
+  Node::cRef type_ { no_ref };
 
   builder* mach_;
   std::uint_fast64_t gid_;
@@ -78,9 +78,11 @@ struct Param : Node
   using Ref = Param*;
   using cRef = Param*;
 
-  Param(Node::Ref type)
+  Param(Node::cRef type)
     : Node(NodeKind::Param, {})
   { set_type(type); }
+
+  Node::cRef clone(builder& b) const override;
 };
 
 struct Int : Node
@@ -88,12 +90,13 @@ struct Int : Node
   using Ref = Int*;
   using cRef = const Int*;
 
-  Int(bool no_sign, Node::Ref size)
+  Int(bool no_sign, Node::cRef size)
     : Node(NodeKind::Int, {size}), no_sign(no_sign)
   {  }
 
+  Node::cRef clone(builder& b) const override;
+
   Node::cRef size() const { return me()[0]; }
-  Node::Ref size() { return me()[0]; }
   bool is_unsigned() const { return no_sign; }
 
   bool no_sign;
@@ -107,6 +110,8 @@ struct Literal : Node
   Literal(std::uint_fast64_t literal)
     : Node(NodeKind::Literal, {}), literal(literal)
   {  }
+
+  Node::cRef clone(builder& b) const override;
 
   std::uint_fast64_t literal;
 };
@@ -122,15 +127,14 @@ struct Binary : Node
   using Ref = Binary*;
   using cRef = const Binary*;
 
-  Binary(BinaryKind op, Node::Ref lhs, Node::Ref rhs)
+  Binary(BinaryKind op, Node::cRef lhs, Node::cRef rhs)
     : Node(NodeKind::Binary, {lhs, rhs}), op(op)
   {  }
 
+  Node::cRef clone(builder& b) const override;
+
   Node::cRef lhs() const { return me()[0]; }
   Node::cRef rhs() const { return me()[1]; }
-
-  Node::Ref lhs() { return me()[0]; }
-  Node::Ref rhs() { return me()[1]; }
 
   BinaryKind op;
 };
@@ -141,9 +145,11 @@ struct Constructor : Node
   using Ref = Constructor*;
   using cRef = const Constructor*;
 
-  Constructor(symbol name, Node::Ref type)
+  Constructor(symbol name, Node::cRef type)
     : Node(NodeKind::Ctr, {}), name(name)
   { set_type(type); }
+
+  Node::cRef clone(builder& b) const override;
 
   symbol name;
 };
@@ -154,18 +160,14 @@ struct Fn : Node
   using Ref = Fn*;
   using cRef = const Fn*;
 
-  Fn(Node::Ref codomain, Node::Ref domain)
+  Fn(Node::cRef codomain, Node::cRef domain)
     : Node(NodeKind::Fn, {codomain, domain})
   { this->nominal_ = true; }
 
+  Node::cRef clone(builder& b) const override;
+
   Node::cRef arg() const { return me()[0]; }
   Node::cRef bdy() const { return me()[1]; }
-
-  Node::Ref arg() { return me()[0]; }
-  Node::Ref bdy() { return me()[1]; }
-
-  Node::Ref set_arg(Node::Ref arg) { return me()[0] = arg; }
-  Node::Ref set_bdy(Node::Ref bdy) { return me()[1] = bdy; }
 };
 
 struct App : Node
@@ -173,15 +175,14 @@ struct App : Node
   using Ref = App*;
   using cRef = const App*;
 
-  App(Node::Ref fn, Node::Ref param)
+  App(Node::cRef fn, Node::cRef param)
     : Node(NodeKind::App, {fn, param})
   {  }
 
+  Node::cRef clone(builder& b) const override;
+
   Node::cRef caller() const { return me()[0]; }
   Node::cRef arg() const { return me()[1]; }
-
-  Node::Ref caller() { return me()[0]; }
-  Node::Ref arg() { return me()[1]; }
 };
 
 struct Case : Node
@@ -189,7 +190,7 @@ struct Case : Node
   using Ref = Case*;
   using cRef = const Case*;
 
-  Case(Node::Ref of, std::vector<std::pair<Node::Ref, Node::Ref>> match_arms)
+  Case(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms)
     : Node(NodeKind::Case, { of })
   {
     for(auto&& p : match_arms)
@@ -200,20 +201,12 @@ struct Case : Node
     argc_ = children_.size();
   }
 
+  Node::cRef clone(builder& b) const override;
+
   Node::cRef of() const { return me()[0]; }
   std::vector<std::pair<Node::cRef, Node::cRef>> match_arms() const
   {
     std::vector<std::pair<Node::cRef, Node::cRef>> v;
-    v.reserve(argc() - 1);
-    for(std::size_t i = 1, e = argc(); i < e - 1; i += 2)
-      v.emplace_back(me()[i], me()[i + 1]);
-    return v;
-  }
-
-  Node::Ref of() { return me()[0]; }
-  std::vector<std::pair<Node::Ref, Node::Ref>> match_arms()
-  {
-    std::vector<std::pair<Node::Ref, Node::Ref>> v;
     v.reserve(argc() - 1);
     for(std::size_t i = 1, e = argc(); i < e - 1; i += 2)
       v.emplace_back(me()[i], me()[i + 1]);
@@ -230,7 +223,7 @@ struct Kind : Node
     : Node(NodeKind::Kind, {})
   {  }
 
-  // TODO: add level to disallow Aczel Trees
+  Node::cRef clone(builder& b) const override;
 };
 
 struct Type : Node
@@ -241,6 +234,10 @@ struct Type : Node
   Type()
     : Node(NodeKind::Type, {})
   {  }
+
+  Node::cRef clone(builder& b) const override;
+
+  // TODO: add level to disallow Aczel Trees
 };
 
 struct Prop : Node
@@ -251,6 +248,8 @@ struct Prop : Node
   Prop()
     : Node(NodeKind::Prop, {})
   {  }
+
+  Node::cRef clone(builder& b) const override;
 };
 
 struct Unit : Node
@@ -261,6 +260,8 @@ struct Unit : Node
   Unit()
     : Node(NodeKind::Unit, {})
   {  }
+
+  Node::cRef clone(builder& b) const override;
 };
 
 struct NodeHasher
@@ -275,7 +276,7 @@ struct NodeComparator
   { return (*this)(lhs.get(), rhs.get()); }
   bool operator()(const Node::cRef lhs, const Node::cRef rhs) const;
 };
-using NodeSet = tsl::robin_set<Node::Ref, NodeHasher, NodeComparator>;
+using NodeSet = tsl::robin_set<Node::cRef, NodeHasher, NodeComparator>;
 
 template<typename T>
 using NodeMap = tsl::robin_map<Node::cRef, T, NodeHasher, NodeComparator>;

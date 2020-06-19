@@ -5,7 +5,7 @@ ir::Node::Node(NodeKind kind, std::size_t argc)
     : kind_(kind), nominal_(true), argc_(argc), children_(), type_(no_ref), mach_(), gid_()
 { children_.resize(argc, nullptr); }
 
-ir::Node::Node(NodeKind kind, std::vector<Node::Ref> children)
+ir::Node::Node(NodeKind kind, std::vector<Node::cRef> children)
     : kind_(kind), nominal_(false), argc_(children.size()), children_(children), type_(no_ref), mach_(), gid_()
 {  }
 
@@ -17,16 +17,12 @@ std::size_t ir::Node::argc() const
 { return argc_; }
 std::uint_fast64_t ir::Node::gid() const
 { return gid_; }
-ir::Node::Ref ir::Node::type() const
+ir::Node::cRef ir::Node::type() const
 { return type_; }
 
-ir::Node::Ref& ir::Node::operator[](std::size_t idx)
-{ return children_[idx]; }
 const ir::Node::cRef& ir::Node::operator[](std::size_t idx) const
 { return children_[idx]; }
 
-ir::Node& ir::Node::me()
-{ return *this; }
 const ir::Node& ir::Node::me() const
 { return *this; }
 
@@ -67,4 +63,30 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
       return false;
   return true;
 }
+
+ir::Node::cRef ir::Param::clone(ir::builder& b) const
+{ return b.param(type_); }
+ir::Node::cRef ir::Int::clone(ir::builder& b) const
+{ return b.i(is_unsigned(), (*this)[0]); }
+ir::Node::cRef ir::Literal::clone(ir::builder& b) const
+{ return b.lit(literal); }
+ir::Node::cRef ir::Binary::clone(ir::builder& b) const
+{ return b.binop(op, lhs(), rhs()); }
+ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
+{ return b.id(name, type()); }
+ir::Node::cRef ir::Fn::clone(ir::builder& b) const
+{ return b.fn(arg(), bdy()); }
+ir::Node::cRef ir::App::clone(ir::builder& b) const
+{ return b.app(caller(), arg()); }
+ir::Node::cRef ir::Case::clone(ir::builder& b) const
+{ return b.destruct(of(), match_arms()); }
+ir::Node::cRef ir::Kind::clone(ir::builder& b) const
+{ return b.kind(); }
+ir::Node::cRef ir::Type::clone(ir::builder& b) const
+{ return b.type(); }
+ir::Node::cRef ir::Prop::clone(ir::builder& b) const
+{ return b.prop(); }
+ir::Node::cRef ir::Unit::clone(ir::builder& b) const
+{ return b.unit(); }
+
 

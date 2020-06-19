@@ -9,41 +9,33 @@ struct builder
 {
   builder();
 
-  Node::Ref kind(); 
-  Node::Ref type();
-  Node::Ref prop();  
-  Node::Ref unit();
-  Node::Ref i(bool no_sign, Node::Ref size);
+  Node::cRef kind(); 
+  Node::cRef type();
+  Node::cRef prop();  
+  Node::cRef unit();
+  Node::cRef i(bool no_sign, Node::cRef size);
 
-  Node::Ref id(symbol symb, Node::Ref type);
-  Node::Ref ignore();
+  Node::cRef id(symbol symb, Node::cRef type);
+  Node::cRef ignore();
 
-  Node::Ref param(Node::Ref type = Node::no_ref);
+  Node::cRef param(Node::cRef type = Node::no_ref);
 
-  Node::Ref lit(std::uint_fast64_t value);
-  Node::Ref binop(BinaryKind op, Node::Ref lhs, Node::Ref rhs);
+  Node::cRef lit(std::uint_fast64_t value);
+  Node::cRef binop(BinaryKind op, Node::cRef lhs, Node::cRef rhs);
 
-  Fn::Ref fn(Node::Ref codomain, Node::Ref domain);
+  Fn::cRef fn(Node::cRef codomain, Node::cRef domain);
 
-  Fn::Ref entry();
-  Fn::Ref exit();
+  Node::cRef app(Node::cRef caller, Node::cRef arg);
 
-  Node::Ref app(Node::Ref caller, Node::Ref arg);
-
-  Node::Ref destruct(Node::Ref of, std::vector<std::pair<Node::Ref, Node::Ref>> match_arms);
+  Node::cRef destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms);
 
 
-  // Prints anything that is reachable from main function
-  void print_graph(std::ostream& os);
-  std::ostream& print_graph(std::ostream& os, Node::Ref ref);
-
+  std::ostream& print_graph(std::ostream& os, Node::cRef ref);
 private:
-  Node::Ref lookup_or_emplace(Node::Store store);
+  Node::cRef lookup_or_emplace(Node::Store store);
 private:
   tsl::robin_set<Node::Store, NodeHasher, NodeComparator> nodes;
-
-  Fn::Ref world_entry;
-  Fn::Ref world_exit;
+  tsl::robin_map<Fn::cRef, symbol, NodeHasher, NodeComparator> externals;
 
   std::uint_fast64_t gid { 0 };
 };
