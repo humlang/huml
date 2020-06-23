@@ -4,6 +4,7 @@ project(hx-lang LANGUAGES CXX VERSION 0.0.1)
 
 set(hx-lang_files src/token.cpp
   src/backend/builder.cpp
+  src/backend/cogen.cpp
   src/backend/node.cpp
   src/backend/pe.cpp
   src/parser.cpp
@@ -24,6 +25,7 @@ set(hx-lang_files src/token.cpp
 
 set(hx-lang_vm_files src/vm.cpp
   src/backend/builder.cpp
+  src/backend/cogen.cpp
   src/backend/node.cpp
   src/backend/pe.cpp
   src/repl.cpp
@@ -47,12 +49,12 @@ add_subdirectory(lib/robin-map)
 find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Threads REQUIRED)
+find_package(LLVM REQUIRED CONFIG)
 
-set(ASMJIT_EMBED TRUE)
-add_definitions(-DASMJIT_STATIC)
 
-set(ASMJIT_DIR "./lib/asmjit/")
-include("${ASMJIT_DIR}/CMakeLists.txt")
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+llvm_map_components_to_libnames(llvm_libs support core irreader scalaropts)
 
 option(USE_WERROR_DBG "Treat warnings as errors when compiling hx-lang." ON)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -ggdb -Wpedantic -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -Wno-implicit-fallthrough -Wno-switch")
@@ -66,10 +68,9 @@ endif()
 find_package(Catch2 REQUIRED)
 
 add_executable(hx-lang_vm_tests test/vm.cpp
-  "${hx-lang_vm_files}"
-  "${ASMJIT_SRC}")
+  "${hx-lang_vm_files}")
 target_compile_definitions(hx-lang_vm_tests PUBLIC -DH_LANG_TESTING)
-target_link_libraries(hx-lang_vm_tests Catch2::Catch2 fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json ${ASMJIT_DEPS})
+target_link_libraries(hx-lang_vm_tests Catch2::Catch2 fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json ${llvm_libs})
 set_property(TARGET hx-lang_vm_tests PROPERTY CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/lib/Catch2/contrib/")
@@ -85,12 +86,12 @@ add_test(NAME hx-lang_run_integration_test
 
 # main program
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
-add_executable(hx-lang src/main.cpp src/argument_parser.cpp "${hx-lang_files}" "${ASMJIT_SRC}")
-target_link_libraries(hx-lang PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json ${ASMJIT_DEPS})
+add_executable(hx-lang src/main.cpp src/argument_parser.cpp "${hx-lang_files}")
+target_link_libraries(hx-lang PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json ${llvm_libs})
 set_property(TARGET hx-lang PROPERTY CXX_STANDARD 17)
 
 # virtual machine REPL
-add_executable(hx-vm src/vm_main.cpp "${hx-lang_vm_files}" "${ASMJIT_SRC}")
-target_link_libraries(hx-vm PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json ${ASMJIT_DEPS})
+add_executable(hx-vm src/vm_main.cpp "${hx-lang_vm_files}")
+target_link_libraries(hx-vm PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json ${llvm_libs})
 set_property(TARGET hx-vm PROPERTY CXX_STANDARD 17)
 
