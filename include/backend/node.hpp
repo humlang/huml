@@ -45,6 +45,11 @@ struct Node
   static Store mk_node(Args&& ...args)
   { return std::make_unique<Type>(std::forward<Args>(args)...); }
 
+  template<typename T>
+  const T* to() const { return static_cast<const T*>(this); }
+  template<typename T>
+  T* to() { return static_cast<T*>(this); }
+
   Node(NodeKind kind, std::size_t argc);
   Node(NodeKind kind, std::vector<Node::cRef> children);
 
