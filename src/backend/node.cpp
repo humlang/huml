@@ -11,14 +11,19 @@ ir::Node::Node(NodeKind kind, std::vector<Node::cRef> children)
 
 ir::NodeKind ir::Node::kind() const
 { return kind_; }
+
 bool ir::Node::nominal() const
 { return nominal_; }
+
 std::size_t ir::Node::argc() const
 { return argc_; }
+
 std::uint_fast64_t ir::Node::gid() const
 { return gid_; }
+
 symbol ir::Node::unique_name() const
 { return "n" + std::to_string(gid()); }
+
 ir::Node::cRef ir::Node::type() const
 { return type_; }
 
@@ -70,15 +75,20 @@ ir::Node::cRef ir::Param::clone(ir::builder& b) const
 ir::Node::cRef ir::Literal::clone(ir::builder& b) const
 { return b.lit(literal); }
 ir::Node::cRef ir::Binary::clone(ir::builder& b) const
-{ return b.binop(op, lhs(), rhs()); }
+{ return b.binop(op, lhs()->clone(b), rhs()->clone(b)); }
 ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
-{ return b.id(name, type()); }
+{ return b.id(name, type()->clone(b)); }
 ir::Node::cRef ir::Fn::clone(ir::builder& b) const
-{ return b.fn(arg(), bdy()); }
+{ return b.fn(arg(), bdy()->clone(b)); }
 ir::Node::cRef ir::App::clone(ir::builder& b) const
-{ return b.app(caller(), arg()); }
+{ return b.app(caller(), arg()->clone(b)); }
 ir::Node::cRef ir::Case::clone(ir::builder& b) const
-{ return b.destruct(of(), match_arms()); }
+{
+  auto arms = match_arms();
+  for(auto& arm : arms)
+    arm = std::make_pair(arm.first->clone(b), arm.second->clone(b));
+  return b.destruct(of(), arms);
+}
 ir::Node::cRef ir::Kind::clone(ir::builder& b) const
 { return b.kind(); }
 ir::Node::cRef ir::Type::clone(ir::builder& b) const
@@ -87,5 +97,12 @@ ir::Node::cRef ir::Prop::clone(ir::builder& b) const
 { return b.prop(); }
 ir::Node::cRef ir::Unit::clone(ir::builder& b) const
 { return b.unit(); }
+ir::Node::cRef ir::Tup::clone(ir::builder& b) const
+{
+  auto elms = elements();
+  for(auto& el : elms)
+    el = el->clone(b);
+  return b.tup(elms);
+}
 
 

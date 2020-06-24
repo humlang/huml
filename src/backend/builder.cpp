@@ -25,6 +25,9 @@ ir::Node::cRef ir::builder::prop()
 ir::Node::cRef ir::builder::unit()
 { return lookup_or_emplace(Node::mk_node<Unit>()); }
 
+ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
+{ return lookup_or_emplace(Node::mk_node<Tup>(std::move(elems))); }
+
 ir::Node::cRef ir::builder::id(symbol symb, Node::cRef type)
 {
   assert(type != Node::no_ref && "Type must exist.");
@@ -96,14 +99,12 @@ ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef 
 ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
 {
   auto ictor = lookup_or_emplace(Node::mk_node<Constructor>(no_sign ? "u" : "i", type()));
-
   return app(ictor, size);
 }
 
 ir::Node::cRef ir::builder::ptr(Node::cRef from)
 {
   auto p = lookup_or_emplace(Node::mk_node<Constructor>("_Ptr", type()));
-
   return app(p, from);
 }
 

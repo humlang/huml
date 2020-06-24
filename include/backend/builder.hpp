@@ -15,6 +15,7 @@ struct builder
   Node::cRef unit();
   Node::cRef i(bool no_sign, Node::cRef size);
   Node::cRef ptr(Node::cRef from);
+  Node::cRef tup(std::vector<Node::cRef> elems);
 
   Node::cRef id(symbol symb, Node::cRef type);
   Node::cRef ignore();

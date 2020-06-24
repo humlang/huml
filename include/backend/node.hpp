@@ -19,6 +19,7 @@ enum class NodeKind
   Binary,
 
   Ctr,
+  Tup,
 
   Literal,
 
@@ -133,8 +134,8 @@ struct Constructor : Node
   using Ref = Constructor*;
   using cRef = const Constructor*;
 
-  Constructor(symbol name, Node::cRef type)
-    : Node(NodeKind::Ctr, {}), name(name)
+  Constructor(symbol symb, Node::cRef type)
+    : Node(NodeKind::Ctr, {}), name(symb)
   { set_type(type); }
 
   Node::cRef clone(builder& b) const override;
@@ -158,12 +159,12 @@ struct Fn : Node
   Node::cRef bdy() const { return me()[1]; }
 
   bool is_external() const
-  { return external_name() == symbol(""); }
+  { return external_name() != symbol(""); }
 
   symbol external_name() const
   { return external_name_; }
 
-  void make_external(symbol name)
+  void make_external(symbol name) const
   { external_name_ = name; }
 
 private:
@@ -263,6 +264,22 @@ struct Unit : Node
 
   Node::cRef clone(builder& b) const override;
 };
+
+struct Tup : Node
+{
+  using Ref = Tup*;
+  using cRef = const Tup*;
+
+  Tup(std::vector<Node::cRef>&& elems)
+    : Node(NodeKind::Tup, std::move(elems))
+  {  }
+
+  Node::cRef clone(builder& b) const override;
+
+  const std::vector<Node::cRef>& elements() const
+  { return children_; }
+};
+
 
 struct NodeHasher
 {
