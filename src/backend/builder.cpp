@@ -94,7 +94,11 @@ ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef 
 }
 
 ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
-{ return lookup_or_emplace(Node::mk_node<Int>(no_sign, size)); }
+{
+  auto ictor = lookup_or_emplace(Node::mk_node<Constructor>(no_sign ? "u" : "i", type()));
+
+  return app(ictor, size);
+}
 
 ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef domain)
 {
@@ -134,7 +138,6 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
     case NodeKind::Prop: os << "Prop"; break;
     case NodeKind::Ctr:  os << static_cast<Constructor::cRef>(ref)->name.get_string(); break;
     case NodeKind::Literal: os << static_cast<Literal::cRef>(ref)->literal; break;
-    case NodeKind::Int:  os << "int"; break;
     case NodeKind::Param: os << "p" << ref->gid(); break;
     case NodeKind::Unit: os << "UNIT"; break;
     case NodeKind::Binary: {

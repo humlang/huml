@@ -1,5 +1,6 @@
 #include <backend/cogen.hpp>
 #include <backend/node.hpp>
+#include <tmp.hpp>
 
 #include <libgccjit++.h>
 
@@ -22,6 +23,23 @@ struct generator
   gccjit::context ctx;
 };
 
+gccjit::type cogen_int(generator& gen, Constructor::cRef ctor, Node::cRef arg)
+{
+  // TODO: emit normal error?
+  assert(arg->kind() == NodeKind::Literal && "int is expected to have a constant value as argument here.");
+  Literal::cRef l = arg->to<Literal>();
+
+  const bool is_unsigned = ctor->name == symbol("u");
+  switch(l->literal)
+  {
+  case 8:  return gen.ctx.get_type(is_unsigned ? GCC_JIT_TYPE_UNSIGNED_CHAR  : GCC_JIT_TYPE_CHAR);
+  case 16: return gen.ctx.get_type(is_unsigned ? GCC_JIT_TYPE_UNSIGNED_SHORT : GCC_JIT_TYPE_SHORT);
+  case 32: return gen.ctx.get_type(is_unsigned ? GCC_JIT_TYPE_UNSIGNED_INT   : GCC_JIT_TYPE_INT);
+  }
+  assert(false && "unsupported int size for this backend.");
+  return *((gccjit::type*)nullptr);
+}
+
 void cogen(generator& gen, const Node* ref)
 {
   NodeMap<std::pair<gccjit::function, gccjit::block>> fns;
@@ -31,21 +49,20 @@ void cogen(generator& gen, const Node* ref)
   {
     switch(node->kind())
     {
-    case NodeKind::Int: {
-        Int::cRef i = node->to<Int>();
+    case NodeKind::App: {
+        App::cRef ap = node->to<App>();
 
-        // TODO: emit normal error?
-        assert(i->size()->kind() == NodeKind::Literal && "int is expected to have a constant value as argument here.");
-        Literal::cRef l = i->size()->to<Literal>();
-
-        switch(l->literal)
+        if(ap->caller()->kind() == NodeKind::Ctr)
         {
-        case 8:  return gen.ctx.get_type(i->is_unsigned() ? GCC_JIT_TYPE_UNSIGNED_CHAR  : GCC_JIT_TYPE_CHAR);
-        case 16: return gen.ctx.get_type(i->is_unsigned() ? GCC_JIT_TYPE_UNSIGNED_SHORT : GCC_JIT_TYPE_SHORT);
-        case 32: return gen.ctx.get_type(i->is_unsigned() ? GCC_JIT_TYPE_UNSIGNED_INT   : GCC_JIT_TYPE_INT);
+          Constructor::cRef c = node->to<Constructor>();
+          switch(c->name.get_hash())
+          {
+          case hash_string("u"):
+          case hash_string("i"): return cogen_int(gen, c, ap->arg());
+
+          // TODO: add pointer
+          }
         }
-        assert(false && "unsupported int size for this backend.");
-        return *((gccjit::type*)nullptr);
       } break;
     }
     assert(false && "Unsupported type");

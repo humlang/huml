@@ -47,7 +47,6 @@ std::size_t ir::NodeHasher::operator()(const Node::cRef str) const
 
   case NodeKind::Literal: seed ^= static_cast<std::size_t>(static_cast<Literal::cRef>(str)->literal) + 0x9e3779b9 + (seed << 6) + (seed >> 2); break;
 
-  case NodeKind::Int: seed ^= static_cast<std::size_t>(static_cast<Int::cRef>(str)->no_sign) + 0x9e3779b9 + (seed << 6) + (seed >> 2); break;
   }
 
   return seed;
@@ -68,8 +67,6 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
 
 ir::Node::cRef ir::Param::clone(ir::builder& b) const
 { return b.param(type_); }
-ir::Node::cRef ir::Int::clone(ir::builder& b) const
-{ return b.i(is_unsigned(), (*this)[0]); }
 ir::Node::cRef ir::Literal::clone(ir::builder& b) const
 { return b.lit(literal); }
 ir::Node::cRef ir::Binary::clone(ir::builder& b) const

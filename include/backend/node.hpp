@@ -18,7 +18,6 @@ enum class NodeKind
   Case,
   Binary,
 
-  Int,
   Ctr,
 
   Literal,
@@ -89,23 +88,6 @@ struct Param : Node
   { set_type(type); }
 
   Node::cRef clone(builder& b) const override;
-};
-
-struct Int : Node
-{
-  using Ref = Int*;
-  using cRef = const Int*;
-
-  Int(bool no_sign, Node::cRef size)
-    : Node(NodeKind::Int, {size}), no_sign(no_sign)
-  {  }
-
-  Node::cRef clone(builder& b) const override;
-
-  Node::cRef size() const { return me()[0]; }
-  bool is_unsigned() const { return no_sign; }
-
-  bool no_sign;
 };
 
 struct Literal : Node
