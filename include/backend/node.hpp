@@ -57,6 +57,7 @@ struct Node
   bool nominal() const;
   std::size_t argc() const;
   std::uint_fast64_t gid() const;
+  symbol unique_name() const;
   Node::cRef type() const;
 
   void set_type(Node::cRef typ) { type_ = typ; }
@@ -173,6 +174,18 @@ struct Fn : Node
 
   Node::cRef arg() const { return me()[0]; }
   Node::cRef bdy() const { return me()[1]; }
+
+  bool is_external() const
+  { return external_name() == symbol(""); }
+
+  symbol external_name() const
+  { return external_name_; }
+
+  void make_external(symbol name)
+  { external_name_ = name; }
+
+private:
+  mutable symbol external_name_ { "" };
 };
 
 struct App : Node

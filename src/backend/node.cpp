@@ -17,6 +17,8 @@ std::size_t ir::Node::argc() const
 { return argc_; }
 std::uint_fast64_t ir::Node::gid() const
 { return gid_; }
+symbol ir::Node::unique_name() const
+{ return "n" + std::to_string(gid()); }
 ir::Node::cRef ir::Node::type() const
 { return type_; }
 
