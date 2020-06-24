@@ -44,7 +44,9 @@ void cogen(generator& gen, const Node* ref)
 {
   NodeMap<std::pair<gccjit::function, gccjit::block>> fns;
   NodeMap<gccjit::rvalue> rvals;
+  NodeMap<gccjit::rvalue> params;
 
+  //////////////////////////////// TYPES
   auto genty = [&gen](auto genty, const Node* node) -> gccjit::type
   {
     switch(node->kind())
@@ -63,7 +65,6 @@ void cogen(generator& gen, const Node* ref)
           case hash_string("_Ptr"): {
               return genty(genty, ap->arg()).get_pointer();
             } break;
-          // TODO: add pointer
           }
         }
       } break;
@@ -71,7 +72,8 @@ void cogen(generator& gen, const Node* ref)
     assert(false && "Unsupported type");
     return *((gccjit::type*)nullptr);
   };
-  auto cogen = [&gen,&fns,&rvals,&genty](auto cogen, const Node* node) -> void
+  //////////////////////////////// COGEN
+  auto cogen = [&gen,&fns,&rvals,&params,&genty](auto cogen, const Node* node) -> void
   {
     switch(node->kind())
     {
@@ -80,7 +82,10 @@ void cogen(generator& gen, const Node* ref)
 
       if(auto it = fns.find(fn); it != fns.end())
         return ;
-      std::vector params = { gen.ctx.new_param(genty(genty, fn->arg()), fn->arg()->to<Param>()->unique_name().get_string().c_str()) };
+      auto par = gen.ctx.new_param(genty(genty, fn->arg()), fn->arg()->to<Param>()->unique_name().get_string().c_str());
+      params[fn->arg()] = par;
+
+      std::vector params = { par };
       auto jit_fn = gen.ctx.new_function(fn->is_external() ? GCC_JIT_FUNCTION_EXPORTED : GCC_JIT_FUNCTION_IMPORTED,
                                          gen.ctx.get_type(GCC_JIT_TYPE_VOID),
                                          (fn->is_external() ? fn->external_name() : fn->unique_name()).get_string(),
@@ -97,6 +102,20 @@ void cogen(generator& gen, const Node* ref)
       rvals[node] = gen.ctx.new_rvalue(gen.ctx.get_type(GCC_JIT_TYPE_LONG_LONG),
                                        static_cast<long int>(node->to<Literal>()->literal));
       return ;
+    } break;
+    case NodeKind::Binary: {
+      Binary::cRef bn = node->to<Binary>();
+
+      cogen(cogen, bn->lhs());
+      cogen(cogen, bn->rhs());
+
+      // How to continue? What are our arguments??
+      switch(bn->op)
+      {
+      case BinaryKind::Minus: break;
+      case BinaryKind::Plus:  break;
+      case BinaryKind::Mult:  break;
+      }
     } break;
     }
     assert(false && "Unsupported node for this backend.");
