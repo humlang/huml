@@ -14,6 +14,7 @@ struct builder
   Node::cRef prop();  
   Node::cRef unit();
   Node::cRef i(bool no_sign, Node::cRef size);
+  Node::cRef ptr(Node::cRef from);
 
   Node::cRef id(symbol symb, Node::cRef type);
   Node::cRef ignore();

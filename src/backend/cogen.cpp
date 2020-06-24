@@ -45,7 +45,7 @@ void cogen(generator& gen, const Node* ref)
   NodeMap<std::pair<gccjit::function, gccjit::block>> fns;
   NodeMap<gccjit::rvalue> rvals;
 
-  auto genty = [&gen](const Node* node) -> gccjit::type
+  auto genty = [&gen](auto genty, const Node* node) -> gccjit::type
   {
     switch(node->kind())
     {
@@ -60,6 +60,9 @@ void cogen(generator& gen, const Node* ref)
           case hash_string("u"):
           case hash_string("i"): return cogen_int(gen, c, ap->arg());
 
+          case hash_string("_Ptr"): {
+              return genty(genty, ap->arg()).get_pointer();
+            } break;
           // TODO: add pointer
           }
         }
@@ -77,7 +80,7 @@ void cogen(generator& gen, const Node* ref)
 
       if(auto it = fns.find(fn); it != fns.end())
         return ;
-      std::vector params = { gen.ctx.new_param(genty(fn->arg()), fn->arg()->to<Param>()->unique_name().get_string().c_str()) };
+      std::vector params = { gen.ctx.new_param(genty(genty, fn->arg()), fn->arg()->to<Param>()->unique_name().get_string().c_str()) };
       auto jit_fn = gen.ctx.new_function(fn->is_external() ? GCC_JIT_FUNCTION_EXPORTED : GCC_JIT_FUNCTION_IMPORTED,
                                          gen.ctx.get_type(GCC_JIT_TYPE_VOID),
                                          (fn->is_external() ? fn->external_name() : fn->unique_name()).get_string(),

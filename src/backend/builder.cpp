@@ -100,6 +100,13 @@ ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
   return app(ictor, size);
 }
 
+ir::Node::cRef ir::builder::ptr(Node::cRef from)
+{
+  auto p = lookup_or_emplace(Node::mk_node<Constructor>("_Ptr", type()));
+
+  return app(p, from);
+}
+
 ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef domain)
 {
   assert(codomain != nullptr && "codomain must stay valid.");
