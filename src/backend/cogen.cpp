@@ -54,7 +54,7 @@ void cogen(generator& gen, const Node* ref)
 
         if(ap->caller()->kind() == NodeKind::Ctr)
         {
-          Constructor::cRef c = node->to<Constructor>();
+          Constructor::cRef c = ap->caller()->to<Constructor>();
           switch(c->name.get_hash())
           {
           // Int, Char
