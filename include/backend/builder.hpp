@@ -35,7 +35,7 @@ struct builder
 
   std::ostream& print_graph(std::ostream& os, Node::cRef ref);
 private:
-  Node::cRef lookup_or_emplace(Node::Store store);
+  Node::Ref lookup_or_emplace(Node::Store store);
 private:
   tsl::robin_set<Node::Store, NodeHasher, NodeComparator> nodes;
   tsl::robin_map<Fn::cRef, symbol, NodeHasher, NodeComparator> externals;

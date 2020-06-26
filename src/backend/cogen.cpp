@@ -99,7 +99,7 @@ void cogen(generator& gen, const Node* ref)
           Tup::cRef tup = fn->arg()->to<Tup>();
           for(std::size_t i = 0; i < tup->argc(); ++i)
           {
-            auto par = gen.ctx.new_param(genty(genty, tup->me()[i]), tup->me()[i]->unique_name().get_string().c_str());
+            auto par = gen.ctx.new_param(genty(genty, tup->type()->me()[i]), tup->me()[i]->unique_name().get_string().c_str());
 
             rvals[tup->me()[i]] = par;
             params.push_back(par);
@@ -107,7 +107,7 @@ void cogen(generator& gen, const Node* ref)
         }
         else
         {
-          auto par = gen.ctx.new_param(genty(genty, fn->arg()), fn->arg()->unique_name().get_string().c_str());
+          auto par = gen.ctx.new_param(genty(genty, fn->arg()->type()), fn->arg()->unique_name().get_string().c_str());
           rvals[fn->arg()] = par; // <- one should not be able to change parameter values in an external function, thus the missing lvals insertion
 
           params.push_back(par);
@@ -115,7 +115,7 @@ void cogen(generator& gen, const Node* ref)
         assert(fn->ret() != nullptr && "ret continuation must not be null.");
 
         auto jit_fn = gen.ctx.new_function(fn->is_external() ? GCC_JIT_FUNCTION_EXPORTED : GCC_JIT_FUNCTION_IMPORTED,
-                                           genty(genty, fn->ret()->to<Fn>()->arg()),
+                                           genty(genty, fn->ret()->to<Fn>()->arg()->type()),
                                            (fn->is_external() ? fn->external_name() : fn->unique_name()).get_string(),
                                            params, 0);
         cur_block = jit_fn.new_block(fn->unique_name().get_string().c_str());
@@ -169,7 +169,7 @@ void cogen(generator& gen, const Node* ref)
           cur_block->end_with_return(); // <- function returns void
         else
         {
-          rvals[ap->arg()] = gen.ctx.new_cast(rvals[ap->arg()], genty(genty, ap->caller()->to<Fn>()->arg()));
+          rvals[ap->arg()] = gen.ctx.new_cast(rvals[ap->arg()], genty(genty, ap->caller()->to<Fn>()->arg()->type()));
           cur_block->end_with_return(rvals[ap->arg()]);
         }
         return ;

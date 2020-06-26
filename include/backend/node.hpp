@@ -60,7 +60,7 @@ struct Node
   symbol unique_name() const;
   Node::cRef type() const;
 
-  void set_type(Node::cRef typ) { type_ = typ; }
+  Node::cRef set_type(Node::cRef typ) { type_ = typ; return this; }
 
   virtual Node::cRef clone(builder& b) const
   { assert(false && "Cannot clone base node. Developer: Override this method!"); return nullptr; }
@@ -272,7 +272,7 @@ struct Tup : Node
   using Ref = Tup*;
   using cRef = const Tup*;
 
-  Tup(std::vector<Node::cRef>&& elems)
+  Tup(std::vector<Node::cRef> elems)
     : Node(NodeKind::Tup, std::move(elems))
   {  }
 

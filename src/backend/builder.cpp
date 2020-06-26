@@ -26,7 +26,16 @@ ir::Node::cRef ir::builder::unit()
 { return lookup_or_emplace(Node::mk_node<Unit>()); }
 
 ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
-{ return lookup_or_emplace(Node::mk_node<Tup>(std::move(elems))); }
+{
+  std::vector<Node::cRef> el_typs;
+  for(auto& arg : elems)
+    el_typs.emplace_back(arg->type());
+
+  auto to_ret = lookup_or_emplace(Node::mk_node<Tup>(elems));
+
+  to_ret->set_type(lookup_or_emplace(Node::mk_node<Tup>(el_typs)));
+  return to_ret;
+}
 
 ir::Node::cRef ir::builder::bot()
 { return lookup_or_emplace(Node::mk_node<Constructor>("⊥", nullptr)); }
@@ -44,7 +53,10 @@ ir::Node::cRef ir::builder::param(Node::cRef type)
 { return lookup_or_emplace(Node::mk_node<Param>(type)); }
 
 ir::Node::cRef ir::builder::lit(std::uint_fast64_t value)
-{ return lookup_or_emplace(Node::mk_node<Literal>(value)); }
+{
+  auto lit32 = lookup_or_emplace(Node::mk_node<Literal>(32));
+  return lookup_or_emplace(Node::mk_node<Literal>(value))->set_type(i(false, lit32));
+}
 
 ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef rhs)
 {
@@ -126,7 +138,7 @@ ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)
 ir::Node::cRef ir::builder::destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms)
 { return lookup_or_emplace(Node::mk_node<Case>(of, match_arms)); }
 
-ir::Node::cRef ir::builder::lookup_or_emplace(Node::Store store)
+ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
 {
   store->mach_ = this;
   store->gid_ = gid++;
