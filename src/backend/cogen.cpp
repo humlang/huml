@@ -74,10 +74,12 @@ void cogen(generator& gen, const Node* ref)
   };
   //////////////////////////////// COGEN
   std::optional<gccjit::block> cur_block;
-  NodeMap<gccjit::rvalue> rvals;
-  NodeMap<gccjit::rvalue> lvals;
+  //NodeMap<gccjit::rvalue> rvals;
+  std::unordered_map<Node::cRef, gccjit::rvalue, NodeHasher, NodeComparator> rvals;
+  NodeMap<gccjit::lvalue> lvals;
 
-  auto cogen = [&gen,&fns,&lvals,&rvals,&cur_block,&genty](auto cogen, const Node* node) -> void
+  std::optional<Node::cRef> external_ret;
+  auto cogen = [&gen,&fns,&lvals,&rvals,&cur_block,&genty,&external_ret](auto cogen, const Node* node) -> void
   {
     switch(node->kind())
     {
@@ -110,14 +112,18 @@ void cogen(generator& gen, const Node* ref)
 
           params.push_back(par);
         }
+        assert(fn->ret() != nullptr && "ret continuation must not be null.");
+
         auto jit_fn = gen.ctx.new_function(fn->is_external() ? GCC_JIT_FUNCTION_EXPORTED : GCC_JIT_FUNCTION_IMPORTED,
-                                           gen.ctx.get_type(GCC_JIT_TYPE_VOID),
+                                           genty(genty, fn->ret()->to<Fn>()->arg()),
                                            (fn->is_external() ? fn->external_name() : fn->unique_name()).get_string(),
                                            params, 0);
         cur_block = jit_fn.new_block(fn->unique_name().get_string().c_str());
         fns[fn] = { jit_fn, *cur_block };
-        // add call to other function or case analysis
+
+        external_ret = fn->ret();
         cogen(cogen, fn->bdy());
+        external_ret = std::nullopt;
       }
       else
       {
@@ -130,7 +136,7 @@ void cogen(generator& gen, const Node* ref)
           auto tup = *fn->arg()->to<Tup>();
           for(std::size_t i = 0; i < tup.argc(); ++i)
           {
-            lvals[tup[i]] = rvals[tup[i]] = cur_block->get_function()
+            rvals[tup[i]] = lvals[tup[i]] = cur_block->get_function()
                             .new_local(genty(genty, tup[i]),
                                        tup[i]->unique_name().get_string().c_str());
           }
@@ -152,7 +158,22 @@ void cogen(generator& gen, const Node* ref)
     } break;
 
     case NodeKind::App: {
-      // TODO: !!!!!!!!!!!!!
+      App::cRef ap = node->to<App>();
+
+      if(ap->caller() == external_ret.value())
+      {
+        // external_ret must adhere the calling convention by just literally returning a value
+        cogen(cogen, ap->arg());
+        
+        if(ap->arg()->kind() == NodeKind::Unit)
+          cur_block->end_with_return(); // <- function returns void
+        else
+        {
+          rvals[ap->arg()] = gen.ctx.new_cast(rvals[ap->arg()], genty(genty, ap->caller()->to<Fn>()->arg()));
+          cur_block->end_with_return(rvals[ap->arg()]);
+        }
+        return ;
+      }
     } break;
 
     case NodeKind::Literal: {
@@ -167,7 +188,7 @@ void cogen(generator& gen, const Node* ref)
       cogen(cogen, bn->lhs());
       cogen(cogen, bn->rhs());
       // results are stored in rvals by now
-      assert(rvals.contains(bn->lhs()) && rvals.contains(bn->rhs()) && "Bug in codegen.");
+      assert(rvals.count(bn->lhs()) && rvals.count(bn->rhs()) && "Bug in codegen.");
 
       auto l = rvals[bn->lhs()];
       auto r = rvals[bn->rhs()];
@@ -183,9 +204,6 @@ void cogen(generator& gen, const Node* ref)
     assert(false && "Unsupported node for this backend.");
   };
   cogen(cogen, ref);
-
-  // TODO: remove this, this hooks up the bb from main to return 42
-  cur_block->end_with_return(gen.ctx.new_rvalue(gen.ctx.get_type(GCC_JIT_TYPE_INT), 42));
 }
 
 bool cogen(std::string name, const Node* ref)
@@ -194,7 +212,7 @@ bool cogen(std::string name, const Node* ref)
   cogen(gen, ref);
 
   // always emit assembler for now, is most versatile
-  gen.ctx.compile_to_file(GCC_JIT_OUTPUT_KIND_ASSEMBLER, (name + ".s").c_str());
+  gen.ctx.compile_to_file(GCC_JIT_OUTPUT_KIND_EXECUTABLE, (name + ".out").c_str());
   return true;
 }
 

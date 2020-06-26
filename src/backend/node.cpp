@@ -60,7 +60,7 @@ std::size_t ir::NodeHasher::operator()(const Node::cRef str) const
 bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cRef rhs) const
 {
   if(lhs->nominal() || rhs->nominal())
-    return &lhs == &rhs;
+    return lhs == rhs;
 
   if(!(lhs->argc() == rhs->argc() && lhs->kind() == rhs->kind() && lhs->type() == rhs->type()))
     return false;
@@ -79,15 +79,15 @@ ir::Node::cRef ir::Binary::clone(ir::builder& b) const
 ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
 { return b.id(name, type()->clone(b)); }
 ir::Node::cRef ir::Fn::clone(ir::builder& b) const
-{ return b.fn(arg(), bdy()->clone(b)); }
+{ return b.fn(arg()->clone(b), bdy()->clone(b), ret()->clone(b)); }
 ir::Node::cRef ir::App::clone(ir::builder& b) const
-{ return b.app(caller(), arg()->clone(b)); }
+{ return b.app(caller()->clone(b), arg()->clone(b)); }
 ir::Node::cRef ir::Case::clone(ir::builder& b) const
 {
   auto arms = match_arms();
   for(auto& arm : arms)
     arm = std::make_pair(arm.first->clone(b), arm.second->clone(b));
-  return b.destruct(of(), arms);
+  return b.destruct(of()->clone(b), arms);
 }
 ir::Node::cRef ir::Kind::clone(ir::builder& b) const
 { return b.kind(); }

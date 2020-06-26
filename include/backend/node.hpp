@@ -149,14 +149,16 @@ struct Fn : Node
   using Ref = Fn*;
   using cRef = const Fn*;
 
-  Fn(Node::cRef codomain, Node::cRef domain)
-    : Node(NodeKind::Fn, {codomain, domain})
+  // domain is inferred from the body
+  Fn(Node::cRef codomain, Node::cRef body, Node::cRef ret_cnt)
+    : Node(NodeKind::Fn, {codomain, body, ret_cnt})
   { this->nominal_ = true; }
 
   Node::cRef clone(builder& b) const override;
 
   Node::cRef arg() const { return me()[0]; }
   Node::cRef bdy() const { return me()[1]; }
+  Node::cRef ret() const { return me()[2]; }
 
   bool is_external() const
   { return external_name() != symbol(""); }

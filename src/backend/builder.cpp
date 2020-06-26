@@ -28,6 +28,9 @@ ir::Node::cRef ir::builder::unit()
 ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
 { return lookup_or_emplace(Node::mk_node<Tup>(std::move(elems))); }
 
+ir::Node::cRef ir::builder::bot()
+{ return lookup_or_emplace(Node::mk_node<Constructor>("⊥", nullptr)); }
+
 ir::Node::cRef ir::builder::id(symbol symb, Node::cRef type)
 {
   assert(type != Node::no_ref && "Type must exist.");
@@ -108,10 +111,10 @@ ir::Node::cRef ir::builder::ptr(Node::cRef from)
   return app(p, from);
 }
 
-ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef domain)
+ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef body, Node::cRef ret)
 {
   assert(codomain != nullptr && "codomain must stay valid.");
-  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, domain)));
+  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, body, ret)));
 }
 
 ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)

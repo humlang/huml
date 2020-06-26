@@ -13,6 +13,7 @@ struct builder
   Node::cRef type();
   Node::cRef prop();  
   Node::cRef unit();
+  Node::cRef bot();
   Node::cRef i(bool no_sign, Node::cRef size);
   Node::cRef ptr(Node::cRef from);
   Node::cRef tup(std::vector<Node::cRef> elems);
@@ -25,7 +26,7 @@ struct builder
   Node::cRef lit(std::uint_fast64_t value);
   Node::cRef binop(BinaryKind op, Node::cRef lhs, Node::cRef rhs);
 
-  Fn::cRef fn(Node::cRef codomain, Node::cRef domain);
+  Fn::cRef fn(Node::cRef codomain, Node::cRef body, Node::cRef ret);
 
   Node::cRef app(Node::cRef caller, Node::cRef arg);
 
