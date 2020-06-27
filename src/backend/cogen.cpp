@@ -85,6 +85,7 @@ void cogen(generator& gen, const Node* ref)
         assert(rvals.contains(node) && "Param needs to be bound before it can be used.");
         return ;
       } break;
+
     case NodeKind::Fn: {
       Fn::cRef fn = node->to<Fn>();
       // check if function already exists and can be used for calling
@@ -193,6 +194,14 @@ void cogen(generator& gen, const Node* ref)
       rvals[node] = gen.ctx.new_rvalue(gen.ctx.get_type(GCC_JIT_TYPE_LONG_LONG),
                                        static_cast<long int>(node->to<Literal>()->literal));
       return ;
+    } break;
+
+    case NodeKind::Case: {
+      Case::cRef cs = node->to<Case>();
+
+      cogen(cogen, cs->of(), cur_block);
+
+      // Now create basic block that jumps to specific patterns
     } break;
 
     case NodeKind::Binary: {
