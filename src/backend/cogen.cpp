@@ -200,8 +200,47 @@ void cogen(generator& gen, const Node* ref)
       Case::cRef cs = node->to<Case>();
 
       cogen(cogen, cs->of(), cur_block);
+      assert(rvals.contains(cs->of()) && "thing we match on should've been generated already");
+      auto ofty = genty(genty, cs->of()->type());
 
-      // Now create basic block that jumps to specific patterns
+      // We need to somehow store the value
+      auto cs_v = cur_block->get_function().new_local(ofty, cs->unique_name().get_string().c_str());
+      rvals[cs] = lvals[cs] = cs_v;
+
+      auto fn = cur_block->get_function();
+      auto ma = cs->match_arms();
+      gccjit::block cur = *cur_block;
+      auto join = fn.new_block(("join" + cs->unique_name().get_string()).c_str());
+      for(auto& m : ma)
+      {
+        auto cond = fn.new_block(("cond" + m.first->unique_name().get_string()).c_str());
+        cur.end_with_jump(cond);
+
+        auto tr_b = fn.new_block(("tr_b" + m.second->unique_name().get_string()).c_str());
+        auto fl_b = fn.new_block(("fl_b" + m.first->unique_name().get_string()).c_str());
+
+        // TODO: This does not work well for `_` or more advanced patterns such as `\_. _ + e`
+        cogen(cogen, m.first, &cond);
+        assert(rvals.contains(m.first) && "rvals should contain the pattern by now");
+
+        // cs->of() == pattern   -T-> tr_b    -F-> fl_b
+        auto eq = gen.ctx.new_eq(rvals[cs->of()], gen.ctx.new_cast(rvals[m.first], ofty));
+        cond.end_with_conditional(eq, tr_b, fl_b);
+        
+        // Generate pattern expression thing inside the tr_b branch
+        cogen(cogen, m.second, &tr_b);
+        tr_b.add_assignment(cs_v, gen.ctx.new_cast(rvals[m.second], ofty));
+
+        // join the true and false branches
+        tr_b.end_with_jump(join);
+
+        // tie the knot
+        cur = fl_b;
+      }
+      cur.end_with_jump(join);
+      // update the block one layer up.
+      *cur_block = join;
+      return ;
     } break;
 
     case NodeKind::Binary: {
