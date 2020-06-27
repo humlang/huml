@@ -50,11 +50,9 @@ struct Node
   template<typename T>
   T* to() { return static_cast<T*>(this); }
 
-  Node(NodeKind kind, std::size_t argc);
   Node(NodeKind kind, std::vector<Node::cRef> children);
 
   NodeKind kind() const;
-  bool nominal() const;
   std::size_t argc() const;
   std::uint_fast64_t gid() const;
   symbol unique_name() const;
@@ -70,8 +68,6 @@ struct Node
 protected:
   NodeKind kind_;
 
-  bool nominal_ : 1;
-  std::size_t argc_;
   std::vector<Node::cRef> children_;
   Node::cRef type_ { no_ref };
 
@@ -152,7 +148,7 @@ struct Fn : Node
   // domain is inferred from the body
   Fn(Node::cRef codomain, Node::cRef body, Node::cRef ret_cnt)
     : Node(NodeKind::Fn, {codomain, body, ret_cnt})
-  { this->nominal_ = true; }
+  {  }
 
   Node::cRef clone(builder& b) const override;
 
@@ -201,7 +197,6 @@ struct Case : Node
       children_.emplace_back(std::move(p.first));
       children_.emplace_back(std::move(p.second));
     }
-    argc_ = children_.size();
   }
 
   Node::cRef clone(builder& b) const override;

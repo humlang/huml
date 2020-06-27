@@ -42,8 +42,6 @@ gccjit::type cogen_int(generator& gen, Constructor::cRef ctor, Node::cRef arg)
 
 void cogen(generator& gen, const Node* ref)
 {
-  NodeMap<std::pair<gccjit::function, gccjit::block>> fns;
-
   //////////////////////////////// TYPES
   auto genty = [&gen](auto genty, Node::cRef node) -> gccjit::type
   {
@@ -73,16 +71,20 @@ void cogen(generator& gen, const Node* ref)
     return *((gccjit::type*)nullptr);
   };
   //////////////////////////////// COGEN
-  std::optional<gccjit::block> cur_block;
-  //NodeMap<gccjit::rvalue> rvals;
-  std::unordered_map<Node::cRef, gccjit::rvalue, NodeHasher, NodeComparator> rvals;
+  //NodeMap<gccjit::block> fns;
+  std::unordered_map<Node::cRef, gccjit::block, NodeHasher, NodeComparator> fns;
+  NodeMap<gccjit::rvalue> rvals;
   NodeMap<gccjit::lvalue> lvals;
 
-  std::optional<Node::cRef> external_ret;
-  auto cogen = [&gen,&fns,&lvals,&rvals,&cur_block,&genty,&external_ret](auto cogen, const Node* node) -> void
+  std::optional<Fn::cRef> external_fn;
+  auto cogen = [&gen,&fns,&lvals,&rvals,&genty,&external_fn](auto cogen, const Node* node, gccjit::block* cur_block) -> void
   {
     switch(node->kind())
     {
+    case NodeKind::Param: {
+        assert(rvals.contains(node) && "Param needs to be bound before it can be used.");
+        return ;
+      } break;
     case NodeKind::Fn: {
       Fn::cRef fn = node->to<Fn>();
       // check if function already exists and can be used for calling
@@ -91,6 +93,8 @@ void cogen(generator& gen, const Node* ref)
 
       if(fn->is_external())
       {
+        assert(cur_block == nullptr && "cur_block must be null for external functions");
+
         // generate ordinary function
         std::vector<gccjit::param> params;
         if(fn->arg()->kind() == NodeKind::Tup)
@@ -118,16 +122,15 @@ void cogen(generator& gen, const Node* ref)
                                            genty(genty, fn->ret()->to<Fn>()->arg()->type()),
                                            (fn->is_external() ? fn->external_name() : fn->unique_name()).get_string(),
                                            params, 0);
-        cur_block = jit_fn.new_block(fn->unique_name().get_string().c_str());
-        fns[fn] = { jit_fn, *cur_block };
+        fns[fn] = jit_fn.new_block(fn->unique_name().get_string().c_str());
 
-        external_ret = fn->ret();
-        cogen(cogen, fn->bdy());
-        external_ret = std::nullopt;
+        external_fn = fn;
+        cogen(cogen, fn->bdy(), &fns[fn]);
+        external_fn = std::nullopt;
       }
       else
       {
-        assert(cur_block != std::nullopt && "Cannot start in the middle of nowhere.");
+        assert(cur_block != nullptr && "cur_block must not be null for internal functions.");
 
         // Generate basic block within a function
         if(fn->arg()->kind() == NodeKind::Tup)
@@ -144,15 +147,15 @@ void cogen(generator& gen, const Node* ref)
         else
         {
           rvals[fn->arg()] = lvals[fn->arg()] = cur_block->get_function()
-            .new_local(genty(genty, fn->arg()),
+            .new_local(genty(genty, fn->arg()->type()),
                        fn->arg()->unique_name().get_string().c_str());
         }
-        auto new_block = cur_block->get_function().new_block(fn->unique_name().get_string().c_str());
+        auto new_block = fns[fn] = cur_block->get_function().new_block(fn->unique_name().get_string().c_str());
 
         // go from old block to new block. This is the same as a curried function call
-        cur_block->end_with_jump(new_block);
+        cogen(cogen, fn->bdy(), &new_block);
 
-        cur_block = new_block;
+        //cur_block->end_with_jump(new_block);
       }
       return ;
     } break;
@@ -160,11 +163,15 @@ void cogen(generator& gen, const Node* ref)
     case NodeKind::App: {
       App::cRef ap = node->to<App>();
 
-      if(ap->caller() == external_ret.value())
+      const bool is_external = ap->caller() == external_fn.value()->ret();
+      if(!is_external)
+        cogen(cogen, ap->caller(), cur_block);
+      cogen(cogen, ap->arg(), cur_block);
+
+      // TODO: what if caller is a higher order function? We need to subst!
+      if(is_external)
       {
         // external_ret must adhere the calling convention by just literally returning a value
-        cogen(cogen, ap->arg());
-        
         if(ap->arg()->kind() == NodeKind::Unit)
           cur_block->end_with_return(); // <- function returns void
         else
@@ -172,8 +179,14 @@ void cogen(generator& gen, const Node* ref)
           rvals[ap->arg()] = gen.ctx.new_cast(rvals[ap->arg()], genty(genty, ap->caller()->to<Fn>()->arg()->type()));
           cur_block->end_with_return(rvals[ap->arg()]);
         }
-        return ;
       }
+      else
+      {
+        // Not an external function call, we need to set the parameters and jump to the caller
+        cur_block->add_assignment(lvals[ap->caller()->to<Fn>()->arg()], rvals[ap->arg()]);
+        cur_block->end_with_jump(fns[ap->caller()]);
+      }
+      return ;
     } break;
 
     case NodeKind::Literal: {
@@ -185,25 +198,26 @@ void cogen(generator& gen, const Node* ref)
     case NodeKind::Binary: {
       Binary::cRef bn = node->to<Binary>();
 
-      cogen(cogen, bn->lhs());
-      cogen(cogen, bn->rhs());
+      cogen(cogen, bn->lhs(), cur_block);
+      cogen(cogen, bn->rhs(), cur_block);
       // results are stored in rvals by now
       assert(rvals.count(bn->lhs()) && rvals.count(bn->rhs()) && "Bug in codegen.");
 
-      auto l = rvals[bn->lhs()];
-      auto r = rvals[bn->rhs()];
+      auto lty = genty(genty, bn->lhs()->type());
+      auto l = gen.ctx.new_cast(rvals[bn->lhs()], lty);
+      auto r = gen.ctx.new_cast(rvals[bn->rhs()], lty);
       switch(bn->op)
       {
-      case BinaryKind::Minus: rvals[bn] = l - r; break;
-      case BinaryKind::Plus:  rvals[bn] = l + r; break;
-      case BinaryKind::Mult:  rvals[bn] = l * r; break;
+      case BinaryKind::Minus: rvals[bn] = gen.ctx.new_binary_op(GCC_JIT_BINARY_OP_MINUS, lty, l, r); break;
+      case BinaryKind::Plus:  rvals[bn] = gen.ctx.new_binary_op(GCC_JIT_BINARY_OP_PLUS,  lty, l, r); break;
+      case BinaryKind::Mult:  rvals[bn] = gen.ctx.new_binary_op(GCC_JIT_BINARY_OP_MULT, lty, l, r);  break;
       }
       return ;
     } break;
     }
     assert(false && "Unsupported node for this backend.");
   };
-  cogen(cogen, ref);
+  cogen(cogen, ref, nullptr);
 }
 
 bool cogen(std::string name, const Node* ref)
