@@ -14,16 +14,19 @@ ir::builder::builder()
 }
 
 ir::Node::cRef ir::builder::kind()
-{ return lookup_or_emplace(Node::mk_node<Kind>()); }
+{
+  return lookup_or_emplace(Node::mk_node<Kind>())->set_type(
+         lookup_or_emplace(Node::mk_node<Kind>()));
+}
 
 ir::Node::cRef ir::builder::type()
-{ return lookup_or_emplace(Node::mk_node<Type>()); }
+{ return lookup_or_emplace(Node::mk_node<Type>())->set_type(kind()); }
 
 ir::Node::cRef ir::builder::prop()
-{ return lookup_or_emplace(Node::mk_node<Prop>()); }
+{ return lookup_or_emplace(Node::mk_node<Prop>())->set_type(type()); }
 
 ir::Node::cRef ir::builder::unit()
-{ return lookup_or_emplace(Node::mk_node<Unit>()); }
+{ return lookup_or_emplace(Node::mk_node<Unit>())->set_type(type()); }
 
 ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
 {
@@ -108,7 +111,8 @@ ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef 
       } break;
     }
   }
-  return lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs));
+  // TODO: This does not work well if lhs->type() != rhs->type()
+  return lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs))->set_type(lhs->type());
 }
 
 ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
@@ -126,7 +130,8 @@ ir::Node::cRef ir::builder::ptr(Node::cRef from)
 ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef body, Node::cRef ret)
 {
   assert(codomain != nullptr && "codomain must stay valid.");
-  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, body, ret)));
+  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, body, ret))
+      ->set_type(lookup_or_emplace(Node::mk_node<Fn>(codomain, bot(), nullptr))));
 }
 
 ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)
@@ -136,7 +141,7 @@ ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)
 }
 
 ir::Node::cRef ir::builder::destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms)
-{ return lookup_or_emplace(Node::mk_node<Case>(of, match_arms)); }
+{ return lookup_or_emplace(Node::mk_node<Case>(of, match_arms))->set_type(of->type()); }
 
 ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
 {

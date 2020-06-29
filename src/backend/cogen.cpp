@@ -71,18 +71,23 @@ void cogen(generator& gen, const Node* ref)
     return *((gccjit::type*)nullptr);
   };
   //////////////////////////////// COGEN
+
+  /* Somehow, using NodeMap<gccjit::block> segfaults here */
   //NodeMap<gccjit::block> fns;
   std::unordered_map<Node::cRef, gccjit::block, NodeHasher, NodeComparator> fns;
   NodeMap<gccjit::rvalue> rvals;
-  NodeMap<gccjit::lvalue> lvals;
+  NodeMap<std::vector<gccjit::lvalue>> params;
 
   std::optional<Fn::cRef> external_fn;
-  auto cogen = [&gen,&fns,&lvals,&rvals,&genty,&external_fn](auto cogen, const Node* node, gccjit::block* cur_block) -> void
+  auto cogen = [&gen,&fns,&params,&rvals,&genty,&external_fn](auto cogen, const Node* node, gccjit::block* cur_block) -> void
   {
     switch(node->kind())
     {
     case NodeKind::Param: {
-        assert(rvals.contains(node) && "Param needs to be bound before it can be used.");
+        if(node->type()->kind() != NodeKind::Fn)
+          assert(rvals.contains(node) && "Param needs to be bound before it can be used.");
+        else
+          assert(fns.count(node) && "Function must have been bound before.");
         return ;
       } break;
 
@@ -140,23 +145,33 @@ void cogen(generator& gen, const Node* ref)
           auto tup = *fn->arg()->to<Tup>();
           for(std::size_t i = 0; i < tup.argc(); ++i)
           {
-            rvals[tup[i]] = lvals[tup[i]] = cur_block->get_function()
+            gccjit::lvalue l;
+            rvals[tup[i]] = l = cur_block->get_function()
                             .new_local(genty(genty, tup[i]),
                                        tup[i]->unique_name().get_string().c_str());
+            params[fn].emplace_back(l);
           }
         }
         else
         {
-          rvals[fn->arg()] = lvals[fn->arg()] = cur_block->get_function()
-            .new_local(genty(genty, fn->arg()->type()),
-                       fn->arg()->unique_name().get_string().c_str());
+          if(fn->arg()->type()->kind() != NodeKind::Fn)
+          {
+            gccjit::lvalue l;
+            rvals[fn->arg()] = l = cur_block->get_function()
+              .new_local(genty(genty, fn->arg()->type()),
+                         fn->arg()->unique_name().get_string().c_str());
+            params[fn].emplace_back(l);
+          }
+          else
+          {
+            // Generate basic block
+            fns[fn->arg()] = cur_block->get_function().new_block(fn->arg()->unique_name().get_string().c_str());
+          }
         }
         auto new_block = fns[fn] = cur_block->get_function().new_block(fn->unique_name().get_string().c_str());
 
         // go from old block to new block. This is the same as a curried function call
         cogen(cogen, fn->bdy(), &new_block);
-
-        //cur_block->end_with_jump(new_block);
       }
       return ;
     } break;
@@ -166,10 +181,14 @@ void cogen(generator& gen, const Node* ref)
 
       const bool is_external = ap->caller() == external_fn.value()->ret();
       if(!is_external)
-        cogen(cogen, ap->caller(), cur_block);
+      {
+        // make sure we are not in a higher order function call. otherwise, ignore the caller
+
+        if(!(ap->caller()->kind() == NodeKind::Param && ap->caller()->type()->kind() == NodeKind::Fn))
+          cogen(cogen, ap->caller(), cur_block);
+      }
       cogen(cogen, ap->arg(), cur_block);
 
-      // TODO: what if caller is a higher order function? We need to subst!
       if(is_external)
       {
         // external_ret must adhere the calling convention by just literally returning a value
@@ -184,8 +203,34 @@ void cogen(generator& gen, const Node* ref)
       else
       {
         // Not an external function call, we need to set the parameters and jump to the caller
-        cur_block->add_assignment(lvals[ap->caller()->to<Fn>()->arg()], rvals[ap->arg()]);
-        cur_block->end_with_jump(fns[ap->caller()]);
+
+        // If higher order, we do not need to store a value, but rather jump to the block of our arg
+        if(ap->caller()->kind() == NodeKind::Fn && ap->caller()->to<Fn>()->arg()->kind() == NodeKind::Fn)
+        {
+          assert(fns.count(ap->caller()->to<Fn>()->arg()) && "caller arg is higher order, a block must have been created.");
+          assert(fns.count(ap->arg()) && "arg is a function, a block must have been created.");
+
+          // HIGHER ORDER
+          fns[ap->caller()->to<Fn>()->arg()].end_with_jump(fns[ap->arg()]); 
+          cur_block->end_with_jump(fns[ap->caller()]); // <- caller will somehow jump to ap->caller()->arg. If not, gcc will complain.
+        }
+        else
+        {
+          // TODO: what if arg is a tuple?
+          assert(params.count(ap->caller()) && "caller's argument must be in the list of lvals");
+          assert(rvals.count(ap->arg()) && "arg's argument must be in the list of rvals");
+
+          if(ap->arg()->kind() != NodeKind::Unit && ap->arg()->kind() != NodeKind::Fn) // make sure we actually have a usable argument
+          {
+            // TODO
+            //cur_block->add_assignment(lvals[ap->caller()], rvals[ap->arg()]);
+          }
+          else if(ap->arg()->kind() == NodeKind::Fn)
+          {
+            // WHAT DO HERE? arg is of higher order
+          }
+          cur_block->end_with_jump(fns[ap->caller()]);
+        }
       }
       return ;
     } break;
@@ -205,7 +250,7 @@ void cogen(generator& gen, const Node* ref)
 
       // We need to somehow store the value
       auto cs_v = cur_block->get_function().new_local(ofty, cs->unique_name().get_string().c_str());
-      rvals[cs] = lvals[cs] = cs_v;
+      rvals[cs] = cs_v;
 
       auto fn = cur_block->get_function();
       auto ma = cs->match_arms();
