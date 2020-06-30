@@ -1,4 +1,6 @@
 #include <backend/cogen.hpp>
+#include <backend/builder.hpp>
+#include <backend/defunc.hpp>
 #include <backend/node.hpp>
 #include <tmp.hpp>
 
@@ -42,24 +44,32 @@ struct generator
     switch(node->kind())
     {
     case NodeKind::App: {
-        App::cRef ap = node->to<App>();
+      App::cRef ap = node->to<App>();
 
-        if(ap->caller()->kind() == NodeKind::Ctr)
+      if(ap->caller()->kind() == NodeKind::Ctr)
+      {
+        Constructor::cRef c = ap->caller()->to<Constructor>();
+        switch(c->name.get_hash())
         {
-          Constructor::cRef c = ap->caller()->to<Constructor>();
-          switch(c->name.get_hash())
-          {
-          // Int, Char
-          case hash_string("u"):
-          case hash_string("i"): return cogen_int(c, ap->arg());
+        // Int, Char
+        case hash_string("u"):
+        case hash_string("i"): return cogen_int(c, ap->arg());
 
-          // Pointer
-          case hash_string("_Ptr"): {
-              return genty(ap->arg()).get_pointer();
-            } break;
-          }
+        // Pointer
+        case hash_string("_Ptr"): {
+            return genty(ap->arg()).get_pointer();
+          } break;
         }
-      } break;
+      }
+    } break;
+    case NodeKind::Fn: {
+      Fn::cRef fn = node->to<Fn>();
+      auto arg = genty(fn->arg()->type()).get_inner_type();
+      auto ret = genty(fn->bdy()).get_inner_type();
+
+      // TODO: Make this work for tuples
+      return gcc_jit_context_new_function_ptr_type(ctx.get_inner_context(), NULL, ret, 1, &arg, 0);
+    } break;
     }
     assert(false && "Unsupported type");
     return *((gccjit::type*)nullptr);
@@ -68,6 +78,7 @@ struct generator
   //////////////////////////////// COGEN
   void cogen(const Node* node, gccjit::block* cur_block)
   {
+#if 0
     switch(node->kind())
     {
     case NodeKind::Param: {
@@ -125,10 +136,11 @@ private:
                                      genty(fn->ret()->to<Fn>()->arg()->type()),
                                      fn->external_name().get_string(),
                                      params, 0)
-                  : ctx.new_function(GCC_JIT_FUNCTION_IMPORTED,
+                  : ctx.new_function(GCC_JIT_FUNCTION_INTERNAL,
                                      ctx.get_type(GCC_JIT_TYPE_VOID), // All functions we generate return simply void, because they are continuations!
                                      fn->unique_name().get_string(),
                                      params, 0);
+    rvals[fn] = jit_fn.get_address();
     fns[fn] = jit_fn.new_block(fn->unique_name().get_string().c_str());
 
     if(fn->is_external())
@@ -142,28 +154,27 @@ private:
   }
   void gen_app(App::cRef ap, gccjit::block* cur_block)
   {
-    // TODO:
+    // TODO: Make use of defunctionalization pass to optimize this madness!
+    
     const bool is_external_ret = ap->caller() == external_fn.value()->ret();
     if(!is_external_ret)
       cogen(ap->caller(), cur_block);
     cogen(ap->arg(), cur_block);
 
-    if(is_external_ret)
+    // only emit a function call if the function we call is not an external ret
+    if(!is_external_ret)
     {
-      // external_ret must adhere the calling convention by just literally returning a value
-      if(ap->arg()->kind() == NodeKind::Unit)
-        cur_block->end_with_return(); // <- function returns void
-      else
-      {
-        rvals[ap->arg()] = ctx.new_cast(rvals[ap->arg()], genty(ap->caller()->to<Fn>()->arg()->type()));
-        cur_block->end_with_return(rvals[ap->arg()]);
-      }
+      auto call = ctx.new_call(fns[ap->caller()].get_function(), rvals[ap->arg()]);
+
+      fns[ap->caller()].add_eval(rvals[ap] = call);
     }
+
+    if(ap->arg()->kind() == NodeKind::Unit || !is_external_ret)
+      cur_block->end_with_return(); // <- function returns void if we call with () or if it is not external
     else
     {
-      // Not an external function call, we need to set the parameters and jump to the caller
-      cur_block->add_assignment(lvals[ap->caller()->to<Fn>()->arg()], rvals[ap->arg()]);
-      cur_block->end_with_jump(fns[ap->caller()]);
+      rvals[ap->arg()] = ctx.new_cast(rvals[ap->arg()], genty(ap->caller()->to<Fn>()->arg()->type()));
+      cur_block->end_with_return(rvals[ap->arg()]);
     }
   }
   void gen_case(Case::cRef cs, gccjit::block* cur_block)
@@ -210,7 +221,6 @@ private:
     // update the block one layer up.
     *cur_block = join;
   }
-
   void gen_binary(Binary::cRef bn, gccjit::block* cur_block)
   {
     cogen(bn->lhs(), cur_block);
@@ -227,6 +237,7 @@ private:
     case BinaryKind::Plus:  rvals[bn] = ctx.new_binary_op(GCC_JIT_BINARY_OP_PLUS,  lty, l, r); break;
     case BinaryKind::Mult:  rvals[bn] = ctx.new_binary_op(GCC_JIT_BINARY_OP_MULT, lty, l, r);  break;
     }
+#endif
   }
 public:
   gccjit::context ctx;
@@ -242,8 +253,11 @@ private:
 
 bool cogen(std::string name, const Node* ref)
 {
+  builder cpy;
+  ref = defunctionalize(cpy, ref);
+
   generator gen(name);
-  gen.cogen(ref, nullptr);
+  //gen.cogen(ref, nullptr);
 
   // always emit assembler for now, is most versatile
   gen.ctx.compile_to_file(GCC_JIT_OUTPUT_KIND_EXECUTABLE, (name + ".out").c_str());

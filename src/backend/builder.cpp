@@ -123,10 +123,10 @@ ir::Node::cRef ir::builder::ptr(Node::cRef from)
   return app(p, from);
 }
 
-ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef body, Node::cRef ret)
+ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef body)
 {
   assert(codomain != nullptr && "codomain must stay valid.");
-  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, body, ret)));
+  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, body)));
 }
 
 ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)
