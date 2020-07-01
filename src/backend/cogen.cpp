@@ -8,15 +8,15 @@
 namespace ir
 {
 
-NodeSet find_reachable_fns(Node::cRef foo)
+std::vector<Node::cRef> find_reachable_fns(Node::cRef foo)
 {
-  NodeSet v;
+  std::vector<Node::cRef> v;
   if(foo->kind() == NodeKind::Fn)
-    v.insert(foo);
+    v.insert(v.end(), foo);
   for(std::size_t i = 0; i < foo->argc(); ++i)
   {
     auto w = find_reachable_fns(foo->me()[i]);
-    v.insert(w.begin(), w.end());
+    v.insert(v.end(), w.begin(), w.end());
   }
   return v;
 }
@@ -101,7 +101,8 @@ struct generator
     assert(ret != nullptr && ret->type()->kind() == NodeKind::Fn && "return continuation must have a function type");
 
     /// Build function
-    auto ret_type = genty(ret->to<Fn>()->arg());
+    assert(ret->to<Fn>()->args().size() == 1 && "We only support one single return type atm");
+    auto ret_type = genty(ret->to<Fn>()->args().front()->type());
     // TODO: check return type and potentially return a tuple
     
     std::vector<gccjit::param> params;
@@ -111,7 +112,7 @@ struct generator
         continue;
       // TODO: potentially emit tuple type
 
-      auto typ = genty(v);
+      auto typ = genty(v->type());
       auto param = ctx.new_param(typ, v->unique_name().get_string().c_str());
 
       lvals.emplace(v, std::vector<gccjit::lvalue> { param });
@@ -120,40 +121,54 @@ struct generator
       params.emplace_back(param);
     }
     gccjit::function gccfn = ctx.new_function(GCC_JIT_FUNCTION_EXPORTED, ret_type,
-                                              node->unique_name().get_string().c_str(),
+                                              (node->to<Fn>()->is_external()
+                                               ? node->to<Fn>()->external_name() : node->unique_name()).get_string().c_str(),
                                               params, false);
     // TODO: do we need a particular schedule?
-    NodeSet rfns = find_reachable_fns(node->to<Fn>());
+    std::vector<Node::cRef> rfns = find_reachable_fns(node->to<Fn>());
 
-    /// emit *all* parameters
+    /// emit *all* (reachable) parameters and function blocks
     for(auto& x : rfns)
     {
-      auto v = x->to<Fn>();
-      if(v->arg()->type()->kind() == NodeKind::Unit)
+      if(x == ret || fns.contains(x))
         continue;
-      // TODO: emit tuple type
 
-      auto a  = gccfn.new_local(genty(v), v->unique_name().get_string().c_str());
-      auto pa = gccfn.new_local(genty(v), ("p" + v->unique_name().get_string()).c_str());
+      for(auto& a : x->to<Fn>()->args())
+      {
+        if(a->type()->kind() == NodeKind::Unit || a->type()->kind() == NodeKind::Fn)
+          continue;
 
-      lvals.emplace(v, std::vector<gccjit::lvalue> { a, pa });
-      rvals.emplace(v, std::vector<gccjit::rvalue> { a, pa });
+        // TODO: emit tuple type
+        auto a_ = gccfn.new_local(genty(a->type()), a->unique_name().get_string().c_str());
+        auto pa = gccfn.new_local(genty(a->type()), ("p" + a->unique_name().get_string()).c_str());
+
+        lvals.emplace(a, std::vector<gccjit::lvalue> { a_, pa });
+        rvals.emplace(a, std::vector<gccjit::rvalue> { a_, pa });
+      }
+      fns[x] = gccfn.new_block(("b" + x->unique_name().get_string()).c_str());
     }
 
     /// emit all cfnodes
     for(auto& x : rfns)
     {
       auto v = x->to<Fn>();
-      gccjit::block blk = fns[v] = gccfn.new_block(("l" + v->unique_name().get_string()).c_str());
+      if(v == ret)
+        continue;
+
+      assert(fns.contains(v) && "Basicblock of fn must have been created");
+      gccjit::block blk = fns[v];
 
       // load param from phi
-      if(v->arg()->type()->kind() != NodeKind::Unit)
-        blk.add_assignment(lvals[v->arg()].front(), rvals[v->arg()].back());
+      for(auto& a : v->args())
+      {
+        if(a->type()->kind() != NodeKind::Unit && a->type()->kind() != NodeKind::Fn)
+          blk.add_assignment(lvals[a].front(), rvals[a].back());
+      }
 
       // close lam
       if(v->bdy()->kind() == NodeKind::Case)
       {
-
+        assert(false && "Unimplemented");
       }
       else if(v->bdy()->kind() == NodeKind::App)
       {
@@ -173,20 +188,22 @@ struct generator
         auto vret = ret->uncurry();
         assert(vret.size() == 1 && "We don't support returning tuples right now."); // TODO: tuples...
 
-        blk->end_with_return(cogen(vret.front(), blk));
+        blk->end_with_return(cogen(v->arg(), blk));
       }
     }
     else
     {
-      auto store_phi = [this,blk](Node::cRef param, Node::cRef arg)
-        { blk->add_assignment(lvals[param].back(), rvals[arg].front()); };
-
       // If this is a basic block, we can simply jump
-      if(v->caller()->type()->to<Fn>()->arg()->kind() == NodeKind::Fn)
+      if(v->caller()->kind() == NodeKind::Fn)
       {
-        assert(v->caller()->kind() == NodeKind::Fn && "Caller must be a fn."); // How the heck will this work if it is a param??
-        store_phi(v->caller()->to<Fn>()->arg(), v->arg());
+        auto x = v->caller()->to<Fn>();
+        for(auto& a : x->args())
+        {
+          assert(lvals.contains(a) && rvals.contains(a) && "App args must exist in fn call.");
 
+          blk->add_assignment(lvals[a].back(), rvals[v->arg()].front());
+        }
+        assert(fns.contains(v->caller()) && "Caller must be contained in the set.");
         blk->end_with_jump(fns[v->caller()]);
       }
       else
@@ -205,7 +222,7 @@ struct generator
     {
       auto bin = node->to<Binary>();
 
-      auto lhs_typ = genty(bin->lhs());
+      auto lhs_typ = genty(bin->lhs()->type());
 
       auto lhs = ctx.new_cast(cogen(bin->lhs(), blk), lhs_typ);
       auto rhs = ctx.new_cast(cogen(bin->rhs(), blk), lhs_typ);
@@ -215,6 +232,11 @@ struct generator
       case BinaryKind::Plus:  return ctx.new_plus(lhs_typ, lhs, rhs);
       case BinaryKind::Mult:  return ctx.new_mult(lhs_typ, lhs, rhs);
       }
+    }
+
+    if(node->kind() == NodeKind::Literal)
+    {
+      return ctx.new_rvalue(ctx.get_type(GCC_JIT_TYPE_LONG), static_cast<long>(node->to<Literal>()->literal));
     }
 
     if(node->kind() == NodeKind::Case)
@@ -229,8 +251,8 @@ public:
   gccjit::context ctx;
 
 private:
-  //NodeMap<gccjit::block> fns;
-  std::unordered_map<Node::cRef, gccjit::block, NodeHasher, NodeComparator> fns;
+  NodeMap<gccjit::block> fns;
+  //std::unordered_map<Node::cRef, gccjit::block, NodeHasher, NodeComparator> fns;
   NodeMap<std::vector<gccjit::rvalue>> rvals;
   NodeMap<std::vector<gccjit::lvalue>> lvals;
 

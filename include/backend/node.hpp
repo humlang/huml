@@ -146,14 +146,14 @@ struct Fn : Node
   using cRef = const Fn*;
 
   // domain is inferred from the body
-  Fn(Node::cRef codomain, Node::cRef body)
-    : Node(NodeKind::Fn, {codomain, body})
-  {  }
+  Fn(std::vector<Node::cRef> args, Node::cRef body)
+    : Node(NodeKind::Fn, {body})
+  { children_.insert(children_.end(), args.begin(), args.end()); }
 
   Node::cRef clone(builder& b) const override;
 
-  Node::cRef arg() const { return me()[0]; }
-  Node::cRef bdy() const { return me()[1]; }
+  std::vector<Node::cRef> args() const { return std::vector(children_.begin() + 1, children_.end()); }
+  Node::cRef bdy() const { return me()[0]; }
 
   std::vector<Node::cRef> uncurry() const;
 

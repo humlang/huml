@@ -127,11 +127,15 @@ ir::Node::cRef ir::builder::ptr(Node::cRef from)
   return app(p, from);
 }
 
-ir::Fn::cRef ir::builder::fn(Node::cRef codomain, Node::cRef body)
+ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
 {
-  assert(codomain != nullptr && "codomain must stay valid.");
-  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(codomain, body))
-      ->set_type(lookup_or_emplace(Node::mk_node<Fn>(codomain, bot()))));
+  std::vector<Node::cRef> argTs;
+  argTs.reserve(args.size());
+  for(auto& v : args)
+    argTs.emplace_back(v->type());
+
+  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(args, body))
+      ->set_type(lookup_or_emplace(Node::mk_node<Fn>(argTs, bot()))));
 }
 
 ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)
@@ -208,7 +212,8 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         std::string op = "fn_" + std::to_string(fn->gid());
         if(!defs_printed.contains(ref))
         {
-          internal(internal, fn->arg()) << " -> " << op << ";\n";
+          for(auto& v : fn->args())
+            internal(internal, v) << " -> " << op << ";\n";
           internal(internal, fn->bdy()) << " -> " << op << ";\n";
 
           defs_printed.insert(ref);
