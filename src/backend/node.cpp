@@ -65,6 +65,19 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
   return true;
 }
 
+std::vector<ir::Node::cRef> ir::Fn::uncurry() const
+{
+  std::vector<ir::Node::cRef> vec;
+  vec.reserve(64);
+  vec.emplace_back(arg());
+
+  for(Node::cRef body = bdy(); vec.back()->type()->kind() == NodeKind::Fn && body->kind() == NodeKind::Fn; body = body->to<Fn>()->bdy())
+  {
+    vec.emplace_back(body->to<Fn>()->arg());
+  }
+  return vec;
+}
+
 ir::Node::cRef ir::Param::clone(ir::builder& b) const
 { return b.param(type_); }
 ir::Node::cRef ir::Literal::clone(ir::builder& b) const
@@ -74,7 +87,7 @@ ir::Node::cRef ir::Binary::clone(ir::builder& b) const
 ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
 { return b.id(name, type()->clone(b)); }
 ir::Node::cRef ir::Fn::clone(ir::builder& b) const
-{ return b.fn(arg()->clone(b), bdy()->clone(b), ret()->clone(b)); }
+{ return b.fn(arg()->clone(b), bdy()->clone(b)); }
 ir::Node::cRef ir::App::clone(ir::builder& b) const
 { return b.app(caller()->clone(b), arg()->clone(b)); }
 ir::Node::cRef ir::Case::clone(ir::builder& b) const

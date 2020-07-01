@@ -26,7 +26,7 @@ struct builder
   Node::cRef lit(std::uint_fast64_t value);
   Node::cRef binop(BinaryKind op, Node::cRef lhs, Node::cRef rhs);
 
-  Fn::cRef fn(Node::cRef codomain, Node::cRef body, Node::cRef ret);
+  Fn::cRef fn(Node::cRef codomain, Node::cRef body);
 
   Node::cRef app(Node::cRef caller, Node::cRef arg);
 
