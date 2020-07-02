@@ -168,13 +168,69 @@ struct generator
       // close lam
       if(v->bdy()->kind() == NodeKind::Case)
       {
-        assert(false && "Unimplemented");
+        cogen_handle_switch(v->bdy()->to<Case>(), &blk, ret->to<Fn>());
       }
       else if(v->bdy()->kind() == NodeKind::App)
       {
         cogen_handle_app(v->bdy()->to<App>(), &blk, ret->to<Fn>());
       }
     }
+  }
+  void cogen_handle_switch(Case::cRef v, gccjit::block* blk, Fn::cRef ret)
+  {
+    // Case cannot return anything! It is not an rvalue!!
+    auto oftyp = genty(v->of()->type());
+    auto ofrval = cogen(v->of(), blk);
+
+    // Generate blocks for all alternatives
+    std::vector<gccjit::case_> alternatives;
+    alternatives.reserve(v->match_arms().size());
+
+    gccjit::block defblock;
+    gccjit::block last_altblock;
+    for(auto& x : v->match_arms())
+    {
+      if(x.first->kind() == NodeKind::Ctr && x.first->to<Constructor>()->name == symbol("_") && defblock.get_inner_block() == nullptr)
+      {
+        // generate default block
+        gccjit::block def_block = blk->get_function().new_block(("b" + x.first->unique_name().get_string()).c_str());
+
+        if(x.second->kind() == NodeKind::Case)
+          cogen_handle_switch(x.second->to<Case>(), &def_block, ret);
+        else if(x.second->kind() == NodeKind::App)
+          cogen_handle_app(x.second->to<App>(), &def_block, ret);
+        else
+          assert(false && "Function must end with an app or case");
+
+        defblock = def_block;
+      }
+      else
+      {
+        // generate a match arm
+        gccjit::block alt_block = last_altblock = blk->get_function().new_block(("b" + x.first->unique_name().get_string()).c_str());
+
+        if(x.second->kind() == NodeKind::Case)
+          cogen_handle_switch(x.second->to<Case>(), &alt_block, ret);
+        else if(x.second->kind() == NodeKind::App)
+          cogen_handle_app(x.second->to<App>(), &alt_block, ret);
+        else
+          assert(false && "Function must end with an app or case");
+
+        assert(x.first->kind() == NodeKind::Literal && "We only support literal patterns at the moment.");
+
+        auto pat_val = ctx.new_rvalue(oftyp, static_cast<long>(x.first->to<Literal>()->literal));
+        alternatives.emplace_back(ctx.new_case(pat_val, pat_val, alt_block));
+      }
+    }
+    if(defblock.get_inner_block() == nullptr)
+    {
+      // Just jump to the first alternative
+      assert(last_altblock.get_inner_block() != nullptr && "Cases must not be empty for codegen");
+
+      defblock = blk->get_function().new_block(("b" + v->unique_name().get_string() + "_default").c_str());
+      defblock.end_with_jump(last_altblock);
+    }
+    blk->end_with_switch(ofrval, defblock, alternatives);
   }
   void cogen_handle_app(App::cRef v, gccjit::block* blk, Fn::cRef ret)
   {
@@ -188,19 +244,21 @@ struct generator
         auto vret = ret->uncurry();
         assert(vret.size() == 1 && "We don't support returning tuples right now."); // TODO: tuples...
 
-        blk->end_with_return(cogen(v->arg(), blk));
+        auto ret_type = genty(ret->args().front()->type());
+        blk->end_with_return(ctx.new_cast(cogen(v->arg(), blk), ret_type));
       }
     }
     else
     {
       // If this is a basic block, we can simply jump
-      if(v->caller()->kind() == NodeKind::Fn)
+      if(v->caller()->kind() == NodeKind::Fn && !v->caller()->to<Fn>()->is_external())
       {
         auto x = v->caller()->to<Fn>();
         for(auto& a : x->args())
         {
           assert(lvals.contains(a) && rvals.contains(a) && "App args must exist in fn call.");
 
+          // TODO: typecasts....
           blk->add_assignment(lvals[a].back(), rvals[v->arg()].front());
         }
         assert(fns.contains(v->caller()) && "Caller must be contained in the set.");
@@ -209,7 +267,7 @@ struct generator
       else
       {
         // TODO
-        assert(false && "Ordinary function calls are unimplemented");
+        assert(false && "function calls of this kind are unimplemented");
       }
     }
   }
@@ -234,14 +292,14 @@ struct generator
       }
     }
 
+    if(node->kind() == NodeKind::App || node->kind() == NodeKind::Case)
+    {
+      assert(false && "Unreachable, because kind app or case are not rvalues");
+    }
+
     if(node->kind() == NodeKind::Literal)
     {
       return ctx.new_rvalue(ctx.get_type(GCC_JIT_TYPE_LONG), static_cast<long>(node->to<Literal>()->literal));
-    }
-
-    if(node->kind() == NodeKind::Case)
-    {
-      // TODO: implement
     }
 
     assert(false && "unreachable");
