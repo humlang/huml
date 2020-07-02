@@ -41,7 +41,7 @@ ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
 }
 
 ir::Node::cRef ir::builder::bot()
-{ return lookup_or_emplace(Node::mk_node<Constructor>("⊥", nullptr)); }
+{ return lookup_or_emplace(Node::mk_node<Constructor>("_⊥", nullptr)); }
 
 ir::Node::cRef ir::builder::id(symbol symb, Node::cRef type)
 {
@@ -118,13 +118,13 @@ ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef 
 ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
 {
   auto ictor = lookup_or_emplace(Node::mk_node<Constructor>(no_sign ? "u" : "i", type()));
-  return app(ictor, size);
+  return app(ictor, {size});
 }
 
 ir::Node::cRef ir::builder::ptr(Node::cRef from)
 {
   auto p = lookup_or_emplace(Node::mk_node<Constructor>("_Ptr", type()));
-  return app(p, from);
+  return app(p, {from});
 }
 
 ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
@@ -138,10 +138,12 @@ ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
       ->set_type(lookup_or_emplace(Node::mk_node<Fn>(argTs, bot()))));
 }
 
-ir::Node::cRef ir::builder::app(Node::cRef caller, Node::cRef arg)
+ir::Node::cRef ir::builder::app(Node::cRef caller, std::vector<Node::cRef> args)
 {
-  assert(caller != nullptr && arg != nullptr && "caller and arg must stay valid.");
-  return lookup_or_emplace(Node::mk_node<App>(caller, arg));
+  bool not_null = std::all_of(args.begin(), args.end(), [](Node::cRef x) { return x != nullptr; });
+
+  assert(caller != nullptr && not_null && "caller and arg must stay valid.");
+  return lookup_or_emplace(Node::mk_node<App>(caller, args));
 }
 
 ir::Node::cRef ir::builder::destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms)
@@ -200,7 +202,8 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         if(!defs_printed.contains(ref))
         {
           internal(internal, ap->caller()) << " -> " << op << ";\n";
-          internal(internal, ap->arg()) << " -> " << op << ";\n";
+          for(auto& v : ap->args())
+            internal(internal, v) << " -> " << op << ";\n";
 
           defs_printed.insert(ref);
         }

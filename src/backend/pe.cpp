@@ -51,7 +51,8 @@ Fn::cRef drop(ir::builder& b, const ir::App* ref)
 
   auto subst = [&b,&seen](auto subst, Node::cRef what, Node::cRef for_, Node::cRef in)
   {
-    // Move ref->arg() into ref->bdy() and yield ref->bdy()
+    // M          internal(internal, ap->arg()) << " -> " << op << ";\n";
+ove ref->arg() into ref->bdy() and yield ref->bdy()
     if(what == for_)
       return in; // no-op
 
@@ -142,6 +143,7 @@ bool ir::partially_evaluate(ir::builder& b, const ir::Node* ref)
 
     if(bdy->kind() == NodeKind::Fn)
     {
+      /*
       // Functions can only have one arg
       Node::cRef arg = head->arg();
 
@@ -157,6 +159,7 @@ bool ir::partially_evaluate(ir::builder& b, const ir::Node* ref)
         //drop(b, ap);
         did_specialize = true;
       }
+      */
     }
     for(auto& s : succs(static_cast<const ir::Fn*>(hd_ref)))
       worklist.emplace(s);

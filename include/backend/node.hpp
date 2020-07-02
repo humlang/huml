@@ -155,8 +155,6 @@ struct Fn : Node
   std::vector<Node::cRef> args() const { return std::vector(children_.begin() + 1, children_.end()); }
   Node::cRef bdy() const { return me()[0]; }
 
-  std::vector<Node::cRef> uncurry() const;
-
   bool is_external() const
   { return external_name() != symbol(""); }
 
@@ -175,14 +173,14 @@ struct App : Node
   using Ref = App*;
   using cRef = const App*;
 
-  App(Node::cRef fn, Node::cRef param)
-    : Node(NodeKind::App, {fn, param})
-  {  }
+  App(Node::cRef fn, std::vector<Node::cRef> params)
+    : Node(NodeKind::App, {fn})
+  { children_.insert(children_.end(), params.begin(), params.end()); }
 
   Node::cRef clone(builder& b) const override;
 
   Node::cRef caller() const { return me()[0]; }
-  Node::cRef arg() const { return me()[1]; }
+  std::vector<Node::cRef> args() const { return std::vector(children_.begin() + 1, children_.end()); }
 };
 
 struct Case : Node

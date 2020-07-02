@@ -28,7 +28,7 @@ struct builder
 
   Fn::cRef fn(std::vector<Node::cRef> args, Node::cRef body);
 
-  Node::cRef app(Node::cRef caller, Node::cRef arg);
+  Node::cRef app(Node::cRef caller, std::vector<Node::cRef> arg);
 
   Node::cRef destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms);
 

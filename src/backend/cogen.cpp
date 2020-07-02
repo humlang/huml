@@ -65,11 +65,12 @@ struct generator
         {
         // Int, Char
         case hash_string("u"):
-        case hash_string("i"): return cogen_int(c, ap->arg());
-
+        case hash_string("i"): assert(ap->args().size() == 1 && "Wrong arity.");
+                               return cogen_int(c, ap->args().front());
         // Pointer
         case hash_string("_Ptr"): {
-            return genty(ap->arg()).get_pointer();
+            assert(ap->args().size() == 1 && "Wrong arity.");
+            return genty(ap->args().front()).get_pointer();
           } break;
         }
       }
@@ -92,13 +93,13 @@ struct generator
 
     /// Find return continuation
     Node::cRef ret = nullptr;
-    for(auto& v : node->to<Fn>()->uncurry())
+    for(auto& v : node->to<Fn>()->args())
     {
       if(v->type()->kind() == NodeKind::Fn)
-        ret = v;
+        ret = v->type();
     }
     // TODO: this assumes that the continuation is not hidden under a tuple. Should be ok if we enforce this somehow!
-    assert(ret != nullptr && ret->type()->kind() == NodeKind::Fn && "return continuation must have a function type");
+    assert(ret != nullptr && ret->kind() == NodeKind::Fn && "return continuation must have a function type");
 
     /// Build function
     assert(ret->to<Fn>()->args().size() == 1 && "We only support one single return type atm");
@@ -106,7 +107,7 @@ struct generator
     // TODO: check return type and potentially return a tuple
     
     std::vector<gccjit::param> params;
-    for(auto& v : node->to<Fn>()->uncurry())
+    for(auto& v : node->to<Fn>()->args())
     {
       if(v->type()->kind() == NodeKind::Unit || v->type()->kind() == NodeKind::Fn)
         continue;
@@ -130,7 +131,8 @@ struct generator
     /// emit *all* (reachable) parameters and function blocks
     for(auto& x : rfns)
     {
-      if(x == ret || fns.contains(x))
+      if((x == ret || fns.contains(x))
+      || (x->to<Fn>()->bdy()->kind() == NodeKind::Ctr && x->to<Fn>()->bdy()->to<Constructor>()->name == symbol("_⊥")))
         continue;
 
       for(auto& a : x->to<Fn>()->args())
@@ -173,6 +175,10 @@ struct generator
       else if(v->bdy()->kind() == NodeKind::App)
       {
         cogen_handle_app(v->bdy()->to<App>(), &blk, ret->to<Fn>());
+      }
+      else
+      {
+        assert(false && "Cannot close block.");
       }
     }
   }
@@ -236,16 +242,17 @@ struct generator
   {
     if(v->caller() == ret)
     {
+      assert(v->args().size() != 0 && "Number of things to return must not be 0.");
+
       // just simply return
-      if(v->arg()->type()->kind() == NodeKind::Unit)
+      if(v->args().size() == 1 && v->args().front()->type()->kind() == NodeKind::Unit)
         blk->end_with_return();
       else
       {
-        auto vret = ret->uncurry();
-        assert(vret.size() == 1 && "We don't support returning tuples right now."); // TODO: tuples...
+        assert(ret->args().size() == 1 && "We only support one elment returns currently.");
 
         auto ret_type = genty(ret->args().front()->type());
-        blk->end_with_return(ctx.new_cast(cogen(v->arg(), blk), ret_type));
+        blk->end_with_return(ctx.new_cast(cogen(v->args().front(), blk), ret_type));
       }
     }
     else
@@ -254,12 +261,21 @@ struct generator
       if(v->caller()->kind() == NodeKind::Fn && !v->caller()->to<Fn>()->is_external())
       {
         auto x = v->caller()->to<Fn>();
-        for(auto& a : x->args())
-        {
-          assert(lvals.contains(a) && rvals.contains(a) && "App args must exist in fn call.");
+        auto xargs = x->args();
+        auto vargs = v->args();
 
-          // TODO: typecasts....
-          blk->add_assignment(lvals[a].back(), rvals[v->arg()].front());
+        // Set all the parameters prior to function call
+        assert(xargs.size() == vargs.size() && "Wrong arity");
+        for(std::size_t i = 0; i < xargs.size(); ++i)
+        {
+          auto& a = xargs[i];
+          auto& b = vargs[i];
+          if(a->type()->kind() == NodeKind::Unit || a->type()->kind() == NodeKind::Fn)
+            continue;
+          cogen(b, blk);
+          assert(lvals.contains(a) && rvals.contains(b) && "App args must exist in fn call.");
+
+          blk->add_assignment(lvals[a].back(), ctx.new_cast(rvals[b].front(), genty(a->type())));
         }
         assert(fns.contains(v->caller()) && "Caller must be contained in the set.");
         blk->end_with_jump(fns[v->caller()]);
@@ -284,12 +300,17 @@ struct generator
 
       auto lhs = ctx.new_cast(cogen(bin->lhs(), blk), lhs_typ);
       auto rhs = ctx.new_cast(cogen(bin->rhs(), blk), lhs_typ);
+
+      gccjit::rvalue ret;
       switch(bin->op)
       {
-      case BinaryKind::Minus: return ctx.new_minus(lhs_typ, lhs, rhs);
-      case BinaryKind::Plus:  return ctx.new_plus(lhs_typ, lhs, rhs);
-      case BinaryKind::Mult:  return ctx.new_mult(lhs_typ, lhs, rhs);
+      case BinaryKind::Minus: ret = ctx.new_minus(lhs_typ, lhs, rhs);
+      case BinaryKind::Plus:  ret = ctx.new_plus(lhs_typ, lhs, rhs);
+      case BinaryKind::Mult:  ret = ctx.new_mult(lhs_typ, lhs, rhs);
       }
+      rvals.emplace(bin, std::vector<gccjit::rvalue>{ ret });
+
+      return ret;
     }
 
     if(node->kind() == NodeKind::App || node->kind() == NodeKind::Case)
@@ -299,7 +320,10 @@ struct generator
 
     if(node->kind() == NodeKind::Literal)
     {
-      return ctx.new_rvalue(ctx.get_type(GCC_JIT_TYPE_LONG), static_cast<long>(node->to<Literal>()->literal));
+      auto ret = ctx.new_rvalue(ctx.get_type(GCC_JIT_TYPE_LONG), static_cast<long>(node->to<Literal>()->literal));
+      rvals.emplace(node, std::vector<gccjit::rvalue>{ ret });
+
+      return ret;
     }
 
     assert(false && "unreachable");
