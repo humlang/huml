@@ -35,8 +35,11 @@ ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
     el_typs.emplace_back(arg->type());
 
   auto to_ret = lookup_or_emplace(Node::mk_node<Tup>(elems));
-
   to_ret->set_type(lookup_or_emplace(Node::mk_node<Tup>(el_typs)));
+
+  for(auto& a : elems)
+    uses_of[a].emplace(to_ret);
+
   return to_ret;
 }
 
@@ -58,7 +61,11 @@ ir::Node::cRef ir::builder::param(Node::cRef type)
 ir::Node::cRef ir::builder::lit(std::uint_fast64_t value)
 {
   auto lit32 = lookup_or_emplace(Node::mk_node<Literal>(32));
-  return lookup_or_emplace(Node::mk_node<Literal>(value))->set_type(i(false, lit32));
+  auto to_ret = lookup_or_emplace(Node::mk_node<Literal>(value))->set_type(i(false, lit32));
+
+  uses_of[lit32].emplace(to_ret);
+
+  return to_ret;
 }
 
 ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef rhs)
@@ -112,19 +119,34 @@ ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef 
     }
   }
   // TODO: This does not work well if lhs->type() != rhs->type()
-  return lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs))->set_type(lhs->type());
+  auto to_ret = lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs))->set_type(lhs->type());
+
+  uses_of[lhs].emplace(to_ret);
+  uses_of[rhs].emplace(to_ret);
+
+  return to_ret;
 }
 
 ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
 {
   auto ictor = lookup_or_emplace(Node::mk_node<Constructor>(no_sign ? "u" : "i", type()));
-  return app(ictor, {size});
+  auto to_ret = app(ictor, {size});
+
+  uses_of[ictor].emplace(to_ret);
+  uses_of[size].emplace(to_ret);
+
+  return to_ret;
 }
 
 ir::Node::cRef ir::builder::ptr(Node::cRef from)
 {
   auto p = lookup_or_emplace(Node::mk_node<Constructor>("_Ptr", type()));
-  return app(p, {from});
+  auto to_ret = app(p, {from});
+
+  uses_of[p].emplace(to_ret);
+  uses_of[from].emplace(to_ret);
+
+  return to_ret;
 }
 
 ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
@@ -134,20 +156,44 @@ ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
   for(auto& v : args)
     argTs.emplace_back(v->type());
 
-  return static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(args, body))
+  auto to_ret = static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(args, body))
       ->set_type(lookup_or_emplace(Node::mk_node<Fn>(argTs, bot()))));
+
+  for(auto& a : args)
+    uses_of[a].emplace(to_ret);
+  uses_of[body].emplace(to_ret);
+
+  return to_ret;
 }
 
 ir::Node::cRef ir::builder::app(Node::cRef caller, std::vector<Node::cRef> args)
 {
   bool not_null = std::all_of(args.begin(), args.end(), [](Node::cRef x) { return x != nullptr; });
-
   assert(caller != nullptr && not_null && "caller and arg must stay valid.");
-  return lookup_or_emplace(Node::mk_node<App>(caller, args));
+
+  auto to_ret = lookup_or_emplace(Node::mk_node<App>(caller, args));
+
+  uses_of[caller].emplace(to_ret);
+  for(auto& a : args)
+    uses_of[a].emplace(to_ret);
+
+  // app does not return
+  return to_ret->set_type(bot());
 }
 
 ir::Node::cRef ir::builder::destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms)
-{ return lookup_or_emplace(Node::mk_node<Case>(of, match_arms))->set_type(of->type()); }
+{
+  // case has no value
+  auto to_ret = lookup_or_emplace(Node::mk_node<Case>(of, match_arms))->set_type(bot());
+
+  uses_of[of].emplace(to_ret);
+  for(auto& p : match_arms)
+  {
+    uses_of[p.first].emplace(to_ret);
+    uses_of[p.second].emplace(to_ret);
+  }
+  return to_ret;
+}
 
 ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
 {
@@ -159,8 +205,46 @@ ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
   return nodes.emplace(std::move(store)).first->get();
 }
 
+ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with)
+{
+  // TODO: also subst type
+  static constexpr NodeComparator cmp;
+  
+  // go through all uses_of and simply change the value
+  for(auto& in : uses_of[what])
+  {
+    auto it = nodes.find(in);
+    assert(it != nodes.end() && "Node must belong to this builder");
+
+    // Now find the arg in the children_
+    bool was_subst = false;
+    for(std::size_t i = 0, e = in->argc(); i < e; ++i)
+    {
+      // we may not subst params in binding occurences
+      if(in->kind() == NodeKind::Fn && i > 0)
+        break;
+
+      auto& c = (*it)->children_[i];
+      if(cmp(c, what))
+      {
+        // SUBST!
+        c = with;
+        was_subst = true;
+      }
+    }
+    assert(was_subst && "Node appears in uses_of set, so we should've substituted it!");
+  }
+
+  uses_of[with].insert(uses_of[what].begin(), uses_of[what].end());
+  uses_of[what].clear();
+  nodes.erase(what); // erase node, we substituted it, so it won't be used anymore
+
+  return with;
+}
+
 ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::Node::cRef in)
 {
+  // TODO: also subst type
   static constexpr ir::NodeComparator cmp;
 
   if(cmp(what, in))
@@ -195,13 +279,27 @@ ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::
     } break;
   }
 subst_children:
-  for(std::size_t i = 0, e = n.argc(); i < e; ++i)
+  for(std::size_t i = idx, e = n.argc(); i < e; ++i)
   {
     auto it = nodes.find(in);
     assert(it != nodes.end() && "Node must belong to this builder");
 
     // We literally change where this node points to. This is the only place where we do these kinds of stateful things!
+    Node::cRef old = (*it)->children_[i];
+
     (*it)->children_[i] = subst(what, with, n[i]);
+
+    if(old != (*it)->children_[i])
+    {
+      /// it was substituted. we need to update uses_of set
+
+      // remove old use
+      assert(uses_of[old].find(in) != uses_of[old].end() && "We substituted, so the use should be at the end.");
+      uses_of[old].erase(in);
+      
+      // insert new use
+      uses_of[with].insert(in);
+    }
   }
 end:
   return in;

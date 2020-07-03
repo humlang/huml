@@ -279,12 +279,16 @@ struct Tup : Node
 
 struct NodeHasher
 {
+  using is_transparent = void;
+
   std::size_t operator()(const Node::Store& str) const
   { return (*this)(str.get()); }
   std::size_t operator()(const Node::cRef ref) const;
 };
 struct NodeComparator
 {
+  using is_transparent = void;
+
   bool operator()(const Node::Store& lhs, const Node::Store& rhs) const
   { return (*this)(lhs.get(), rhs.get()); }
   bool operator()(const Node::Store& lhs, const Node::cRef& rhs) const
