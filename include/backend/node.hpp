@@ -139,7 +139,6 @@ struct Constructor : Node
   symbol name;
 };
 
-
 struct Fn : Node
 {
   using Ref = Fn*;

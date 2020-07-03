@@ -273,7 +273,7 @@ ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::
 
   case NodeKind::Fn:     {
       // We start at 1 with functions, params bound by it should not be replaced.
-       // TODO: do we need to do this for case as well?
+       // TODO: do we need to do kind of this for case patterns as well?
       idx = 1;
       goto subst_children;
     } break;

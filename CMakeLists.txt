@@ -6,7 +6,7 @@ set(hx-lang_files src/token.cpp
   src/backend/builder.cpp
   src/backend/cogen.cpp
   src/backend/node.cpp
-  src/backend/pe.cpp
+  src/backend/sc.cpp
   src/parser.cpp
   src/tokenizer.cpp
   src/ast.cpp
@@ -27,7 +27,7 @@ set(hx-lang_vm_files src/vm.cpp
   src/backend/builder.cpp
   src/backend/cogen.cpp
   src/backend/node.cpp
-  src/backend/pe.cpp
+  src/backend/sc.cpp
   src/repl.cpp
   src/parser.cpp
   src/tokenizer.cpp
