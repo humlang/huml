@@ -287,6 +287,10 @@ struct NodeComparator
 {
   bool operator()(const Node::Store& lhs, const Node::Store& rhs) const
   { return (*this)(lhs.get(), rhs.get()); }
+  bool operator()(const Node::Store& lhs, const Node::cRef& rhs) const
+  { return (*this)(lhs.get(), rhs); }
+  bool operator()(const Node::cRef& lhs, const Node::Store& rhs) const
+  { return (*this)(lhs, rhs.get()); }
   bool operator()(const Node::cRef lhs, const Node::cRef rhs) const;
 };
 using NodeSet = tsl::robin_set<Node::cRef, NodeHasher, NodeComparator>;

@@ -159,6 +159,54 @@ ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
   return nodes.emplace(std::move(store)).first->get();
 }
 
+ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::Node::cRef in)
+{
+  static constexpr ir::NodeComparator cmp;
+
+  if(cmp(what, in))
+    return with;
+
+  auto& n = *in;
+  std::size_t idx = 0;
+  switch(n.kind())
+  {
+  case NodeKind::Kind:
+  case NodeKind::Type:
+  case NodeKind::Prop:
+  case NodeKind::Unit:
+  case NodeKind::Literal:
+  case NodeKind::Ctr:
+  case NodeKind::Param:
+    goto end;
+
+  case NodeKind::Binary:
+  case NodeKind::Case:
+  case NodeKind::App:
+  case NodeKind::Tup:    {
+      idx = 0;
+      goto subst_children;
+    };
+
+  case NodeKind::Fn:     {
+      // We start at 1 with functions, params bound by it should not be replaced.
+       // TODO: do we need to do this for case as well?
+      idx = 1;
+      goto subst_children;
+    } break;
+  }
+subst_children:
+  for(std::size_t i = 0, e = n.argc(); i < e; ++i)
+  {
+    auto it = nodes.find(in);
+    assert(it != nodes.end() && "Node must belong to this builder");
+
+    // We literally change where this node points to. This is the only place where we do these kinds of stateful things!
+    (*it)->children_[i] = subst(what, with, n[i]);
+  }
+end:
+  return in;
+}
+
 std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
 {
   ir::NodeSet defs_printed = {};

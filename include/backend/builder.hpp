@@ -33,6 +33,8 @@ struct builder
   Node::cRef destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms);
 
 
+  Node::cRef subst(Node::cRef what, Node::cRef with, Node::cRef in);
+
   std::ostream& print_graph(std::ostream& os, Node::cRef ref);
 private:
   Node::Ref lookup_or_emplace(Node::Store store);
