@@ -66,7 +66,7 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
 }
 
 ir::Node::cRef ir::Param::clone(ir::builder& b) const
-{ return b.param(type_); }
+{ return this; } // <- params are not cloned!
 ir::Node::cRef ir::Literal::clone(ir::builder& b) const
 { return b.lit(literal); }
 ir::Node::cRef ir::ConstexprAnnot::clone(ir::builder& b) const
@@ -77,10 +77,20 @@ ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
 { return b.id(name, type()->clone(b)); }
 ir::Node::cRef ir::Fn::clone(ir::builder& b) const
 {
+  auto new_bdy = bdy()->clone(b);
+
   auto argz = args();
   for(auto& v : argz)
-    v = v->clone(b);
-  return b.fn(argz, bdy()->clone(b));
+  {
+    Node::cRef old_v = v;
+
+    // build new param
+    v = b.param(old_v->type());
+
+    // We need to subst the old param with the new param in the body
+    new_bdy = b.subst(old_v, v, new_bdy);
+  }
+  return b.fn(argz, new_bdy);
 }
 ir::Node::cRef ir::App::clone(ir::builder& b) const
 {
@@ -91,6 +101,8 @@ ir::Node::cRef ir::App::clone(ir::builder& b) const
 }
 ir::Node::cRef ir::Case::clone(ir::builder& b) const
 {
+  // TODO: if case patterns are binding we need to replace the old with the new bindings
+  
   auto arms = match_arms();
   for(auto& arm : arms)
     arm = std::make_pair(arm.first->clone(b), arm.second->clone(b));

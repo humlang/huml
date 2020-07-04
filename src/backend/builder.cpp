@@ -59,7 +59,7 @@ ir::Node::cRef ir::builder::param(Node::cRef type)
 {
   auto to_ret = lookup_or_emplace(Node::mk_node<Param>(type));
 
-  if(type != nullptr && type->kind() == NodeKind::Fn)
+  if(type != nullptr && type->kind() == NodeKind::Fn && !type->to<Fn>()->is_external())
   {
     // if we have a function as param, we want to specialize it for codegen
     return cexpr(to_ret);
@@ -74,7 +74,7 @@ ir::Node::cRef ir::builder::cexpr(Node::cRef expr)
   auto to_ret = lookup_or_emplace(Node::mk_node<ConstexprAnnot>(expr));
   uses_of[expr].emplace(to_ret);
 
-  return to_ret;
+  return to_ret->set_type(expr->type());
 }
 
 ir::Node::cRef ir::builder::lit(std::uint_fast64_t value)
@@ -272,7 +272,7 @@ ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::
     return with;
 
   auto& n = *in;
-  std::size_t idx = 0;
+  std::size_t e = 0;
   switch(n.kind())
   {
   case NodeKind::Kind:
@@ -288,23 +288,24 @@ ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::
   case NodeKind::Case:
   case NodeKind::App:
   case NodeKind::Tup:    {
-      idx = 0;
+      e = n.argc();
       goto subst_children;
     };
 
   case NodeKind::Fn:     {
-      // We start at 1 with functions, params bound by it should not be replaced.
+      // We stop at 1 with functions, params bound by it should not be replaced.
        // TODO: do we need to do kind of this for case patterns as well?
-      idx = 1;
+      e = 1;
       goto subst_children;
     } break;
   }
 subst_children:
-  for(std::size_t i = idx, e = n.argc(); i < e; ++i)
   {
-    auto it = nodes.find(in);
-    assert(it != nodes.end() && "Node must belong to this builder");
+  auto it = nodes.find(in);
+  assert(it != nodes.end() && "Node must belong to this builder");
 
+  for(std::size_t i = 0; i < e; ++i)
+  {
     // We literally change where this node points to. This is the only place where we do these kinds of stateful things!
     Node::cRef old = (*it)->children_[i];
 
@@ -313,7 +314,6 @@ subst_children:
     if(old != (*it)->children_[i])
     {
       /// it was substituted. we need to update uses_of set
-
       // remove old use
       assert(uses_of[old].find(in) != uses_of[old].end() && "We substituted, so the use should be at the end.");
       uses_of[old].erase(in);
@@ -321,6 +321,7 @@ subst_children:
       // insert new use
       uses_of[with].insert(in);
     }
+  }
   }
 end:
   return in;
@@ -337,12 +338,13 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
     case NodeKind::Kind: os << "Kind"; break;
     case NodeKind::Type: os << "Type"; break;
     case NodeKind::Prop: os << "Prop"; break;
-    case NodeKind::Ctr:  os << static_cast<Constructor::cRef>(ref)->name.get_string(); break;
-    case NodeKind::Literal: os << static_cast<Literal::cRef>(ref)->literal; break;
+    case NodeKind::Ctr:  os << ref->to<Constructor>()->name.get_string(); break;
+    case NodeKind::Literal: os << "l" << ref->to<Literal>()->literal; break;
     case NodeKind::Param: os << "p" << ref->gid(); break;
+    case NodeKind::ConstexprAnnot: os << "inl_"; internal(internal, ref->to<ConstexprAnnot>()->what()); break;
     case NodeKind::Unit: os << "UNIT"; break;
     case NodeKind::Binary: {
-        auto bin = static_cast<Binary::cRef>(ref);
+        auto bin = ref->to<Binary>();
 
         std::string op;
         switch(bin->op)
@@ -363,7 +365,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         os << op;
       } break;
     case NodeKind::App: {
-        auto ap = static_cast<App::cRef>(ref);
+        auto ap = ref->to<App>();
 
         std::string op = "app_" + std::to_string(ap->gid());
         if(!defs_printed.contains(ref))
@@ -377,7 +379,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         os << op;
       } break;
     case NodeKind::Fn: {
-        auto fn = static_cast<Fn::cRef>(ref);
+        auto fn = ref->to<Fn>();
 
         std::string op = "fn_" + std::to_string(fn->gid());
         if(!defs_printed.contains(ref))
@@ -391,7 +393,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         os << op;
       } break;
     case NodeKind::Case: {
-        auto cs = static_cast<Case::cRef>(ref);
+        auto cs = ref->to<Case>();
 
         std::string op = "case_" + std::to_string(cs->gid());
         if(!defs_printed.contains(ref))

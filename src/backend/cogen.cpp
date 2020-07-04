@@ -7,6 +7,8 @@
 
 #include <libgccjit++.h>
 
+#include <iostream>
+
 namespace ir
 {
 
@@ -242,7 +244,7 @@ struct generator
   }
   void cogen_handle_app(App::cRef v, gccjit::block* blk, Fn::cRef ret)
   {
-    if(v->caller() == ret)
+    if(v->caller()->type() == ret)
     {
       assert(v->args().size() != 0 && "Number of things to return must not be 0.");
 
