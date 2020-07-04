@@ -22,6 +22,7 @@ struct builder
   Node::cRef ignore();
 
   Node::cRef param(Node::cRef type = Node::no_ref);
+  Node::cRef cexpr(Node::cRef expr); // <-- param `expr` is considered constant
 
   Node::cRef lit(std::uint_fast64_t value);
   Node::cRef binop(BinaryKind op, Node::cRef lhs, Node::cRef rhs);

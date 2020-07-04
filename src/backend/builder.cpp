@@ -56,7 +56,26 @@ ir::Node::cRef ir::builder::ignore() // TODO: replace nullptr with existential
 { return lookup_or_emplace(Node::mk_node<Constructor>("_", nullptr)); }
 
 ir::Node::cRef ir::builder::param(Node::cRef type)
-{ return lookup_or_emplace(Node::mk_node<Param>(type)); }
+{
+  auto to_ret = lookup_or_emplace(Node::mk_node<Param>(type));
+
+  if(type != nullptr && type->kind() == NodeKind::Fn)
+  {
+    // if we have a function as param, we want to specialize it for codegen
+    return cexpr(to_ret);
+  }
+  return to_ret;
+}
+
+ir::Node::cRef ir::builder::cexpr(Node::cRef expr)
+{
+  assert(expr->kind() == NodeKind::Param && "Annotations only works with params.");
+
+  auto to_ret = lookup_or_emplace(Node::mk_node<ConstexprAnnot>(expr));
+  uses_of[expr].emplace(to_ret);
+
+  return to_ret;
+}
 
 ir::Node::cRef ir::builder::lit(std::uint_fast64_t value)
 {
@@ -151,6 +170,8 @@ ir::Node::cRef ir::builder::ptr(Node::cRef from)
 
 ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
 {
+  assert(!args.empty() && "args must not be empty. Use a single unit argument for functions without arguments.");
+
   std::vector<Node::cRef> argTs;
   argTs.reserve(args.size());
   for(auto& v : args)

@@ -18,6 +18,8 @@ enum class NodeKind
   Case,
   Binary,
 
+  ConstexprAnnot,
+
   Ctr,
   Tup,
 
@@ -85,6 +87,20 @@ struct Param : Node
   { set_type(type); }
 
   Node::cRef clone(builder& b) const override;
+};
+
+struct ConstexprAnnot : Node
+{
+  using Ref = ConstexprAnnot*;
+  using cRef = const ConstexprAnnot*;
+
+  ConstexprAnnot(Node::cRef what)
+    : Node(NodeKind::ConstexprAnnot, {what})
+  {  }
+
+  Node::cRef clone(builder& b) const override;
+
+  Node::cRef what() const { return me()[0]; }
 };
 
 struct Literal : Node

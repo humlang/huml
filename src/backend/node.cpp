@@ -69,6 +69,8 @@ ir::Node::cRef ir::Param::clone(ir::builder& b) const
 { return b.param(type_); }
 ir::Node::cRef ir::Literal::clone(ir::builder& b) const
 { return b.lit(literal); }
+ir::Node::cRef ir::ConstexprAnnot::clone(ir::builder& b) const
+{ return b.cexpr(what()); }
 ir::Node::cRef ir::Binary::clone(ir::builder& b) const
 { return b.binop(op, lhs()->clone(b), rhs()->clone(b)); }
 ir::Node::cRef ir::Constructor::clone(ir::builder& b) const

@@ -3,6 +3,8 @@
 #include <backend/node.hpp>
 #include <tmp.hpp>
 
+#include <backend/sc.hpp>
+
 #include <libgccjit++.h>
 
 namespace ir
