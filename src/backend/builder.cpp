@@ -341,7 +341,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
     case NodeKind::Kind: os << "Kind"; break;
     case NodeKind::Type: os << "Type"; break;
     case NodeKind::Prop: os << "Prop"; break;
-    case NodeKind::Ctr:  os << ref->to<Constructor>()->name.get_string(); break;
+    case NodeKind::Ctr:  os << "ctor_" << ref->to<Constructor>()->name.get_string(); break;
     case NodeKind::Literal: os << "l" << ref->to<Literal>()->literal; break;
     case NodeKind::Param: os << "p" << ref->gid(); break;
     case NodeKind::ConstexprAnnot: os << "inl_"; internal(internal, ref->to<ConstexprAnnot>()->what()); break;
@@ -408,6 +408,19 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
             internal(internal, v.first)  << " -> " << op << ";\n";
             internal(internal, v.second) << " -> " << op << ";\n";
           }
+
+          defs_printed.insert(ref);
+        }
+        os << op;
+      } break;
+    case NodeKind::Tup: {
+        auto tup = ref->to<Tup>();
+
+        std::string op = "tup_" + std::to_string(tup->gid());
+        if(!defs_printed.contains(ref))
+        {
+          for(auto& v : tup->elements())
+            internal(internal, v) << " -> " << op << ";\n";
 
           defs_printed.insert(ref);
         }
