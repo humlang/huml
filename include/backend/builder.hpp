@@ -1,6 +1,7 @@
 #pragma once
 
 #include <backend/node.hpp>
+#include <unordered_set>
 
 namespace ir
 {
@@ -46,7 +47,7 @@ struct builder
 private:
   Node::Ref lookup_or_emplace(Node::Store store);
 private:
-  tsl::robin_set<Node::Store, NodeHasher, NodeComparator> nodes;
+  tsl::robin_pg_set<Node::Store, NodeHasher, NodeComparator> nodes;
   NodeMap<tsl::robin_set<Node::cRef>> uses_of;
 
   std::uint_fast64_t gid { 0 };

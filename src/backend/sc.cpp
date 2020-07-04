@@ -45,7 +45,7 @@ private:
 
       if(fn->bdy() != new_body)
       {
-        // change fns body
+        // change fn's body
         auto new_fn = b.subst(fn->bdy(), new_body, fn);
         
         assert(new_fn->kind() == NodeKind::Fn && "Must still be a function after subst.");

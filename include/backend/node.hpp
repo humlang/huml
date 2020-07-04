@@ -312,10 +312,10 @@ struct NodeComparator
   { return (*this)(lhs, rhs.get()); }
   bool operator()(const Node::cRef lhs, const Node::cRef rhs) const;
 };
-using NodeSet = tsl::robin_set<Node::cRef, NodeHasher, NodeComparator>;
+using NodeSet = tsl::robin_pg_set<Node::cRef, NodeHasher, NodeComparator>;
 
 template<typename T>
-using NodeMap = tsl::robin_map<Node::cRef, T, NodeHasher, NodeComparator>;
+using NodeMap = tsl::robin_pg_map<Node::cRef, T, NodeHasher, NodeComparator>;
 
 }
 
