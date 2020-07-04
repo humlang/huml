@@ -65,16 +65,18 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
   return true;
 }
 
+// TODO: this is dangerous! The idea of these methods is, that they clone themselves into the potentially different builder.
+//       However, for `Param` and `Constructor` this is simply not possible.
 ir::Node::cRef ir::Param::clone(ir::builder& b) const
 { return this; } // <- params are not cloned!
+ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
+{ return this; } // <- nothing to clone, name won't change and it must be unique
 ir::Node::cRef ir::Literal::clone(ir::builder& b) const
 { return b.lit(literal); }
 ir::Node::cRef ir::ConstexprAnnot::clone(ir::builder& b) const
 { return b.cexpr(what()); }
 ir::Node::cRef ir::Binary::clone(ir::builder& b) const
 { return b.binop(op, lhs()->clone(b), rhs()->clone(b)); }
-ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
-{ return b.id(name, type()->clone(b)); }
 ir::Node::cRef ir::Fn::clone(ir::builder& b) const
 {
   auto new_bdy = bdy()->clone(b);
