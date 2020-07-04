@@ -18,6 +18,8 @@ struct builder
   Node::cRef ptr(Node::cRef from);
   Node::cRef tup(std::vector<Node::cRef> elems);
 
+  // constructs the Z combinator used for recursion
+  Node::cRef rec();
   Node::cRef id(symbol symb, Node::cRef type);
   Node::cRef ignore();
 

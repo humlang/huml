@@ -46,6 +46,9 @@ ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
 ir::Node::cRef ir::builder::bot()
 { return lookup_or_emplace(Node::mk_node<Constructor>("_⊥", nullptr)); }
 
+ir::Node::cRef ir::builder::rec()
+{ return lookup_or_emplace(Node::mk_node<Constructor>("_Z", nullptr)); }
+
 ir::Node::cRef ir::builder::id(symbol symb, Node::cRef type)
 {
   assert(type != Node::no_ref && "Type must exist.");
