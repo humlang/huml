@@ -171,6 +171,17 @@ ir::Node::cRef ir::builder::ptr(Node::cRef from)
   return to_ret;
 }
 
+ir::Node::cRef ir::builder::entry_ret()
+{
+  auto Int = i(false, lit(32));
+
+  auto retf = fn({param(Int)}, bot());
+  retf->make_external("__start_return");
+  auto ret = param(retf);
+
+  return ret;
+}
+
 ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
 {
   assert(!args.empty() && "args must not be empty. Use a single unit argument for functions without arguments.");

@@ -29,6 +29,7 @@ struct builder
   Node::cRef lit(std::uint_fast64_t value);
   Node::cRef binop(BinaryKind op, Node::cRef lhs, Node::cRef rhs);
 
+  Node::cRef entry_ret();
   Fn::cRef fn(std::vector<Node::cRef> args, Node::cRef body);
 
   Node::cRef app(Node::cRef caller, std::vector<Node::cRef> arg);
