@@ -7,6 +7,7 @@ namespace ir
 
 struct builder
 {
+  friend struct Constructor;
   builder();
 
   Node::cRef kind(); 
