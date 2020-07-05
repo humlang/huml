@@ -65,20 +65,25 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
   return true;
 }
 
-ir::Node::cRef ir::Param::clone(ir::builder& b) const
-{ return this; } // <- params are not cloned!
-ir::Node::cRef ir::Constructor::clone(ir::builder& b) const
-{ return b.lookup_or_emplace(Node::mk_node<Constructor>(name, type())); }
-ir::Node::cRef ir::Literal::clone(ir::builder& b) const
-{ return b.lit(literal); }
-ir::Node::cRef ir::ConstexprAnnot::clone(ir::builder& b) const
-{ return b.cexpr(what()); }
-ir::Node::cRef ir::Binary::clone(ir::builder& b) const
-{ return b.binop(op, lhs()->clone(b), rhs()->clone(b)); }
-ir::Node::cRef ir::Fn::clone(ir::builder& b) const
+ir::Node::cRef ir::Param::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
-  auto new_bdy = bdy()->clone(b);
+  auto it = old_to_new.find(this);
 
+  assert(it != old_to_new.end() && "can't clone params directly"); // <- params are not cloned!
+
+  return it->second;
+}
+ir::Node::cRef ir::Constructor::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
+{ return b.lookup_or_emplace(Node::mk_node<Constructor>(name, type())); }
+ir::Node::cRef ir::Literal::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
+{ return b.lit(literal); }
+ir::Node::cRef ir::ConstexprAnnot::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
+{ return b.cexpr(what()); }
+ir::Node::cRef ir::Binary::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
+{ return b.binop(op, lhs()->clone(b, old_to_new), rhs()->clone(b, old_to_new)); }
+ir::Node::cRef ir::Fn::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
+{
+  auto old_args = args();
   auto argz = args();
   for(auto& v : argz)
   {
@@ -87,40 +92,49 @@ ir::Node::cRef ir::Fn::clone(ir::builder& b) const
     // build new param
     v = b.param(old_v->type());
 
-    // We need to subst the old param with the new param in the body
-    new_bdy = b.subst(old_v, v, new_bdy);
+    assert(!old_to_new.contains(old_v) && "ill-formed IR");
+    old_to_new.emplace(old_v, v);
   }
-  return b.fn(argz, new_bdy);
+  // new_bdy will use old_to_new map to clone the param
+  auto new_bdy = bdy()->clone(b, old_to_new);
+
+  auto to_ret = b.fn(argz, new_bdy);
+  old_to_new.emplace(this, to_ret);
+
+  return to_ret;
 }
-ir::Node::cRef ir::App::clone(ir::builder& b) const
+ir::Node::cRef ir::App::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
   auto argz = args();
   for(auto& v : argz)
-    v = v->clone(b);
-  return b.app(caller()->clone(b), argz);
+    v = v->clone(b, old_to_new);
+
+  if(auto it = old_to_new.find(caller()); it != old_to_new.end())
+    return b.app(it->second, argz);
+  return b.app(caller()->clone(b, old_to_new), argz);
 }
-ir::Node::cRef ir::Case::clone(ir::builder& b) const
+ir::Node::cRef ir::Case::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
   // TODO: if case patterns are binding we need to replace the old with the new bindings
   
   auto arms = match_arms();
   for(auto& arm : arms)
-    arm = std::make_pair(arm.first->clone(b), arm.second->clone(b));
-  return b.destruct(of()->clone(b), arms);
+    arm = std::make_pair(arm.first->clone(b, old_to_new), arm.second->clone(b, old_to_new));
+  return b.destruct(of()->clone(b, old_to_new), arms);
 }
-ir::Node::cRef ir::Kind::clone(ir::builder& b) const
+ir::Node::cRef ir::Kind::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 { return b.kind(); }
-ir::Node::cRef ir::Type::clone(ir::builder& b) const
+ir::Node::cRef ir::Type::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 { return b.type(); }
-ir::Node::cRef ir::Prop::clone(ir::builder& b) const
+ir::Node::cRef ir::Prop::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 { return b.prop(); }
-ir::Node::cRef ir::Unit::clone(ir::builder& b) const
+ir::Node::cRef ir::Unit::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 { return b.unit(); }
-ir::Node::cRef ir::Tup::clone(ir::builder& b) const
+ir::Node::cRef ir::Tup::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
   auto elms = elements();
   for(auto& el : elms)
-    el = el->clone(b);
+    el = el->clone(b, old_to_new);
   return b.tup(elms);
 }
 

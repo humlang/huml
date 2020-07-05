@@ -80,7 +80,7 @@ private:
     }
     if(!can_be_specialized.empty())
     {
-      auto new_caller = app->caller()->to<Fn>()->bdy()->clone(b);
+      auto new_caller = app->caller()->to<Fn>()->clone(b, specialized_params);
       auto caller_args = app->caller()->to<Fn>()->args();
       auto app_args = app->args();
       assert(caller_args.size() == app_args.size() && "Same arity required.");
@@ -106,7 +106,7 @@ private:
         }
       }
       // create a new version of new_caller with the fresh args
-      auto new_fn = b.fn(new_args, new_caller);
+      auto new_fn = b.fn(new_args, new_caller->to<Fn>()->bdy());
 
       // Finally, construct a fresh `app` adhering the new interface
       auto new_app = b.app(new_fn, new_app_args);
@@ -145,6 +145,9 @@ private:
   bool did_specialize { false };
   ir::NodeSet cache;
   ir::builder& b;
+
+  NodeMap<Node::cRef> specialized_params;
+
   std::queue<Fn::cRef> worklist;
 };
 }

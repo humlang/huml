@@ -103,7 +103,7 @@ struct generator
         ret = v->type();
     }
     // TODO: this assumes that the continuation is not hidden under a tuple. Should be ok if we enforce this somehow!
-    assert(ret != nullptr && ret->kind() == NodeKind::Fn && "return continuation must have a function type");
+    assert(ret != nullptr && ret->kind() == NodeKind::Fn && "return continuation must exist and have a function type");
 
     /// Build function
     assert(ret->to<Fn>()->args().size() == 1 && "We only support one single return type atm");
