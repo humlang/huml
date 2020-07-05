@@ -52,6 +52,9 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
 {
   if(!(lhs->argc() == rhs->argc() && lhs->kind() == rhs->kind() && lhs->type() == rhs->type()))
     return false;
+  if(lhs->kind() == NodeKind::ConstexprAnnot)
+    return (*this)(lhs->to<ConstexprAnnot>()->what(), rhs->to<ConstexprAnnot>()->what());
+
   for(std::size_t i = 0, e = lhs->argc(); i < e; ++i)
     if(lhs->me()[i] != rhs->me()[i])
       return false;
@@ -67,22 +70,30 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
 
 ir::Node::cRef ir::Param::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
-  auto it = old_to_new.find(this);
+  bool is_in_there = old_to_new.contains(this);
+  assert(is_in_there && "can't clone params directly"); // <- params are not cloned!
 
-  assert(it != old_to_new.end() && "can't clone params directly"); // <- params are not cloned!
-
-  return it->second;
+  return old_to_new.find(this)->second;
 }
 ir::Node::cRef ir::Constructor::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 { return b.lookup_or_emplace(Node::mk_node<Constructor>(name, type())); }
 ir::Node::cRef ir::Literal::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 { return b.lit(literal); }
 ir::Node::cRef ir::ConstexprAnnot::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
-{ return b.cexpr(what()); }
+{
+  auto res = what()->clone(b, old_to_new);
+
+  assert(res->kind() == NodeKind::ConstexprAnnot && "Param must have been stored as cexprannot");
+
+  return res;
+}
 ir::Node::cRef ir::Binary::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 { return b.binop(op, lhs()->clone(b, old_to_new), rhs()->clone(b, old_to_new)); }
 ir::Node::cRef ir::Fn::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
+  if(auto it = old_to_new.find(this); it != old_to_new.end())
+    return it->second;
+
   auto old_args = args();
   auto argz = args();
   for(auto& v : argz)
@@ -90,10 +101,24 @@ ir::Node::cRef ir::Fn::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) co
     Node::cRef old_v = v;
 
     // build new param
-    v = b.param(old_v->type());
+    if(old_v->kind() == NodeKind::Param)
+    {
+      v = b.lookup_or_emplace(Node::mk_node<Param>(v->type()));
 
-    assert(!old_to_new.contains(old_v) && "ill-formed IR");
-    old_to_new.emplace(old_v, v);
+      assert(!old_to_new.contains(old_v) && "ill-formed IR");
+      old_to_new.emplace(old_v, v);
+    }
+    else if(old_v->kind() == NodeKind::ConstexprAnnot)
+    {
+      v = b.lookup_or_emplace(Node::mk_node<Param>(v->type()));
+      v = b.cexpr(v);
+
+      assert(!old_to_new.contains(old_v) && "ill-formed IR");
+      old_to_new.emplace(old_v, v);
+      old_to_new.emplace(old_v->to<ConstexprAnnot>()->what(), v);
+    }
+    else
+      assert(false && "Ill-formed IR");
   }
   // new_bdy will use old_to_new map to clone the param
   auto new_bdy = bdy()->clone(b, old_to_new);
@@ -108,15 +133,13 @@ ir::Node::cRef ir::App::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) c
   auto argz = args();
   for(auto& v : argz)
     v = v->clone(b, old_to_new);
-
-  if(auto it = old_to_new.find(caller()); it != old_to_new.end())
-    return b.app(it->second, argz);
   return b.app(caller()->clone(b, old_to_new), argz);
 }
 ir::Node::cRef ir::Case::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
   // TODO: if case patterns are binding we need to replace the old with the new bindings
   
+
   auto arms = match_arms();
   for(auto& arm : arms)
     arm = std::make_pair(arm.first->clone(b, old_to_new), arm.second->clone(b, old_to_new));

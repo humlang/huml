@@ -81,7 +81,7 @@ private:
     if(!can_be_specialized.empty())
     {
       auto new_caller = app->caller()->to<Fn>()->clone(b, specialized_params);
-      auto caller_args = app->caller()->to<Fn>()->args();
+      auto caller_args = new_caller->to<Fn>()->args();
       auto app_args = app->args();
       assert(caller_args.size() == app_args.size() && "Same arity required.");
 
@@ -93,6 +93,9 @@ private:
 
         Node::cRef x = b.subst(caller_args[idx], app_args[idx], new_caller);
 
+        assert(b.is_free(caller_args[idx], new_caller) && "caller arg must not exist anymore");
+        assert(!b.is_free(app_args[idx], new_caller) && "app arg must have been replaced by caller arg");
+
         assert(new_caller == x && "subst should only substitute inside the body of new_caller");
       }
       // Now, we need to change the interface of new_caller, i.e. remove the specialized args
@@ -103,6 +106,11 @@ private:
         {
           new_args.emplace_back(caller_args[i]);
           new_app_args.emplace_back(app_args[i]);
+        }
+        else
+        {
+          assert(b.is_free(caller_args[i], new_caller) && "Caller arg must appear free");
+          assert(!b.is_free(app_args[i], new_caller) && "App arg must have been substituted for corresponding caller arg");
         }
       }
       // create a new version of new_caller with the fresh args

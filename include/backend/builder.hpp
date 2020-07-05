@@ -9,6 +9,8 @@ namespace ir
 struct builder
 {
   friend struct Constructor;
+  friend struct Fn;
+
   builder();
 
   Node::cRef kind(); 
@@ -38,6 +40,8 @@ struct builder
 
   Node::cRef destruct(Node::cRef of, std::vector<std::pair<Node::cRef, Node::cRef>> match_arms);
 
+
+  bool is_free(Node::cRef what, Node::cRef in);
 
   /// Replaces `what` with `with` in *all* occurences. -> what will be erased
   Node::cRef subst(Node::cRef what, Node::cRef with);

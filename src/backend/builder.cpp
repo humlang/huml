@@ -240,6 +240,21 @@ ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
   return nodes.emplace(std::move(store)).first->get();
 }
 
+bool ir::builder::is_free(ir::Node::cRef what, ir::Node::cRef in)
+{
+  // TODO: also check type
+  static constexpr NodeComparator cmp;
+  
+  if(cmp(what, in))
+    return false;
+
+  for(std::size_t i = 0, e = in->kind() == NodeKind::Fn ? 1 : in->argc(); i < e; ++i)
+    if(!is_free(what, in->me()[i]))
+      return false;
+
+  return true;
+}
+
 ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with)
 {
   // TODO: also subst type
@@ -285,45 +300,15 @@ ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::
   if(cmp(what, in))
     return with;
 
-  auto& n = *in;
-  std::size_t e = 0;
-  switch(n.kind())
-  {
-  case NodeKind::Kind:
-  case NodeKind::Type:
-  case NodeKind::Prop:
-  case NodeKind::Unit:
-  case NodeKind::Literal:
-  case NodeKind::Ctr:
-  case NodeKind::Param:
-    goto end;
-
-  case NodeKind::Binary:
-  case NodeKind::Case:
-  case NodeKind::App:
-  case NodeKind::Tup:    {
-      e = n.argc();
-      goto subst_children;
-    };
-
-  case NodeKind::Fn:     {
-      // We stop at 1 with functions, params bound by it should not be replaced.
-       // TODO: do we need to do kind of this for case patterns as well?
-      e = 1;
-      goto subst_children;
-    } break;
-  }
-subst_children:
-  {
   auto it = nodes.find(in);
   assert(it != nodes.end() && "Node must belong to this builder");
 
-  for(std::size_t i = 0; i < e; ++i)
+  for(std::size_t i = 0, e = in->kind() == NodeKind::Fn ? 1 : in->argc(); i < e; ++i)
   {
     // We literally change where this node points to. This is the only place where we do these kinds of stateful things!
     Node::cRef old = (*it)->children_[i];
 
-    (*it)->children_[i] = subst(what, with, n[i]);
+    (*it)->children_[i] = subst(what, with, in->me()[i]);
 
     if(old != (*it)->children_[i])
     {
@@ -336,8 +321,6 @@ subst_children:
       uses_of[with].insert(in);
     }
   }
-  }
-end:
   return in;
 }
 
