@@ -4,8 +4,6 @@
 #include <string>
 #include <queue>
 
-#include <iostream>
-
 ir::builder::builder()
 {
   // Bootstrap
@@ -268,16 +266,26 @@ std::ostream& ir::builder::print(std::ostream& os, Node::cRef ref)
   if(ref->kind() != NodeKind::Fn)
     return os;
   NodeSet definitions_to_print;
-  auto collect_definitions = [defs_printed = NodeSet (), &definitions_to_print](auto self, Node::cRef ref) mutable -> void
+  NodeSet defs_printed;
+  auto collect_definitions = [&defs_printed,&definitions_to_print](auto self, Node::cRef ref) -> void
   {
     if(ref->kind() == NodeKind::Fn)
       definitions_to_print.emplace(ref);
 
+    if(defs_printed.contains(ref))
+      return;
     defs_printed.emplace(ref);
     for(std::size_t i = 0, e = ref->argc(); i < e; ++i)
       self(self, ref->me()[i]);
   };
   collect_definitions(collect_definitions, ref);
+
+  os << "defs to print: \n";
+  for(auto& x : definitions_to_print)
+  {
+    os << x->unique_name() << "\n";
+  }
+  os << "-------------\n\n";
 
   auto internal = [&os](auto internal, Node::cRef ref) -> std::ostream&
   {
@@ -358,7 +366,6 @@ std::ostream& ir::builder::print(std::ostream& os, Node::cRef ref)
     os << ") -> ⊥:\n      ";
     internal(internal, fn->bdy()) << "\n\n";
   }
-  internal(internal, ref);
   return os << "\n\n";
 }
 

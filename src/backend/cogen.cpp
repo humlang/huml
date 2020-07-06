@@ -8,19 +8,32 @@
 #include <libgccjit++.h>
 
 #include <iostream>
+#include <queue>
 
 namespace ir
 {
 
-std::vector<Node::cRef> find_reachable_fns(Node::cRef foo)
+NodeSet find_reachable_fns(Node::cRef foo)
 {
-  std::vector<Node::cRef> v;
-  if(foo->kind() == NodeKind::Fn)
-    v.insert(v.end(), foo);
-  for(std::size_t i = 0; i < foo->argc(); ++i)
+  std::queue<Node::cRef> work;
+  work.emplace(foo);
+
+  NodeSet seen;
+  NodeSet v;
+  while(!work.empty())
   {
-    auto w = find_reachable_fns(foo->me()[i]);
-    v.insert(v.end(), w.begin(), w.end());
+    auto f = work.front();
+    work.pop();
+
+    if(seen.contains(f))
+      continue;
+
+    if(f->kind() == NodeKind::Fn)
+      v.emplace(f);
+    seen.emplace(f);
+    for(std::size_t i = 0; i < f->argc(); ++i)
+      if(!seen.contains(f->me()[i]))
+        work.emplace(f->me()[i]);
   }
   return v;
 }
@@ -130,7 +143,7 @@ struct generator
                                                ? node->to<Fn>()->external_name() : node->unique_name()).get_string().c_str(),
                                               params, false);
     // TODO: do we need a particular schedule?
-    std::vector<Node::cRef> rfns = find_reachable_fns(node->to<Fn>());
+    NodeSet rfns = find_reachable_fns(node->to<Fn>());
 
     /// emit *all* (reachable) parameters and function blocks
     for(auto& x : rfns)
@@ -281,8 +294,35 @@ struct generator
 
           blk->add_assignment(lvals[a].back(), ctx.new_cast(rvals[b].front(), genty(a->type())));
         }
-        assert(fns.contains(v->caller()) && "Caller must be contained in the set.");
-        blk->end_with_jump(fns[v->caller()]);
+        assert(fns.contains(x) && "Caller must be contained in the set.");
+        blk->end_with_jump(fns[x]);
+      }
+      else if(v->caller()->kind() == NodeKind::App)
+      {
+        auto aapps = v->caller()->to<App>()->args();
+        assert(aapps.size() == 1 && "Z combinator expects exactly one argument");
+
+        auto x = aapps.front();
+        assert(x->kind() == NodeKind::Fn && "Only functions can be called recursively.");
+        auto xargs = x->to<Fn>()->args();
+        auto vargs = v->args();
+        vargs.emplace(vargs.begin(), v->caller()); // <- change `(Z f) a b c` to `f (Z f) a b c`
+
+        // Set all the parameters prior to function call
+        assert(xargs.size() == vargs.size() && "Wrong arity");
+        for(std::size_t i = 0; i < xargs.size(); ++i)
+        {
+          auto& a = xargs[i];
+          auto& b = vargs[i];
+          if(a->type()->kind() == NodeKind::Unit || a->type()->kind() == NodeKind::Fn)
+            continue;
+          cogen(b, blk);
+          assert(lvals.contains(a) && rvals.contains(b) && "App args must exist in fn call.");
+
+          blk->add_assignment(lvals[a].back(), ctx.new_cast(rvals[b].front(), genty(a->type())));
+        }
+        assert(fns.contains(x) && "Caller must be contained in the set.");
+        blk->end_with_jump(fns[x]);
       }
       else
       {

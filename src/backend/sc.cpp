@@ -36,6 +36,8 @@ private:
 
       // NOTE: we must not ignore externals, they contain app/cases that we certainly want to specialize!
       
+      //if(cache.contains(fn))
+      //  continue;
       // Specialize case and app calls in case there is something to specialize
       Node::cRef new_body = nullptr;
       if(fn->bdy()->kind() == NodeKind::App)
@@ -52,7 +54,7 @@ private:
 
         worklist.emplace(new_fn->to<Fn>());
 
-        if(auto it = cache.find(fn); it != cache.end())
+        if(auto it = cache.find(new_fn); it != cache.end())
           cache.erase(it);
       }
     }
@@ -80,7 +82,9 @@ private:
 
       // (Z f) a b c   -> f (Z f) a b c
       auto ap = b.app(app->caller()->to<App>()->args().front(), args);
+      assert(ap->kind() == NodeKind::App && "Must be an app again");
 
+      // retry
       return ap;
     }
     else if(app->caller()->kind() != NodeKind::Fn)
@@ -150,8 +154,34 @@ private:
     // Currently, we do nothing. However, as soon as the supercompiler gets going, this will be a core part of it.
     // We analyze if we can split using case_->of() etc.
 
-    fill_worklist_with_children(case_);
 
+    auto arms = case_->match_arms();
+    for(std::size_t i = 0; i < arms.size(); ++i)
+    {
+      if(arms[i].second->kind() == NodeKind::Case)
+      {
+        auto new_arm = handle_case(arms[i].second->to<Case>());
+
+        if(arms[i].second != new_arm)
+          b.subst(arms[i].second, new_arm, case_);
+      }
+      else if(arms[i].second->kind() == NodeKind::App)
+      {
+retry:
+        auto new_arm = handle_app(arms[i].second->to<App>());
+
+        if(arms[i].second != new_arm)
+        {
+          b.subst(arms[i].second, new_arm, case_);
+
+          arms = case_->match_arms();
+          if(new_arm->kind() == NodeKind::App)
+            goto retry;
+        }
+      }
+    }
+
+    fill_worklist_with_children(case_);
     return case_;
   }
 

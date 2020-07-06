@@ -43,6 +43,8 @@ std::size_t ir::NodeHasher::operator()(const Node::cRef str) const
   case NodeKind::Literal: seed ^= static_cast<std::size_t>(static_cast<Literal::cRef>(str)->literal) + 0x9e3779b9 + (seed << 6) + (seed >> 2); break;
 
   case NodeKind::Param:   seed ^= str->gid() + 0x9e3779b9 + (seed << 6) + (seed >> 2); break;
+
+  case NodeKind::Fn:      seed ^= str->to<Fn>()->external_name().get_hash() + 0x9e3779b9 + (seed << 6) + (seed >> 2); break;
   }
 
   return seed;
@@ -53,7 +55,9 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
   if(lhs == rhs)
     return true;
 
-  if(!(lhs->argc() == rhs->argc() && lhs->kind() == rhs->kind() && lhs->type() == rhs->type()))
+  // TODO: also consider type. However for this, we also need to clone the type
+  //       and to update it in sc.cpp
+  if(!(lhs->argc() == rhs->argc() && lhs->kind() == rhs->kind())) // && lhs->type() == rhs->type()))
     return false;
   if(lhs->kind() == NodeKind::ConstexprAnnot)
     return (*this)(lhs->to<ConstexprAnnot>()->what(), rhs->to<ConstexprAnnot>()->what());
@@ -67,6 +71,7 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
   case NodeKind::Ctr:     return lhs->to<Constructor>()->name == rhs->to<Constructor>()->name;
   case NodeKind::Literal: return lhs->to<Literal>()->literal == rhs->to<Literal>()->literal;
   case NodeKind::Param:   return lhs->gid() == rhs->gid();
+  case NodeKind::Fn:      return lhs->to<Fn>()->external_name() == rhs->to<Fn>()->external_name();
   }
   return true;
 }
@@ -74,7 +79,10 @@ bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cR
 ir::Node::cRef ir::Param::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) const
 {
   bool is_in_there = old_to_new.contains(this);
-  assert(is_in_there && "can't clone params directly"); // <- params are not cloned!
+
+  if(!is_in_there)
+    return this; // <- this is somewhat dangerous if b is not the same parent 
+  // assert(is_in_there && "can't clone params directly"); // <- params are not cloned!
 
   return old_to_new.find(this)->second;
 }
