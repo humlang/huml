@@ -280,13 +280,6 @@ std::ostream& ir::builder::print(std::ostream& os, Node::cRef ref)
   };
   collect_definitions(collect_definitions, ref);
 
-  os << "defs to print: \n";
-  for(auto& x : definitions_to_print)
-  {
-    os << x->unique_name() << "\n";
-  }
-  os << "-------------\n\n";
-
   auto internal = [&os](auto internal, Node::cRef ref) -> std::ostream&
   {
     switch(ref->kind())
