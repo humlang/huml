@@ -37,9 +37,6 @@ ir::Node::cRef ir::builder::tup(std::vector<Node::cRef> elems)
   auto to_ret = lookup_or_emplace(Node::mk_node<Tup>(elems));
   to_ret->set_type(lookup_or_emplace(Node::mk_node<Tup>(el_typs)));
 
-  for(auto& a : elems)
-    uses_of[a].emplace(to_ret);
-
   return to_ret;
 }
 
@@ -75,7 +72,6 @@ ir::Node::cRef ir::builder::cexpr(Node::cRef expr)
   assert(expr->kind() == NodeKind::Param && "Annotations only works with params.");
 
   auto to_ret = lookup_or_emplace(Node::mk_node<ConstexprAnnot>(expr));
-  uses_of[expr].emplace(to_ret);
 
   return to_ret->set_type(expr->type());
 }
@@ -84,8 +80,6 @@ ir::Node::cRef ir::builder::lit(std::uint_fast64_t value)
 {
   auto lit32 = lookup_or_emplace(Node::mk_node<Literal>(32));
   auto to_ret = lookup_or_emplace(Node::mk_node<Literal>(value))->set_type(i(false, lit32));
-
-  uses_of[lit32].emplace(to_ret);
 
   return to_ret;
 }
@@ -143,9 +137,6 @@ ir::Node::cRef ir::builder::binop(ir::BinaryKind op, Node::cRef lhs, Node::cRef 
   // TODO: This does not work well if lhs->type() != rhs->type()
   auto to_ret = lookup_or_emplace(Node::mk_node<Binary>(op, lhs, rhs))->set_type(lhs->type());
 
-  uses_of[lhs].emplace(to_ret);
-  uses_of[rhs].emplace(to_ret);
-
   return to_ret;
 }
 
@@ -154,9 +145,6 @@ ir::Node::cRef ir::builder::i(bool no_sign, Node::cRef size)
   auto ictor = lookup_or_emplace(Node::mk_node<Constructor>(no_sign ? "u" : "i", type()));
   auto to_ret = app(ictor, {size});
 
-  uses_of[ictor].emplace(to_ret);
-  uses_of[size].emplace(to_ret);
-
   return to_ret;
 }
 
@@ -164,9 +152,6 @@ ir::Node::cRef ir::builder::ptr(Node::cRef from)
 {
   auto p = lookup_or_emplace(Node::mk_node<Constructor>("_Ptr", type()));
   auto to_ret = app(p, {from});
-
-  uses_of[p].emplace(to_ret);
-  uses_of[from].emplace(to_ret);
 
   return to_ret;
 }
@@ -194,10 +179,6 @@ ir::Fn::cRef ir::builder::fn(std::vector<Node::cRef> args, Node::cRef body)
   auto to_ret = static_cast<Fn::cRef>(lookup_or_emplace(Node::mk_node<Fn>(args, body))
       ->set_type(lookup_or_emplace(Node::mk_node<Fn>(argTs, bot()))));
 
-  for(auto& a : args)
-    uses_of[a].emplace(to_ret);
-  uses_of[body].emplace(to_ret);
-
   return to_ret;
 }
 
@@ -208,10 +189,6 @@ ir::Node::cRef ir::builder::app(Node::cRef caller, std::vector<Node::cRef> args)
 
   auto to_ret = lookup_or_emplace(Node::mk_node<App>(caller, args));
 
-  uses_of[caller].emplace(to_ret);
-  for(auto& a : args)
-    uses_of[a].emplace(to_ret);
-
   // app does not return
   return to_ret->set_type(bot());
 }
@@ -221,12 +198,6 @@ ir::Node::cRef ir::builder::destruct(Node::cRef of, std::vector<std::pair<Node::
   // case has no value
   auto to_ret = lookup_or_emplace(Node::mk_node<Case>(of, match_arms))->set_type(bot());
 
-  uses_of[of].emplace(to_ret);
-  for(auto& p : match_arms)
-  {
-    uses_of[p.first].emplace(to_ret);
-    uses_of[p.second].emplace(to_ret);
-  }
   return to_ret;
 }
 
@@ -236,8 +207,12 @@ ir::Node::Ref ir::builder::lookup_or_emplace(Node::Store store)
   store->gid_ = gid++;
 
   if(auto it = nodes.find(store); it != nodes.end())
-      return it->get(); // <- might be different pointer
-  return nodes.emplace(std::move(store)).first->get();
+      return data[it->second].get(); // <- might be different pointer
+
+  data.emplace_back(std::move(store));
+  nodes.emplace(data.back().get(), data.size() - 1);
+
+  return data.back().get();
 }
 
 bool ir::builder::is_free(ir::Node::cRef what, ir::Node::cRef in)
@@ -251,45 +226,7 @@ bool ir::builder::is_free(ir::Node::cRef what, ir::Node::cRef in)
   for(std::size_t i = 0, e = in->kind() == NodeKind::Fn ? 1 : in->argc(); i < e; ++i)
     if(!is_free(what, in->me()[i]))
       return false;
-
   return true;
-}
-
-ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with)
-{
-  // TODO: also subst type
-  static constexpr NodeComparator cmp;
-  
-  // go through all uses_of and simply change the value
-  for(auto& in : uses_of[what])
-  {
-    auto it = nodes.find(in);
-    assert(it != nodes.end() && "Node must belong to this builder");
-
-    // Now find the arg in the children_
-    bool was_subst = false;
-    for(std::size_t i = 0, e = in->argc(); i < e; ++i)
-    {
-      // we may not subst params in binding occurences
-      if(in->kind() == NodeKind::Fn && i > 0)
-        break;
-
-      auto& c = (*it)->children_[i];
-      if(cmp(c, what))
-      {
-        // SUBST!
-        c = with;
-        was_subst = true;
-      }
-    }
-    assert(was_subst && "Node appears in uses_of set, so we should've substituted it!");
-  }
-
-  uses_of[with].insert(uses_of[what].begin(), uses_of[what].end());
-  uses_of[what].clear();
-  nodes.erase(what); // erase node, we substituted it, so it won't be used anymore
-
-  return with;
 }
 
 ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::Node::cRef in)
@@ -306,23 +243,125 @@ ir::Node::cRef ir::builder::subst(ir::Node::cRef what, ir::Node::cRef with, ir::
   for(std::size_t i = 0, e = in->kind() == NodeKind::Fn ? 1 : in->argc(); i < e; ++i)
   {
     // We literally change where this node points to. This is the only place where we do these kinds of stateful things!
-    Node::cRef old = (*it)->children_[i];
+    Node::cRef old = data[it->second]->children_[i];
 
-    (*it)->children_[i] = subst(what, with, in->me()[i]);
+    Node::cRef fresh = subst(what, with, in->me()[i]);
 
-    if(old != (*it)->children_[i])
+    if(old != fresh)
     {
-      /// it was substituted. we need to update uses_of set
-      // remove old use
-      assert(uses_of[old].find(in) != uses_of[old].end() && "We substituted, so the use should be at the end.");
-      uses_of[old].erase(in);
-      
-      // insert new use
-      uses_of[with].insert(in);
+      // SUBST!
+      // rehash this single element
+
+      std::size_t pos = it->second;
+      //nodes.erase(it);
+      data[pos]->children_[i] = fresh;
+      nodes.emplace(in, pos);
+
+      assert(nodes.contains(in) && "Node must be re-hashed by now.");
     }
   }
   return in;
 }
+
+std::ostream& ir::builder::print(std::ostream& os, Node::cRef ref)
+{
+  if(ref->kind() != NodeKind::Fn)
+    return os;
+  NodeSet definitions_to_print;
+  auto collect_definitions = [defs_printed = NodeSet (), &definitions_to_print](auto self, Node::cRef ref) mutable -> void
+  {
+    if(ref->kind() == NodeKind::Fn)
+      definitions_to_print.emplace(ref);
+
+    defs_printed.emplace(ref);
+    for(std::size_t i = 0, e = ref->argc(); i < e; ++i)
+      self(self, ref->me()[i]);
+  };
+  collect_definitions(collect_definitions, ref);
+
+  auto internal = [&os](auto internal, Node::cRef ref) -> std::ostream&
+  {
+    switch(ref->kind())
+    {
+    case NodeKind::Kind: os << "Kind"; break;
+    case NodeKind::Type: os << "Type"; break;
+    case NodeKind::Prop: os << "Prop"; break;
+    case NodeKind::Ctr:  os << "c" << ref->to<Constructor>()->name.get_string(); break;
+    case NodeKind::Literal: os << ref->to<Literal>()->literal; break;
+    case NodeKind::Param: os << "p" << ref->gid(); break;
+    case NodeKind::ConstexprAnnot: os << "@"; internal(internal, ref->to<ConstexprAnnot>()->what()); break;
+    case NodeKind::Unit: os << "()"; break;
+    case NodeKind::Binary: {
+        auto bin = ref->to<Binary>();
+
+        std::string op;
+        switch(bin->op)
+        {
+        case BinaryKind::Mult:  op = " * "; break;
+        case BinaryKind::Plus:  op = " + "; break;
+        case BinaryKind::Minus: op = " - "; break;
+        }
+        internal(internal, bin->lhs()) << op;
+        internal(internal, bin->rhs());
+      } break;
+    case NodeKind::App: {
+        auto ap = ref->to<App>();
+
+        internal(internal, ap->caller()) << " (";
+        std::size_t i = 0;
+        for(auto& v : ap->args())
+          internal(internal, v) << (++i < ap->argc() - 1 ? ", " : "");
+        os << ")";
+      } break;
+    case NodeKind::Fn: {
+        auto fn = ref->to<Fn>();
+        os << "fn_" + std::to_string(fn->gid());
+      } break;
+    case NodeKind::Case: {
+        auto cs = ref->to<Case>();
+
+        auto vals = cs->match_arms();
+        os << "case ";
+        internal(internal, cs->of()) << "[ \n";
+        std::size_t i = 0; 
+        for(auto& v : vals)
+        {
+          os << ((i+=2) < cs->argc() - 1 ? "   | " : "     ");
+          internal(internal, v.first)  << " => ";
+          internal(internal, v.second) << "\n";
+        }
+        os << "    ]\n";
+      } break;
+    case NodeKind::Tup: {
+        auto tup = ref->to<Tup>();
+
+        os << "(";
+        std::size_t i = 0;
+        for(auto& v : tup->elements())
+          internal(internal, v) << (++i < tup->argc() - 1 ? ", " : "");
+        os << ")";
+      } break;
+    }
+    return os;
+  };
+  for(auto it = definitions_to_print.begin(); it != definitions_to_print.end(); ++it)
+  {
+    auto fn = it.key()->to<Fn>();
+
+    os << "fn_" + std::to_string(fn->gid()) << " #(";
+    std::size_t i = 0;
+    for(auto& v : fn->args())
+    {
+      internal(internal, v) << " : ";
+      internal(internal, v->type()) << (++i < fn->argc() - 1 ? ", " : "");
+    }
+    os << ") -> ⊥:\n      ";
+    internal(internal, fn->bdy()) << "\n\n";
+  }
+  internal(internal, ref);
+  return os << "\n\n";
+}
+
 
 std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
 {
@@ -354,10 +393,9 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
 
         if(!defs_printed.contains(ref))
         {
+          defs_printed.insert(ref);
           internal(internal, bin->lhs()) << " -> " << op << ";\n";
           internal(internal, bin->rhs()) << " -> " << op << ";\n";
-
-          defs_printed.insert(ref);
         }
         os << op;
       } break;
@@ -367,11 +405,10 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         std::string op = "app_" + std::to_string(ap->gid());
         if(!defs_printed.contains(ref))
         {
+          defs_printed.insert(ref);
           internal(internal, ap->caller()) << " -> " << op << ";\n";
           for(auto& v : ap->args())
             internal(internal, v) << " -> " << op << ";\n";
-
-          defs_printed.insert(ref);
         }
         os << op;
       } break;
@@ -381,11 +418,10 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         std::string op = "fn_" + std::to_string(fn->gid());
         if(!defs_printed.contains(ref))
         {
+          defs_printed.insert(ref);
           for(auto& v : fn->args())
             internal(internal, v) << " -> " << op << ";\n";
           internal(internal, fn->bdy()) << " -> " << op << ";\n";
-
-          defs_printed.insert(ref);
         }
         os << op;
       } break;
@@ -395,6 +431,7 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         std::string op = "case_" + std::to_string(cs->gid());
         if(!defs_printed.contains(ref))
         {
+          defs_printed.insert(ref);
           auto vals = cs->match_arms();
           internal(internal, cs->of()) << " -> " << op << ";\n";
           for(auto& v : vals)
@@ -402,8 +439,6 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
             internal(internal, v.first)  << " -> " << op << ";\n";
             internal(internal, v.second) << " -> " << op << ";\n";
           }
-
-          defs_printed.insert(ref);
         }
         os << op;
       } break;
@@ -413,10 +448,9 @@ std::ostream& ir::builder::print_graph(std::ostream& os, Node::cRef ref)
         std::string op = "tup_" + std::to_string(tup->gid());
         if(!defs_printed.contains(ref))
         {
+          defs_printed.insert(ref);
           for(auto& v : tup->elements())
             internal(internal, v) << " -> " << op << ";\n";
-
-          defs_printed.insert(ref);
         }
         os << op;
       } break;

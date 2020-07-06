@@ -44,15 +44,15 @@ struct builder
   bool is_free(Node::cRef what, Node::cRef in);
 
   /// Replaces `what` with `with` in *all* occurences. -> what will be erased
-  Node::cRef subst(Node::cRef what, Node::cRef with);
   Node::cRef subst(Node::cRef what, Node::cRef with, Node::cRef in);
 
+  std::ostream& print(std::ostream& os, Node::cRef ref);
   std::ostream& print_graph(std::ostream& os, Node::cRef ref);
 private:
   Node::Ref lookup_or_emplace(Node::Store store);
 private:
-  tsl::robin_pg_set<Node::Store, NodeHasher, NodeComparator> nodes;
-  NodeMap<tsl::robin_set<Node::cRef>> uses_of;
+  std::vector<Node::Store> data;
+  NodeMap<std::size_t> nodes;
 
   std::uint_fast64_t gid { 0 };
 };

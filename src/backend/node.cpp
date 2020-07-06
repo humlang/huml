@@ -50,6 +50,9 @@ std::size_t ir::NodeHasher::operator()(const Node::cRef str) const
 
 bool ir::NodeComparator::operator()(const ir::Node::cRef lhs, const ir::Node::cRef rhs) const
 {
+  if(lhs == rhs)
+    return true;
+
   if(!(lhs->argc() == rhs->argc() && lhs->kind() == rhs->kind() && lhs->type() == rhs->type()))
     return false;
   if(lhs->kind() == NodeKind::ConstexprAnnot)

@@ -51,6 +51,9 @@ private:
         assert(new_fn->kind() == NodeKind::Fn && "Must still be a function after subst.");
 
         worklist.emplace(new_fn->to<Fn>());
+
+        if(auto it = cache.find(fn); it != cache.end())
+          cache.erase(it);
       }
     }
     return did_specialize;
@@ -67,6 +70,24 @@ private:
   // Finally, we need to collect any kind of function and put it in our worklist
   ir::Node::cRef handle_app(ir::App::cRef app)
   {
+    // Can't do anything about apps calling constuctors or params
+    if(app->caller()->kind() == NodeKind::App && app->caller()->to<App>()->caller() == b.rec())
+    {
+      assert(app->caller()->to<App>()->args().size() == 1 && "Z combinator expects exactly one arg");
+
+      auto args = app->args();
+      args.insert(args.begin(), app->caller());
+
+      // (Z f) a b c   -> f (Z f) a b c
+      auto ap = b.app(app->caller()->to<App>()->args().front(), args);
+
+      return ap;
+    }
+    else if(app->caller()->kind() != NodeKind::Fn)
+    {
+      fill_worklist_with_children(app);
+      return app;
+    }
     // Look at caller arguments and see if we can specialize a position.
     std::vector<std::size_t> can_be_specialized;
     can_be_specialized.reserve(app->argc() - 1);
@@ -94,8 +115,6 @@ private:
         Node::cRef x = b.subst(caller_args[idx], app_args[idx], new_caller);
 
         assert(b.is_free(caller_args[idx], new_caller) && "caller arg must not exist anymore");
-        assert(!b.is_free(app_args[idx], new_caller) && "app arg must have been replaced by caller arg");
-
         assert(new_caller == x && "subst should only substitute inside the body of new_caller");
       }
       // Now, we need to change the interface of new_caller, i.e. remove the specialized args
@@ -110,7 +129,6 @@ private:
         else
         {
           assert(b.is_free(caller_args[i], new_caller) && "Caller arg must appear free");
-          assert(!b.is_free(app_args[i], new_caller) && "App arg must have been substituted for corresponding caller arg");
         }
       }
       // create a new version of new_caller with the fresh args
