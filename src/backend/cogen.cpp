@@ -13,13 +13,13 @@
 namespace ir
 {
 
-NodeSet find_reachable_fns(Node::cRef foo)
+std::vector<Node::cRef> find_reachable_fns(Node::cRef foo)
 {
   std::queue<Node::cRef> work;
   work.emplace(foo);
 
   NodeSet seen;
-  NodeSet v;
+  std::vector<Node::cRef> v;
   while(!work.empty())
   {
     auto f = work.front();
@@ -27,10 +27,10 @@ NodeSet find_reachable_fns(Node::cRef foo)
 
     if(seen.contains(f))
       continue;
+    seen.emplace(f);
 
     if(f->kind() == NodeKind::Fn)
-      v.emplace(f);
-    seen.emplace(f);
+      v.emplace_back(f);
     for(std::size_t i = 0; i < f->argc(); ++i)
       if(!seen.contains(f->me()[i]))
         work.emplace(f->me()[i]);
@@ -143,7 +143,7 @@ struct generator
                                                ? node->to<Fn>()->external_name() : node->unique_name()).get_string().c_str(),
                                               params, false);
     // TODO: do we need a particular schedule?
-    NodeSet rfns = find_reachable_fns(node->to<Fn>());
+    auto rfns = find_reachable_fns(node->to<Fn>());
 
     /// emit *all* (reachable) parameters and function blocks
     for(auto& x : rfns)
@@ -297,33 +297,6 @@ struct generator
         assert(fns.contains(x) && "Caller must be contained in the set.");
         blk->end_with_jump(fns[x]);
       }
-      else if(v->caller()->kind() == NodeKind::App)
-      {
-        auto aapps = v->caller()->to<App>()->args();
-        assert(aapps.size() == 1 && "Z combinator expects exactly one argument");
-
-        auto x = aapps.front();
-        assert(x->kind() == NodeKind::Fn && "Only functions can be called recursively.");
-        auto xargs = x->to<Fn>()->args();
-        auto vargs = v->args();
-        vargs.emplace(vargs.begin(), v->caller()); // <- change `(Z f) a b c` to `f (Z f) a b c`
-
-        // Set all the parameters prior to function call
-        assert(xargs.size() == vargs.size() && "Wrong arity");
-        for(std::size_t i = 0; i < xargs.size(); ++i)
-        {
-          auto& a = xargs[i];
-          auto& b = vargs[i];
-          if(a->type()->kind() == NodeKind::Unit || a->type()->kind() == NodeKind::Fn)
-            continue;
-          cogen(b, blk);
-          assert(lvals.contains(a) && rvals.contains(b) && "App args must exist in fn call.");
-
-          blk->add_assignment(lvals[a].back(), ctx.new_cast(rvals[b].front(), genty(a->type())));
-        }
-        assert(fns.contains(x) && "Caller must be contained in the set.");
-        blk->end_with_jump(fns[x]);
-      }
       else
       {
         // TODO
@@ -348,9 +321,9 @@ struct generator
       gccjit::rvalue ret;
       switch(bin->op)
       {
-      case BinaryKind::Minus: ret = ctx.new_minus(lhs_typ, lhs, rhs);
-      case BinaryKind::Plus:  ret = ctx.new_plus(lhs_typ, lhs, rhs);
-      case BinaryKind::Mult:  ret = ctx.new_mult(lhs_typ, lhs, rhs);
+      case BinaryKind::Minus: ret = ctx.new_binary_op(GCC_JIT_BINARY_OP_MINUS, lhs_typ, lhs, rhs); break;
+      case BinaryKind::Plus:  ret = ctx.new_binary_op(GCC_JIT_BINARY_OP_PLUS, lhs_typ, lhs, rhs);  break;
+      case BinaryKind::Mult:  ret = ctx.new_binary_op(GCC_JIT_BINARY_OP_MULT, lhs_typ, lhs, rhs);
       }
       rvals.emplace(bin, std::vector<gccjit::rvalue>{ ret });
 
@@ -390,7 +363,8 @@ bool cogen(std::string name, const Node* ref)
   generator gen(name);
   gen.cogen(ref);
 
-  // always emit assembler for now, is most versatile
+//  gen.ctx.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
+
   gen.ctx.compile_to_file(GCC_JIT_OUTPUT_KIND_EXECUTABLE, (name + ".out").c_str());
   return true;
 }
