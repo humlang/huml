@@ -351,7 +351,6 @@ public:
 
 private:
   NodeMap<gccjit::block> fns;
-  //std::unordered_map<Node::cRef, gccjit::block, NodeHasher, NodeComparator> fns;
   NodeMap<std::vector<gccjit::rvalue>> rvals;
   NodeMap<std::vector<gccjit::lvalue>> lvals;
 

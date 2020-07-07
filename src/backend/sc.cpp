@@ -135,17 +135,21 @@ private:
           assert(b.is_free(caller_args[i], new_caller) && "Caller arg must appear free");
         }
       }
+      if(new_args.empty() && new_app_args.empty())
+      {
+        new_args.push_back(b.unit());
+        new_app_args.push_back(b.unit());
+      }
       // create a new version of new_caller with the fresh args
       auto new_fn = b.fn(new_args, new_caller->to<Fn>()->bdy());
 
       // Finally, construct a fresh `app` adhering the new interface
       auto new_app = b.app(new_fn, new_app_args);
+      assert(new_app->kind() == NodeKind::App && "Must be an app.");
 
-      fill_worklist_with_children(new_app);
-      return new_app;
+      app = new_app->to<App>();
     }
-    else
-      fill_worklist_with_children(app);
+    fill_worklist_with_children(app);
     return app;
   }
 
