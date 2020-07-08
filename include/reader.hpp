@@ -84,7 +84,6 @@ private:
   // always uses old for the error
   ast_ptr mk_error();
 
-  ast_ptr parse_assign();
   ast_ptr parse_expr_stmt();
   ast_ptr parse_type_ctor();
   ast_ptr parse_data_ctor();
@@ -92,6 +91,7 @@ private:
 
   ast_ptr parse_directive();
 
+  ast_ptr parse_assign(ast_ptr to);
   ast_ptr parse_case();
   ast_ptr parse_with_parentheses();
   ast_ptr parse_type_check(ast_ptr left);

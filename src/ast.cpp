@@ -66,15 +66,6 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
       else
         os << "#Explicit Type;";
     } break;
-  case ASTNodeKind::map_impl: {
-      map_impl::ptr map = std::static_pointer_cast<map_impl>(node);
-
-      os << "map_impl ";
-      print(os, map->lhs);
-      os << " ";
-      print(os, map->rhs);
-      os << ";";
-    } break;
   case ASTNodeKind::identifier:  {
       identifier::ptr id = std::static_pointer_cast<identifier>(node);
       os << id->symb.get_string();

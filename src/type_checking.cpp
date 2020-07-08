@@ -801,10 +801,6 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
       return what->type = synthesize(ctx, ex->lhs);
     } break;
-  // S-MapImpl
-  case ASTNodeKind::map_impl: {
-      return what;
-    } break;
   // S-Directive
   case ASTNodeKind::directive: {
       implicit = std::static_pointer_cast<directive>(what)->implicit_typing;

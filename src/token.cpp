@@ -14,16 +14,13 @@ std::string_view kind_to_str(token_kind kind)
   case token_kind::Keyword: return "Keyword";
   case token_kind::Doublearrow: return "Doublearrow";
   case token_kind::Backslash: return "Backslash";
-  case token_kind::Pipe: return "Pipe";
-  case token_kind::Colon: return "Colon";
   case token_kind::Semi: return "Semicolon";
+  case token_kind::Colon: return "Colon";
   case token_kind::LBrace: return "LBrace";
   case token_kind::RBrace: return "RBrace";
   case token_kind::Plus: return "Plus";
   case token_kind::Minus: return "Minus";
   case token_kind::Asterisk: return "Asterisk";
-  case token_kind::Equal: return "Equal";
-  case token_kind::Dot: return "Dot";
   case token_kind::LParen: return "LParen";
   case token_kind::RParen: return "RParen";
   case token_kind::Comma: return "Comma";

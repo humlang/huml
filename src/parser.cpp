@@ -9,12 +9,11 @@
 const ast_ptr hx_reader::error_ref = nullptr;
 
 auto token_precedence_map = tsl::robin_map<token_kind, int>( {
-  {token_kind::Colon, 1},
   {token_kind::Arrow, 1},
-  {token_kind::Dot, 7},
   {token_kind::Plus, 5},
   {token_kind::Minus, 5},
   {token_kind::Asterisk, 6},
+  {token_kind::Colon, 7},
   {token_kind::LParen, 65535},
   {token_kind::LBrace, 65535},
   {token_kind::Identifier, 1}, //65535},
@@ -307,41 +306,21 @@ ast_ptr hx_reader::parse_type_ctor()
 }
 
 
-ast_ptr hx_reader::parse_assign()
+ast_ptr hx_reader::parse_assign(ast_ptr to)
 {
-  auto current_source_loc = current.loc;
-  scoping_ctx.is_binding = true;
-  auto var = parse_identifier();
-  scoping_ctx.is_binding = false;
-
-  bool error = false;
-  if(var == error_ref)
-    error = true;
-
   auto var_symb = old.data;
-  if(!expect('=', diagnostic_db::parser::assign_expects_equal))
+  auto current_source_loc = old.loc;
+
+  bool error = to == error_ref;
+  if(!expect(token_kind::ColonEqual, diagnostic_db::parser::assign_expects_equal))
     error = true;
   auto arg = parse_expression();
-
   if(arg == error_ref)
     error = true;
 
-  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
-  {
-    source_range loc = {};
-    auto proj = loc.snd_proj();
-
-    // do not want to ignore this token
-    loc.column_beg = loc.column_end;
-    fixits_stack.back().changes.emplace_back(proj, nlohmann::json { {"what", loc}, {"how", ";"} });
-
-    diagnostic <<= mk_diag::fixit(current_source_loc + loc, fixits_stack.back());
-
-    error = true;
-  }
   if(error)
     return mk_error();
-  auto ass = std::make_shared<assign>(var, arg);
+  auto ass = std::make_shared<assign>(to, arg);
   ass->lhs->annot = arg->annot;
 
   return ass;
@@ -375,19 +354,6 @@ ast_ptr hx_reader::parse_expr_stmt()
   return std::make_shared<expr_stmt>(expr);
 }
 
-ast_ptr hx_reader::parse_map_impl()
-{
-  assert(expect(token_kind::Keyword, diagnostic_db::parser::map_impl_expected));
-
-  auto constructor_name = parse_identifier();
-  auto ffi_name = parse_identifier();
-
-  if(constructor_name == error_ref || ffi_name == error_ref)
-    return mk_error();
-
-  return std::make_shared<map_impl>(constructor_name, ffi_name);
-}
-
 ast_ptr hx_reader::parse_statement()
 {
   ast_ptr to_ret = nullptr;
@@ -396,10 +362,6 @@ ast_ptr hx_reader::parse_statement()
     to_ret = parse_type_ctor();
   else if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("data").get_hash())
     to_ret = parse_data_ctor();
-  else if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("map_impl").get_hash())
-    to_ret = parse_map_impl();
-  else if(next_toks[0].kind == token_kind::Equal)
-    to_ret = parse_assign();
   else if(current.kind == token_kind::Hash)
     to_ret = parse_directive();
   else
@@ -610,7 +572,6 @@ ast_ptr hx_reader::parse_expression(int precedence)
       case token_kind::RParen:
       case token_kind::RBracket:
       case token_kind::RBrace:
-      case token_kind::Pipe:
       case token_kind::Comma:
       case token_kind::LBracket:
       case token_kind::Doublearrow:
@@ -626,6 +587,11 @@ ast_ptr hx_reader::parse_expression(int precedence)
       case token_kind::Colon:
       {
         return parse_type_check(prefix);
+      } break;
+
+      case token_kind::ColonEqual:
+      {
+        return parse_assign(prefix);
       } break;
 
       default:

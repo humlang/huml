@@ -137,17 +137,6 @@ struct expr_stmt : ast_base
   ast_ptr lhs;
 };
 
-struct map_impl : ast_base
-{
-  using ptr = std::shared_ptr<map_impl>;
-
-  map_impl(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::map_impl), lhs(lhs), rhs(rhs)
-  {  }
-
-  ast_ptr lhs;
-  ast_ptr rhs;
-};
-
 struct hx_ast
 {
   void print(std::ostream& os) const;

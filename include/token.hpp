@@ -32,17 +32,15 @@ enum class token_kind : std::int8_t
     Keyword = 3,
     Doublearrow = 4, // =>
     Arrow = 5,  // ->
+    ColonEqual = 6, // :=
     Backslash = '\\',
-    Pipe = '|',
-    Colon = ':',
     Semi = ';',
+    Colon = ':',
     LBrace = '{',
     RBrace = '}',
     Plus = '+',
     Minus = '-',
     Asterisk = '*',
-    Equal = '=',
-    Dot = '.',
     LParen = '(',
     RParen = ')',
     LBracket = '[',

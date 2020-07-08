@@ -49,16 +49,13 @@ auto keyword_set = tsl::robin_set<std::string_view>({
 
 auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
   {"\\"sv, token_kind::Backslash},
-  {"|"sv, token_kind::Pipe},
-  {":"sv, token_kind::Colon},
+  {":="sv, token_kind::ColonEqual},
   {";"sv, token_kind::Semi},
   {"{"sv, token_kind::LBrace},
   {"}"sv, token_kind::RBrace},
   {"+"sv, token_kind::Plus},
   {"-"sv, token_kind::Minus},
   {"*"sv,  token_kind::Asterisk},
-  {"="sv,  token_kind::Equal},
-  {"."sv,  token_kind::Dot},
   {"("sv,  token_kind::LParen},
   {")"sv,  token_kind::RParen},
   {"["sv,  token_kind::LBracket},
@@ -230,21 +227,11 @@ restart_get:
       data = "=>";
       ch = linebuf[col++];
     }
-    else
-    {
-      kind = token_kind::Equal;
-      data = "=";
-    }
   } break;
   case '#':
   {
     kind = token_kind::Hash;
     data = "#";
-  } break;
-  case '|':
-  {
-    kind = token_kind::Pipe;
-    data = "|";
   } break;
   case '*':
   {
@@ -297,18 +284,17 @@ restart_get:
   } break;
   case ':':
   {
-    kind = token_kind::Colon;
-    data = ":";
+    if(col < linebuf.size() && linebuf[col] == '=')
+    {
+      kind = token_kind::ColonEqual;
+      data = ":=";
+      ch = linebuf[col++];
+    }
   } break;
   case '\\':
   {
     kind = token_kind::Backslash;
     data = "\\";
-  } break;
-  case '.':
-  {
-    kind = token_kind::Dot;
-    data = ".";
   } break;
   case '(':
   {
