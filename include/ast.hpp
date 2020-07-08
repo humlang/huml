@@ -111,12 +111,19 @@ struct lambda : ast_base
   lambda(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs)
   {  }
 
+  lambda(ast_ptr lhs, ast_ptr rhs, symbol external_name) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs)
+  {  }
+
+  std::pair<std::vector<ast_ptr>, ast_ptr> uncurry() const;
+
   ir::Node::cRef cogen(ir::builder&) override;
   ir::Node::cRef cogen_lval(ir::builder&) override
   { assert(false && "no cogen"); }
 
   ast_ptr lhs;
   ast_ptr rhs;
+
+  symbol name { "" };
 };
 
 struct match : ast_base

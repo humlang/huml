@@ -31,22 +31,21 @@ ir::Node::cRef type::cogen(ir::builder& mach)
 ir::Node::cRef lambda::cogen(ir::builder& mach)
 {
   // 0. collect all curried params
-  ast_base* l = this;
-  std::vector<ir::Node::cRef> args;
-  while(l->kind == ASTNodeKind::lambda)
-  {
-    args.emplace_back(static_cast<lambda*>(l)->lhs->cogen(mach));
-
-    l = static_cast<lambda*>(l)->rhs.get();
-  }
+  auto uncurried = uncurry();
   // 1. generate params and body
-  auto bdy = l->cogen(mach);
+  std::vector<ir::Node::cRef> args;
+  for(auto& x : uncurried.first)
+    args.emplace_back(x->cogen(mach));
+  auto bdy = uncurried.second->cogen(mach);
 
   // 2. Add return continuation, arg type is our return type, new return type is ⊥
-  auto ret = mach.fn({ l->type->cogen(mach) }, mach.bot());
+  auto ret = mach.fn({ uncurried.second->type->cogen(mach) }, mach.bot());
   args.emplace_back(ret);
 
-  return mach.app(bdy, args);
+  auto lm = mach.fn(args, bdy);
+  lm->make_external(name);
+
+  return lm;
 }
 
 ir::Node::cRef app::cogen(ir::builder& mach)
@@ -109,7 +108,7 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(node);
       print(os, as->lhs);
-      os << " = ";
+      os << " := ";
       print(os, as->rhs);
       os << ";";
     } break;
@@ -149,20 +148,39 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
   case ASTNodeKind::lambda:      {
       lambda::ptr lam = std::static_pointer_cast<lambda>(node);
 
-      if(lam->lhs->annot != nullptr && !hx_ast::used(lam->lhs, lam->rhs))
+      if(lam->name != "")
       {
-        os << "(";
-        print(os, lam->lhs->annot);
-        os << " -> ";
-        print(os, lam->rhs);
-        os << ")";
+        os << lam->name.get_string() << " ";
+
+        auto uncurried = lam->uncurry();
+        for(auto& a : uncurried.first)
+        {
+          os << "(";
+          print(os, a);
+          os << " : ";
+          print(os, a->annot);
+          os << ") ";
+        }
+        os << ":= ";
+        print(os, uncurried.second);
       }
       else
       {
-        os << "\\";
-        print(os, lam->lhs);
-        os << ". ";
-        print(os, lam->rhs);
+        if(lam->lhs->annot != nullptr && !hx_ast::used(lam->lhs, lam->rhs))
+        {
+          os << "(";
+          print(os, lam->lhs->annot);
+          os << " -> ";
+          print(os, lam->rhs);
+          os << ")";
+        }
+        else
+        {
+          os << "\\";
+          print(os, lam->lhs);
+          os << ". ";
+          print(os, lam->rhs);
+        }
       }
     } break;
   case ASTNodeKind::app:         {
@@ -202,6 +220,20 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
   }
 }
 
+std::pair<std::vector<ast_ptr>, ast_ptr> lambda::uncurry() const
+{
+  std::vector<ast_ptr> args;
+  args.emplace_back(lhs);
+
+  ast_ptr lam = rhs;
+  while(lam->kind == ASTNodeKind::lambda)
+  {
+    args.emplace_back(std::static_pointer_cast<lambda>(lam)->lhs);
+    lam = std::static_pointer_cast<lambda>(lam)->rhs;
+  }
+  return { args, lam };
+}
+
 void hx_ast::print(std::ostream& os) const
 {
   for(auto& root : data)
@@ -223,8 +255,6 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(in);
 
-      auto itp = binders.insert(std::static_pointer_cast<identifier>(as->lhs));
-      assert(itp.second && "Binder already inserted before.");
       if(used(what, as->rhs, binders, ign_type))
         ret = true;
     } break;
@@ -365,11 +395,11 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   case ASTNodeKind::Prop: os << "Prop"; break;
   case ASTNodeKind::unit: os << "()"; break;
 
-  case ASTNodeKind::assign:
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
   case ASTNodeKind::expr_stmt:
   case ASTNodeKind::directive:
+  case ASTNodeKind::assign:
                           assert(false && "Statements are no types."); break;
 
   case ASTNodeKind::identifier:  {
@@ -379,6 +409,7 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   case ASTNodeKind::lambda:      {
       lambda::ptr lam = std::static_pointer_cast<lambda>(node);
 
+      assert(lam->name != symbol("") && "must not be external");
       if(lam->lhs->type != nullptr && !hx_ast::used(lam->lhs, lam->rhs))
       {
         os << "(";

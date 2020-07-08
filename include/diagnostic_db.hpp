@@ -41,6 +41,7 @@ db_entry_arg(error, not_a_prefix, "Token \"{}\" is not a prefix.");
 db_entry_arg(error, not_a_sort, "Token \"{}\" is not a sort.");
 db_entry_arg(error, leading_zeros, "Leading zeros for literal number \"{}\".");
 db_entry_arg(error, no_number, "\"{}\" is not a number.");
+db_entry_arg(error, function_expects_colon_eq, "Function expects \":=\", instead got \"{}\".");
 db_entry_arg(error, expected_keyword_Prop, "Keyword \"Prop\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_Kind, "Keyword \"Kind\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_Type, "Keyword \"Type\" expected, instead got \"{}\".");

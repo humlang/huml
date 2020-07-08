@@ -234,7 +234,8 @@ ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& clo
     return ex;
   } break;
 
-  case ASTNodeKind::assign:
+  case ASTNodeKind::assign: assert(false && "unimplemented"); return nullptr;
+
   case ASTNodeKind::directive:
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
@@ -457,7 +458,8 @@ ast_ptr typing_context::subst(ast_ptr what)
       return ex;
     } break;
 
-  case ASTNodeKind::assign:
+  case ASTNodeKind::assign: assert(false && "unimplemented"); return nullptr;
+
   case ASTNodeKind::directive:
   case ASTNodeKind::expr_stmt:
   case ASTNodeKind::assign_data:

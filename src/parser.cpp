@@ -220,6 +220,52 @@ ast_ptr hx_reader::parse_lambda()
   return std::make_shared<lambda>(param, expr);
 }
 
+// s := id (a : type)...(z : type) := e ;
+ast_ptr hx_reader::parse_function()
+{
+  auto id = parse_identifier();
+  auto fn_name = old.data;
+
+  bool error = id == error_ref;
+
+  std::vector<ast_ptr> params;
+  if(!expect('(', diagnostic_db::parser::type_expects_lparen))
+    error = true;
+  do {
+    parsing_pattern = true;
+    auto name = parse_identifier();
+    parsing_pattern = false;
+    auto oldname = old.data;
+
+    if(!expect(':', diagnostic_db::parser::lambda_param_type_decl_expects_colon))
+      error = true;
+
+    auto typ = parse_expression();
+
+    name->annot = typ;
+    params.emplace_back(name);
+
+    scoping_ctx.binder_stack.emplace_back(oldname, name);
+    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
+      error = true;
+  } while(accept('('));
+
+  if(!expect(token_kind::ColonEqual, diagnostic_db::parser::function_expects_colon_eq))
+    error = true;
+
+  auto expr = parse_expression();
+  for(auto& x : params)
+    scoping_ctx.binder_stack.pop_back();
+
+  if(error || expr == error_ref)
+    return mk_error();
+  lambda::ptr lam = std::make_shared<lambda>(params.back(), expr, fn_name);
+
+  for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
+    lam = std::make_shared<lambda>(*it, lam, fn_name);
+  return lam;
+}
+
 // e := Kind
 ast_ptr hx_reader::parse_Kind()
 {
@@ -364,6 +410,8 @@ ast_ptr hx_reader::parse_statement()
     to_ret = parse_data_ctor();
   else if(current.kind == token_kind::Hash)
     to_ret = parse_directive();
+  else if(current.kind == token_kind::Identifier && next_toks[0].kind == token_kind::LParen)
+    to_ret = parse_function();
   else
     to_ret = parse_expr_stmt();
   fixits_stack.pop_back();
