@@ -2,10 +2,58 @@
 #include <type_checking.hpp>
 #include "exist.hpp" //<- stored under src/
 
-#include <iterator>
+#include <backend/builder.hpp>
 
+#include <iterator>
 #include <iostream>
 #include <queue>
+
+
+ir::Node::cRef identifier::cogen(ir::builder& mach)
+{
+  assert(irn != ir::Node::no_ref && "free variables can't be lowered");
+
+  return irn;
+}
+
+ir::Node::cRef unit::cogen(ir::builder& mach)
+{ return mach.unit(); }
+
+ir::Node::cRef prop::cogen(ir::builder& mach)
+{ return mach.prop(); }
+
+ir::Node::cRef kind::cogen(ir::builder& mach)
+{ return mach.kind(); }
+
+ir::Node::cRef type::cogen(ir::builder& mach)
+{ return mach.type(); }
+
+ir::Node::cRef lambda::cogen(ir::builder& mach)
+{ assert(false && "Unimplemented"); }
+
+ir::Node::cRef app::cogen(ir::builder& mach)
+{ assert(false && "Unimplemented"); }
+
+ir::Node::cRef pattern_matcher::cogen(ir::builder& mach)
+{
+  std::vector<std::pair<ir::Node::cRef, ir::Node::cRef>> arms;
+  for(auto& d : data)
+  {
+    assert(d->kind == ASTNodeKind::match && "match arm must be a match");
+
+    match& m = static_cast<match&>(*d);
+
+    arms.emplace_back(m.pat->cogen(mach), m.exp->cogen(mach));
+  }
+
+  return mach.destruct(to_match->cogen(mach), std::move(arms));
+}
+
+ir::Node::cRef assign::cogen(ir::builder& mach)
+{ assert(false && "Unimplemented"); }
+
+ir::Node::cRef expr_stmt::cogen(ir::builder& mach)
+{ return lhs->cogen(mach); }
 
 void hx_ast::print(std::ostream& os, ast_ptr node)
 {

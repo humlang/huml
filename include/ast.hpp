@@ -4,9 +4,14 @@
 #include <ast_nodes.hpp>
 #include <memory>
 
+#include <backend/node.hpp>
+
 struct ast_base
 {
   ast_base(ASTNodeKind kind) : kind(kind) {}
+
+  virtual ir::Node::cRef cogen(ir::builder&) = 0;
+  virtual ir::Node::cRef cogen_lval(ir::builder&) = 0;
 
   ASTNodeKind kind;
 
@@ -23,6 +28,11 @@ struct directive : ast_base
     : ast_base(ASTNodeKind::directive), implicit_typing(typing)
   {  }
 
+  ir::Node::cRef cogen(ir::builder&) override
+  { assert(false && "no cogen"); }
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+
   bool implicit_typing;
 };
 
@@ -34,20 +44,50 @@ struct identifier : ast_base
     : ast_base(ASTNodeKind::identifier), symb(symb)
   {  }
 
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+
   symbol symb;
+
+  ir::Node::cRef irn;
 };
 
 struct unit : ast_base
-{ using ptr = std::shared_ptr<unit>; unit() : ast_base(ASTNodeKind::unit) {} };
+{
+  using ptr = std::shared_ptr<unit>; unit() : ast_base(ASTNodeKind::unit) {}
+
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+};
 
 struct prop : ast_base
-{ using ptr = std::shared_ptr<prop>; prop() : ast_base(ASTNodeKind::Prop) {} };
+{
+  using ptr = std::shared_ptr<prop>; prop() : ast_base(ASTNodeKind::Prop) {}
+
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+};
 
 struct type : ast_base
-{ using ptr = std::shared_ptr<type>; type() : ast_base(ASTNodeKind::Type) {} };
+{
+  using ptr = std::shared_ptr<type>; type() : ast_base(ASTNodeKind::Type) {}
+
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+};
 
 struct kind : ast_base
-{ using ptr = std::shared_ptr<kind>; kind() : ast_base(ASTNodeKind::Kind) {} };
+{
+  using ptr = std::shared_ptr<kind>; kind() : ast_base(ASTNodeKind::Kind) {}
+
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+};
 
 struct app : ast_base
 {
@@ -55,6 +95,10 @@ struct app : ast_base
 
   app(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::app), lhs(lhs), rhs(rhs)
   {  }
+
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
 
   ast_ptr lhs;
   ast_ptr rhs;
@@ -67,6 +111,10 @@ struct lambda : ast_base
   lambda(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs)
   {  }
 
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+
   ast_ptr lhs;
   ast_ptr rhs;
 };
@@ -77,6 +125,11 @@ struct match : ast_base
 
   match(ast_ptr pat, ast_ptr exp) : ast_base(ASTNodeKind::match), pat(pat), exp(exp)
   {  }
+
+  ir::Node::cRef cogen(ir::builder&) override
+  { assert(false && "no cogen"); }
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
 
   ast_ptr pat;
   ast_ptr exp;
@@ -90,6 +143,10 @@ struct pattern_matcher : ast_base
     : ast_base(ASTNodeKind::pattern_matcher), to_match(to_match), data(patterns)
   {  }
 
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+
   ast_ptr to_match;
   std::vector<ast_ptr> data;
 };
@@ -100,6 +157,10 @@ struct assign : ast_base
 
   assign(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::assign), lhs(lhs), rhs(rhs)
   {  }
+
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
 
   ast_ptr lhs;
   ast_ptr rhs;
@@ -112,6 +173,11 @@ struct assign_type : ast_base
   assign_type(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::assign_type), lhs(lhs), rhs(rhs)
   {  }
 
+  ir::Node::cRef cogen(ir::builder&) override
+  { assert(false && "no cogen"); }
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+
   ast_ptr lhs;
   ast_ptr rhs;
 };
@@ -123,6 +189,11 @@ struct assign_data : ast_base
   assign_data(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::assign_data), lhs(lhs), rhs(rhs)
   {  }
 
+  ir::Node::cRef cogen(ir::builder&) override
+  { assert(false && "no cogen"); }
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
+
   ast_ptr lhs;
   ast_ptr rhs;
 };
@@ -133,6 +204,10 @@ struct expr_stmt : ast_base
 
   expr_stmt(ast_ptr lhs) : ast_base(ASTNodeKind::expr_stmt), lhs(lhs)
   {  }
+
+  ir::Node::cRef cogen(ir::builder&) override;
+  ir::Node::cRef cogen_lval(ir::builder&) override
+  { assert(false && "no cogen"); }
 
   ast_ptr lhs;
 };
