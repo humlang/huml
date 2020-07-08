@@ -29,10 +29,38 @@ ir::Node::cRef type::cogen(ir::builder& mach)
 { return mach.type(); }
 
 ir::Node::cRef lambda::cogen(ir::builder& mach)
-{ assert(false && "Unimplemented"); }
+{
+  // 0. collect all curried params
+  ast_base* l = this;
+  std::vector<ir::Node::cRef> args;
+  while(l->kind == ASTNodeKind::lambda)
+  {
+    args.emplace_back(static_cast<lambda*>(l)->lhs->cogen(mach));
+
+    l = static_cast<lambda*>(l)->rhs.get();
+  }
+  // 1. generate params and body
+  auto bdy = l->cogen(mach);
+
+  // 2. Add return continuation, arg type is our return type, new return type is ⊥
+  auto ret = mach.fn({ l->type->cogen(mach) }, mach.bot());
+  args.emplace_back(ret);
+
+  return mach.app(bdy, args);
+}
 
 ir::Node::cRef app::cogen(ir::builder& mach)
-{ assert(false && "Unimplemented"); }
+{
+  ast_base* a = this;
+  std::vector<ir::Node::cRef> args;
+  while(a->kind == ASTNodeKind::app)
+  {
+    args.emplace_back(static_cast<app*>(a)->rhs->cogen(mach));
+
+    a = static_cast<app*>(a)->lhs.get();
+  }
+  return mach.app(a->cogen(mach), args);
+}
 
 ir::Node::cRef pattern_matcher::cogen(ir::builder& mach)
 {
