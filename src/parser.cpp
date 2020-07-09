@@ -232,24 +232,47 @@ ast_ptr hx_reader::parse_function()
   if(!expect('(', diagnostic_db::parser::type_expects_lparen))
     error = true;
   do {
-    parsing_pattern = true;
-    auto name = parse_identifier();
-    parsing_pattern = false;
-    auto oldname = old.data;
+    std::vector<std::pair<ast_ptr, symbol>> ids_of_same_type;
+    ids_of_same_type.reserve(32);
 
+    {
+    parsing_pattern = true;
+    auto id = parse_identifier();
+    parsing_pattern = false;
+    ids_of_same_type.emplace_back(id, old.data);
+    while(current.kind == token_kind::Identifier)
+    {
+      parsing_pattern = true;
+      id = parse_identifier();
+      parsing_pattern = false;
+      ids_of_same_type.emplace_back(id, old.data);
+    }
+    }
     if(!expect(':', diagnostic_db::parser::lambda_param_type_decl_expects_colon))
       error = true;
 
     auto typ = parse_expression();
 
-    name->annot = typ;
-    params.emplace_back(name);
+    for(auto& p : ids_of_same_type)
+    {
+      p.first->type = typ;
+      params.push_back(p.first);
 
-    scoping_ctx.binder_stack.emplace_back(oldname, name);
+      scoping_ctx.binder_stack.emplace_back(p.second, p.first);
+    }
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       error = true;
   } while(accept('('));
 
+  // check if the return type is annotated
+  ast_ptr return_type = nullptr;
+  if(accept(token_kind::Arrow))
+  {
+    return_type = parse_expression();
+
+    if(return_type == error_ref)
+      error = true;
+  }
   if(!expect(token_kind::ColonEqual, diagnostic_db::parser::function_expects_colon_eq))
     error = true;
 
@@ -260,6 +283,7 @@ ast_ptr hx_reader::parse_function()
   if(error || expr == error_ref)
     return mk_error();
   lambda::ptr lam = std::make_shared<lambda>(params.back(), expr, fn_name);
+  // TODO: set type of function
 
   for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
     lam = std::make_shared<lambda>(*it, lam, fn_name);
@@ -303,7 +327,7 @@ ast_ptr hx_reader::parse_data_ctor()
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  if(!expect(':', diagnostic_db::parser::type_assign_expects_equal) || type_name == error_ref)
+  if(!expect(':', diagnostic_db::parser::type_assign_expects_colon) || type_name == error_ref)
     error = true;
 
   scoping_ctx.disallow_recursion = type_name;
@@ -335,7 +359,7 @@ ast_ptr hx_reader::parse_type_ctor()
   scoping_ctx.is_binding = false;
   auto type_name_id = old.data;
 
-  if(!expect(':', diagnostic_db::parser::type_assign_expects_equal) || type_name == error_ref)
+  if(!expect(':', diagnostic_db::parser::type_assign_expects_colon) || type_name == error_ref)
     error = true;
 
   scoping_ctx.disallow_recursion = type_name;
@@ -485,13 +509,21 @@ ast_ptr hx_reader::parse_with_parentheses()
 
   if(current.kind == token_kind::Identifier && next_toks[0].kind == token_kind::Colon)
   {
+    std::vector<std::pair<ast_ptr, symbol>> ids_of_same_type;
+    ids_of_same_type.reserve(32);
+
     // type checking or lambda
+    {
+    parsing_pattern = true;
     auto id = parse_identifier();
-
-    if(id == error_ref)
-      error = true;
-    auto psymb = old.data;
-
+    parsing_pattern = false;
+    ids_of_same_type.emplace_back(id, old.data);
+    while(current.kind == token_kind::Identifier)
+    {
+      id = parse_identifier();
+      ids_of_same_type.emplace_back(id, old.data);
+    }
+    }
     if(!expect(':', diagnostic_db::parser::type_ctor_param_expects_colon))
       error = true;
     auto typ = parse_expression();
@@ -501,26 +533,32 @@ ast_ptr hx_reader::parse_with_parentheses()
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       return mk_error();
 
-    id->annot = typ;
+    for(auto& p : ids_of_same_type)
+      p.first->annot = typ;
 
     if(accept(token_kind::Arrow))
     {
       // lambda
-      scoping_ctx.binder_stack.emplace_back(psymb, id);
+      for(auto& p : ids_of_same_type)
+        scoping_ctx.binder_stack.emplace_back(p.second, p.first);
       auto body = parse_expression();
-      scoping_ctx.binder_stack.pop_back();
+      for(auto& p : ids_of_same_type)
+        scoping_ctx.binder_stack.pop_back();
 
       if(body == error_ref)
         error = true;
 
       if(error)
         return mk_error();
-      return std::make_shared<lambda>(id, body);
+      ast_ptr cur = std::make_shared<lambda>(ids_of_same_type.back().first, body);
+      for(auto it = ids_of_same_type.rbegin() + 1; it != ids_of_same_type.rend(); ++it)
+        cur = std::make_shared<lambda>(it->first, cur);
+      return cur;
     }
     // just an identifier with a type annotation
-    if(error)
+    if(error || ids_of_same_type.size() > 1) // TODO: emit useful diagnostic in the latter case
       return mk_error();
-    return id;
+    return ids_of_same_type.front().first;
   }
   else
   {
@@ -554,6 +592,22 @@ ast_ptr hx_reader::parse_prefix()
     case token_kind::LParen:
     {
       return parse_with_parentheses();
+    }
+
+    case token_kind::LiteralNumber:
+    {
+      consume();
+
+      return std::make_shared<number>(old.data);
+    }
+
+    case token_kind::Asterisk:
+    {
+      consume();
+      // Parse pointer thing, i.e. **i8
+      auto exp = parse_expression();
+
+      return std::make_shared<pointer>(exp);
     }
 
     case token_kind::Identifier:

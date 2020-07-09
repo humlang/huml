@@ -72,7 +72,7 @@ db_entry_arg(error, statement_expects_semicolon_at_end, "Statement expects semic
 db_entry_arg(error, closing_parenthesis_expected, "Closing paranthesis expected here, instead got \"{}\".");
 
 db_entry_arg(error, type_keyword_expected, "\"type\" keyword expected here.");
-db_entry_arg(error, type_assign_expects_equal, "Type-assign statment expects an equal here, instead got \"{}\".");
+db_entry_arg(error, type_assign_expects_colon, "Type-assign statment expects a colon here, instead got \"{}\".");
 db_entry_arg(error, type_expects_pipe, "Type declaration expects pipe to define multiple constructors, instead got \"{}\".");
 db_entry_arg(error, constructor_expected, "Constructor expected, instead got \"{}\".");
 db_entry(error, type_check_inside_type_check, "Type checking inside a type check is forbidden.");

@@ -30,6 +30,9 @@ bool eqb(ast_ptr A, ast_ptr B)
   case ASTNodeKind::unit:
     return true;
 
+  case ASTNodeKind::ptr:
+    return eqb(std::static_pointer_cast<pointer>(A)->of, std::static_pointer_cast<pointer>(B)->of);
+
   case ASTNodeKind::identifier: {
       // pointer to an identifier are equal if they have the same binding
       return A == B;
@@ -130,6 +133,14 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
     {
     default: to_ret = in; break;
 
+    case ASTNodeKind::ptr: {
+        pointer::ptr p = std::static_pointer_cast<pointer>(in);
+
+        auto x = subst(what, for_, p->of);
+
+        to_ret = std::make_shared<pointer>(x);
+      } break;
+
     case ASTNodeKind::app: {
         app::ptr a = std::static_pointer_cast<app>(in);
 
@@ -189,6 +200,8 @@ ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& clo
   case ASTNodeKind::Prop: ret = std::make_shared<prop>(); break;
   case ASTNodeKind::Type: ret = std::make_shared<type>(); break;
   case ASTNodeKind::unit: ret = std::make_shared<unit>(); break;
+  case ASTNodeKind::ptr: ret = std::make_shared<pointer>(clone_ast_part_graph(std::static_pointer_cast<pointer>(what)->of,
+                                                                              cloned_ids)); break;
 
   case ASTNodeKind::identifier: {
     identifier::ptr id = std::static_pointer_cast<identifier>(what);
@@ -301,6 +314,10 @@ bool has_existentials(ast_ptr a)
 
   case ASTNodeKind::exist: return true;
 
+  case ASTNodeKind::ptr: {
+    pointer::ptr p = std::static_pointer_cast<pointer>(a);
+    return has_existentials(p->of);
+  } break;
   case ASTNodeKind::app: {
     app::ptr aa = std::static_pointer_cast<app>(a);
     return has_existentials(aa->lhs) || has_existentials(aa->rhs);
@@ -410,6 +427,12 @@ ast_ptr typing_context::subst(ast_ptr what)
   case ASTNodeKind::unit:
   case ASTNodeKind::identifier:
     return what;
+
+  case ASTNodeKind::ptr: {
+      pointer::ptr p = std::static_pointer_cast<pointer>(what);
+
+      return std::make_shared<pointer>(subst(p->of));
+    } break;
 
   case ASTNodeKind::app: {
       app::ptr ap = std::static_pointer_cast<app>(what);
@@ -894,6 +917,10 @@ bool hx_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
   case ASTNodeKind::Prop: return B->kind == ASTNodeKind::Prop;
   // <:-Id
   case ASTNodeKind::identifier: return eqb(A, B);
+  // <:-Ptr
+  case ASTNodeKind::ptr: return B->kind == ASTNodeKind::ptr
+                         && eqb(std::static_pointer_cast<pointer>(A)->of,
+                                std::static_pointer_cast<pointer>(B)->of);
   // <:-App
   case ASTNodeKind::app: {
       if(B->kind != ASTNodeKind::app)
@@ -1140,6 +1167,10 @@ bool hx_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
   case ASTNodeKind::Type:
   case ASTNodeKind::unit:
     return (A->annot ? is_wellformed(ctx, A->annot) : true);
+
+  case ASTNodeKind::ptr:
+    return (A->annot ? is_wellformed(ctx, A->annot) : true)
+      && is_wellformed(ctx, std::static_pointer_cast<pointer>(A)->of);
 
   case ASTNodeKind::exist:
     return ctx.lookup_ex(A) != ctx.data.end();

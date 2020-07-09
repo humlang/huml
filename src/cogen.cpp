@@ -16,6 +16,12 @@ struct CoGen
     return id->irn;
   }
 
+  ir::Node::cRef cogen(number::ptr n)
+  { return mach.lit(std::stoull(n->symb.get_string())); }
+
+  ir::Node::cRef cogen(pointer::ptr p)
+  { return mach.ptr(dispatch(p->of)); }
+
   ir::Node::cRef cogen(unit::ptr u)
   { return mach.unit(); }
 
@@ -31,7 +37,6 @@ struct CoGen
   ir::Node::cRef cogen(lambda::ptr l)
   {
     // TODO: what about recursion
-    // TODO: what about main? we need a call to entry_ret to cerate the special entry-point continuation
 
     // 0. collect all curried params
     auto uncurried = l->uncurry();
@@ -42,7 +47,7 @@ struct CoGen
     auto bdy = dispatch(uncurried.second);
 
     // 2. Add return continuation, arg type is our return type, new return type is ⊥
-    auto ret = mach.fn({ dispatch(uncurried.second->type) }, mach.bot());
+    auto ret = (l->name == symbol("main") ? mach.entry_ret() : mach.fn({ dispatch(uncurried.second->type) }, mach.bot()));
     args.emplace_back(ret);
 
     auto lm = mach.fn(args, bdy);
@@ -99,29 +104,36 @@ struct CoGen
 
   ir::Node::cRef dispatch(ast_ptr node)
   {
+    if(auto it = seen_nodes.find(node); it != seen_nodes.end())
+      return it->second;
+    ir::Node::cRef to_ret = nullptr;
     switch(node->kind)
     {
-    case ASTNodeKind::Kind: return cogen(std::static_pointer_cast<kind>(node));
-    case ASTNodeKind::Prop: return cogen(std::static_pointer_cast<prop>(node));
-    case ASTNodeKind::Type: return cogen(std::static_pointer_cast<type>(node));
-    case ASTNodeKind::unit: return cogen(std::static_pointer_cast<unit>(node));
-    case ASTNodeKind::assign: return cogen(std::static_pointer_cast<assign>(node));
-    case ASTNodeKind::assign_data: return cogen(std::static_pointer_cast<assign_data>(node));
-    case ASTNodeKind::assign_type: return cogen(std::static_pointer_cast<assign_type>(node));
-    case ASTNodeKind::expr_stmt: return cogen(std::static_pointer_cast<expr_stmt>(node));
-    case ASTNodeKind::directive: return cogen(std::static_pointer_cast<directive>(node));
-    case ASTNodeKind::identifier: return cogen(std::static_pointer_cast<identifier>(node));
-    case ASTNodeKind::lambda: return cogen(std::static_pointer_cast<lambda>(node));
-    case ASTNodeKind::app: return cogen(std::static_pointer_cast<app>(node));
-    case ASTNodeKind::match: return cogen(std::static_pointer_cast<match>(node));
-    case ASTNodeKind::pattern_matcher: return cogen(std::static_pointer_cast<pattern_matcher>(node));
+    case ASTNodeKind::Kind: to_ret = cogen(std::static_pointer_cast<kind>(node));
+    case ASTNodeKind::Prop: to_ret = cogen(std::static_pointer_cast<prop>(node));
+    case ASTNodeKind::Type: to_ret = cogen(std::static_pointer_cast<type>(node));
+    case ASTNodeKind::unit: to_ret = cogen(std::static_pointer_cast<unit>(node));
+    case ASTNodeKind::number: to_ret = cogen(std::static_pointer_cast<number>(node));
+    case ASTNodeKind::ptr: to_ret = cogen(std::static_pointer_cast<pointer>(node));
+    case ASTNodeKind::assign: to_ret = cogen(std::static_pointer_cast<assign>(node));
+    case ASTNodeKind::assign_data: to_ret = cogen(std::static_pointer_cast<assign_data>(node));
+    case ASTNodeKind::assign_type: to_ret = cogen(std::static_pointer_cast<assign_type>(node));
+    case ASTNodeKind::expr_stmt: to_ret = cogen(std::static_pointer_cast<expr_stmt>(node));
+    case ASTNodeKind::directive: to_ret = cogen(std::static_pointer_cast<directive>(node));
+    case ASTNodeKind::identifier: to_ret = cogen(std::static_pointer_cast<identifier>(node));
+    case ASTNodeKind::lambda: to_ret = cogen(std::static_pointer_cast<lambda>(node));
+    case ASTNodeKind::app: to_ret = cogen(std::static_pointer_cast<app>(node));
+    case ASTNodeKind::match: to_ret = cogen(std::static_pointer_cast<match>(node));
+    case ASTNodeKind::pattern_matcher: to_ret = cogen(std::static_pointer_cast<pattern_matcher>(node));
     }
-    return cogen(node);
+    if(to_ret == nullptr)
+      return cogen(node);
+    return seen_nodes[node] = to_ret;
   }
 
 private:
   ir::builder& mach;
-  ir::NodeMap<lambda::ptr> seen_funcs;
+  tsl::robin_map<ast_ptr, ir::Node::cRef> seen_nodes;
 };
 
 

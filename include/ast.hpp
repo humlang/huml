@@ -41,6 +41,26 @@ struct identifier : ast_base
   ir::Node::cRef irn;
 };
 
+struct number : ast_base
+{
+  using ptr = std::shared_ptr<number>;
+
+  number(symbol symb)
+    : ast_base(ASTNodeKind::number), symb(symb)
+  {  }
+
+  symbol symb;
+};
+
+struct pointer : ast_base
+{
+  using ptr = std::shared_ptr<pointer>;
+  
+  pointer(ast_ptr of) : ast_base(ASTNodeKind::ptr), of(of) {}
+
+  ast_ptr of;
+};
+
 struct unit : ast_base
 {
   using ptr = std::shared_ptr<unit>; unit() : ast_base(ASTNodeKind::unit) {}

@@ -290,6 +290,11 @@ restart_get:
       data = ":=";
       ch = linebuf[col++];
     }
+    else
+    {
+      kind = token_kind::Colon;
+      data = ":";
+    }
   } break;
   case '\\':
   {

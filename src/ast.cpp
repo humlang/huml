@@ -36,6 +36,8 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
   case ASTNodeKind::Type: os << "Type"; break;
   case ASTNodeKind::Prop: os << "Prop"; break;
   case ASTNodeKind::unit: os << "()"; break;
+  case ASTNodeKind::number: os << std::static_pointer_cast<number>(node)->symb.get_string(); break;
+  case ASTNodeKind::ptr: os << "*"; print(os, std::static_pointer_cast<pointer>(node)->of); break;
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(node);
       print(os, as->lhs);
@@ -183,6 +185,12 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
   case ASTNodeKind::Type: ret = what->kind == ASTNodeKind::Type; break;
   case ASTNodeKind::Prop: ret = what->kind == ASTNodeKind::Prop; break;
   case ASTNodeKind::unit: ret = what->kind == ASTNodeKind::unit; break;
+  case ASTNodeKind::number: ret = what->kind == ASTNodeKind::number
+                            && std::static_pointer_cast<number>(in)->symb == std::static_pointer_cast<number>(what)->symb; break;
+  case ASTNodeKind::ptr: ret = what->kind == ASTNodeKind::ptr &&
+                                 used(std::static_pointer_cast<pointer>(what)->of,
+                                      std::static_pointer_cast<pointer>(in)->of,
+                                      binders, ign_type); break;
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(in);
 
@@ -339,6 +347,8 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   case ASTNodeKind::Type: os << "Type"; break;
   case ASTNodeKind::Prop: os << "Prop"; break;
   case ASTNodeKind::unit: os << "()"; break;
+  case ASTNodeKind::number: os << std::static_pointer_cast<number>(node)->symb.get_string(); break;
+  case ASTNodeKind::ptr: os << "*"; print(os, std::static_pointer_cast<pointer>(node)->of); break;
 
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
