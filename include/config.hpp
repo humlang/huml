@@ -14,6 +14,7 @@ enum class emit_classes
   tokens,
   ast_print,
   ast_typecheck,
+  cogen,
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM( emit_classes, {
@@ -23,6 +24,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM( emit_classes, {
   { emit_classes::tokens, "tokens" },
   { emit_classes::ast_print, "ast-print" },
   { emit_classes::ast_typecheck, "ast-typecheck" },
+  { emit_classes::cogen, "cogen" },
 })
 
 const static auto emit_classes_list = {
@@ -31,6 +33,7 @@ const static auto emit_classes_list = {
   emit_classes::tokens,
   emit_classes::ast_print,
   emit_classes::ast_typecheck,
+  emit_classes::cogen,
 };
 
 void print_emit_classes(std::FILE* f);
@@ -43,6 +46,7 @@ struct config_t
   std::size_t num_cores { 1 };
 
   std::vector<std::string_view> files;
+  std::string output_file { "a.out" };
 };
 
 inline config_t config;

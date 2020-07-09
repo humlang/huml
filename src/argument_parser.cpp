@@ -49,6 +49,9 @@ void parse(int argc, const char** argv, std::FILE* out)
         diagnostic <<= diagnostic_db::args::emit_not_present(source_range { "args", 0, 0, 0, 0 });
         return emit_classes::help;
       })
+    ("o,-output", "Output file to write to." , std::make_any<std::string>("a.out"), "a.out",
+     [](auto x)
+     { return x.front(); }) // TODO: check whether we can write to that file or not?
     ("j,-num-cores", "Number of cores to use for processing modules. \"*\" to determine automatically.", std::make_any<std::size_t>(1), "1",
       [](auto x)
       {
@@ -82,6 +85,7 @@ void parse(int argc, const char** argv, std::FILE* out)
     print_emit_classes(out);
     config.print_help = true;
   }
+  config.output_file = std::any_cast<std::string>(map["o"]);
 }
 
 namespace detail
