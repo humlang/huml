@@ -11,6 +11,11 @@ ir::builder::builder()
   unit();
 }
 
+ir::Node::cRef ir::builder::root(const std::vector<ir::Node::cRef>& nodes)
+{
+  return lookup_or_emplace(Node::mk_node<Root>(nodes));
+}
+
 ir::Node::cRef ir::builder::kind()
 {
   return lookup_or_emplace(Node::mk_node<Kind>())->set_type(

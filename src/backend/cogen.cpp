@@ -363,8 +363,7 @@ bool cogen(std::string name, const Node* ref)
   gen.cogen(ref);
 
 //  gen.ctx.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
-
-  gen.ctx.compile_to_file(GCC_JIT_OUTPUT_KIND_EXECUTABLE, (name + ".out").c_str());
+  gen.ctx.compile_to_file(GCC_JIT_OUTPUT_KIND_EXECUTABLE, name.c_str());
   return true;
 }
 

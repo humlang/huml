@@ -13,16 +13,20 @@ private:
     : b(b)
   {  }
 public:
-  static bool run(ir::builder& b, ir::Node::cRef ref)
+  static bool run(builder& b, Node::cRef ref)
   {
     SupervisingCompiler sc(b);
     return sc.run(ref);
   }
 private:
-  bool run(ir::Node::cRef ref)
+  bool run(Node::cRef ref)
   {
     if(ref->kind() == NodeKind::Fn)
       worklist.emplace(ref->to<Fn>());
+    if(ref->kind() == NodeKind::Root)
+      for(std::size_t i = 0, e = ref->to<Root>()->argc(); i < e; ++i)
+        if(ref->me()[i]->kind() == NodeKind::Fn)
+          worklist.emplace(ref->me()[i]->to<Fn>());
     while(!worklist.empty())
     {
       auto hd_ref = worklist.front();

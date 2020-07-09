@@ -13,6 +13,8 @@ struct builder
 
   builder();
 
+  Node::cRef root(const std::vector<Node::cRef>& nodes);
+
   Node::cRef kind(); 
   Node::cRef type();
   Node::cRef prop();  

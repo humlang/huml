@@ -1,86 +1,17 @@
 #include <ast.hpp>
-#include <type_checking.hpp>
 #include "exist.hpp" //<- stored under src/
 
+#include <type_checking.hpp>
+#include <cogen.hpp>
+
 #include <backend/builder.hpp>
+#include <backend/cogen.hpp>
+#include <backend/sc.hpp>
 
 #include <iterator>
 #include <iostream>
 #include <queue>
 
-
-ir::Node::cRef identifier::cogen(ir::builder& mach)
-{
-  assert(irn != ir::Node::no_ref && "free variables can't be lowered");
-
-  return irn;
-}
-
-ir::Node::cRef unit::cogen(ir::builder& mach)
-{ return mach.unit(); }
-
-ir::Node::cRef prop::cogen(ir::builder& mach)
-{ return mach.prop(); }
-
-ir::Node::cRef kind::cogen(ir::builder& mach)
-{ return mach.kind(); }
-
-ir::Node::cRef type::cogen(ir::builder& mach)
-{ return mach.type(); }
-
-ir::Node::cRef lambda::cogen(ir::builder& mach)
-{
-  // 0. collect all curried params
-  auto uncurried = uncurry();
-  // 1. generate params and body
-  std::vector<ir::Node::cRef> args;
-  for(auto& x : uncurried.first)
-    args.emplace_back(x->cogen(mach));
-  auto bdy = uncurried.second->cogen(mach);
-
-  // 2. Add return continuation, arg type is our return type, new return type is ⊥
-  auto ret = mach.fn({ uncurried.second->type->cogen(mach) }, mach.bot());
-  args.emplace_back(ret);
-
-  auto lm = mach.fn(args, bdy);
-  lm->make_external(name);
-
-  return lm;
-}
-
-ir::Node::cRef app::cogen(ir::builder& mach)
-{
-  ast_base* a = this;
-  std::vector<ir::Node::cRef> args;
-  while(a->kind == ASTNodeKind::app)
-  {
-    args.emplace_back(static_cast<app*>(a)->rhs->cogen(mach));
-
-    a = static_cast<app*>(a)->lhs.get();
-  }
-  return mach.app(a->cogen(mach), args);
-}
-
-ir::Node::cRef pattern_matcher::cogen(ir::builder& mach)
-{
-  std::vector<std::pair<ir::Node::cRef, ir::Node::cRef>> arms;
-  for(auto& d : data)
-  {
-    assert(d->kind == ASTNodeKind::match && "match arm must be a match");
-
-    match& m = static_cast<match&>(*d);
-
-    arms.emplace_back(m.pat->cogen(mach), m.exp->cogen(mach));
-  }
-
-  return mach.destruct(to_match->cogen(mach), std::move(arms));
-}
-
-ir::Node::cRef assign::cogen(ir::builder& mach)
-{ assert(false && "Unimplemented"); }
-
-ir::Node::cRef expr_stmt::cogen(ir::builder& mach)
-{ return lhs->cogen(mach); }
 
 void hx_ast::print(std::ostream& os, ast_ptr node)
 {
@@ -371,6 +302,20 @@ bool hx_ast::type_checks() const
   return type_checks;
 }
 
+void hx_ast::cogen(std::string output_file) const
+{
+  ir::builder mach;
+
+  std::vector<ir::Node::cRef> nodes;
+  for(auto& x : data)
+    nodes.emplace_back(::cogen(mach, x));
+
+  auto entry = mach.root(nodes);
+
+  ir::supercompile(mach, entry);
+  ir::cogen(output_file, entry);
+}
+
 void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
 {
   if(node == nullptr)
@@ -462,3 +407,4 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
     os << "))";
   }
 }
+

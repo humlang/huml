@@ -150,7 +150,6 @@ ir::Node::cRef ir::Case::clone(ir::builder& b, NodeMap<Node::cRef>& old_to_new) 
 {
   // TODO: if case patterns are binding we need to replace the old with the new bindings
   
-
   auto arms = match_arms();
   for(auto& arm : arms)
     arm = std::make_pair(arm.first->clone(b, old_to_new), arm.second->clone(b, old_to_new));

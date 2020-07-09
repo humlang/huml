@@ -10,6 +10,7 @@ set(hx-lang_files src/token.cpp
   src/parser.cpp
   src/tokenizer.cpp
   src/ast.cpp
+  src/cogen.cpp
   src/repl.cpp
   src/symbol.cpp
   src/source_range.cpp
@@ -31,6 +32,7 @@ set(hx-lang_vm_files src/vm.cpp
   src/repl.cpp
   src/parser.cpp
   src/tokenizer.cpp
+  src/cogen.cpp
   src/ast.cpp
   src/assembler.cpp
   src/program.cpp

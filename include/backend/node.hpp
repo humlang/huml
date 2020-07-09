@@ -12,6 +12,8 @@ namespace ir
 
 enum class NodeKind
 {
+  Root, // <- shall contain a list of ir nodes
+
   Fn,
   Param,
   App,
@@ -86,10 +88,23 @@ protected:
   std::uint_fast64_t gid_;
 };
 
+struct Root : Node
+{
+  using Ref = Root*;
+  using cRef = const Root*;
+
+  Root(std::vector<Node::cRef> nodes)
+    : Node(NodeKind::Root, nodes)
+  {  }
+
+  Node::cRef clone(builder& b, NodeMap<Node::cRef>& old_to_new) const override
+  { assert(false && "must not clone root node"); return nullptr; }
+};
+
 struct Param : Node
 {
   using Ref = Param*;
-  using cRef = Param*;
+  using cRef = const Param*;
 
   Param(Node::cRef type)
     : Node(NodeKind::Param, {})
