@@ -48,20 +48,8 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
 
-      global_ir.print(std::cout);
-    } },
-  { emit_classes::ast_typecheck, [](std::string_view t)
-    {
-      auto w = hx_reader::read<hx_ast>(t);
-
-      if(w.empty())
-        return; // <- diagnostic will contain an error
-      auto& global_ir = w.back();
-
-      if(!global_ir.type_checks())
-        std::cout << "~~~> Does not typecheck. <~~~\n";
-      else
-        std::cout << "~~~> Does typecheck. <~~~\n";
+      if(global_ir.type_checks())
+        global_ir.print(std::cout);
     } },
   { emit_classes::cogen, [](std::string_view t)
     {
@@ -73,8 +61,8 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
 
       if(!global_ir.type_checks())
         diagnostic <<= mk_diag::error(source_range{}, 1967, "Program does not typecheck.");
-
-      global_ir.cogen(config.output_file);
+      else
+        global_ir.cogen(config.output_file);
     } },
   { emit_classes::tokens, [](std::string_view t)
     {

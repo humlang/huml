@@ -99,7 +99,7 @@ struct lambda : ast_base
   lambda(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs)
   {  }
 
-  lambda(ast_ptr lhs, ast_ptr rhs, symbol external_name) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs)
+  lambda(ast_ptr lhs, ast_ptr rhs, symbol external_name) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs), name(external_name)
   {  }
 
   std::pair<std::vector<ast_ptr>, ast_ptr> uncurry() const;
@@ -178,6 +178,8 @@ struct expr_stmt : ast_base
 
 struct hx_ast
 {
+  hx_ast();
+
   void print(std::ostream& os) const;
   static void print(std::ostream& os, ast_ptr node);
   static void print_as_type(std::ostream& os, ast_ptr node);

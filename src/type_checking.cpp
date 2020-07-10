@@ -686,6 +686,23 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       return what->type = it->type;
     } break;
 
+  // S-Num
+  case ASTNodeKind::number: {
+      auto it = std::find_if(ctx.data.begin(), ctx.data.end(), [](auto& a)
+                             { return a.type && a.type->kind == ASTNodeKind::identifier
+                                  && std::static_pointer_cast<number>(a.type)->symb == symbol("Nat"); });
+      if(it == ctx.data.end())
+      {
+        std::stringstream a;
+        hx_ast::print(a, what);
+
+        // TODO: be more expressive
+        diagnostic <<= diagnostic_db::sema::id_not_in_context(source_range { }, a.str());
+        return nullptr;
+      }
+      return what->type = it->type;
+    } break;
+
   // S-App
   case ASTNodeKind::app: {
       app::ptr aa = std::static_pointer_cast<app>(what);
@@ -1166,6 +1183,7 @@ bool hx_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
   case ASTNodeKind::Prop:
   case ASTNodeKind::Type:
   case ASTNodeKind::unit:
+  case ASTNodeKind::number:
     return (A->annot ? is_wellformed(ctx, A->annot) : true);
 
   case ASTNodeKind::ptr:

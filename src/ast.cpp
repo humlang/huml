@@ -12,6 +12,9 @@
 #include <iostream>
 #include <queue>
 
+hx_ast::hx_ast()
+{
+}
 
 void hx_ast::print(std::ostream& os, ast_ptr node)
 {

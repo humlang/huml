@@ -255,7 +255,7 @@ ast_ptr hx_reader::parse_function()
 
     for(auto& p : ids_of_same_type)
     {
-      p.first->type = typ;
+      p.first->annot = typ;
       params.push_back(p.first);
 
       scoping_ctx.binder_stack.emplace_back(p.second, p.first);
