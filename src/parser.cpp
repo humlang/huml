@@ -280,7 +280,11 @@ ast_ptr hx_reader::parse_function()
   for(auto& x : params)
     scoping_ctx.binder_stack.pop_back();
 
-  if(error || expr == error_ref)
+
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || expr == error_ref)
+    error = true;
+
+  if(error)
     return mk_error();
   lambda::ptr lam = std::make_shared<lambda>(params.back(), expr, fn_name);
   // TODO: set type of function

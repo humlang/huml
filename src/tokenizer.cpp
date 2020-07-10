@@ -51,6 +51,7 @@ auto operator_symbols_map = tsl::robin_map<std::string_view, token_kind>({
   {"\\"sv, token_kind::Backslash},
   {":="sv, token_kind::ColonEqual},
   {";"sv, token_kind::Semi},
+  {"|"sv, token_kind::Pipe},
   {"{"sv, token_kind::LBrace},
   {"}"sv, token_kind::RBrace},
   {"+"sv, token_kind::Plus},
@@ -232,6 +233,11 @@ restart_get:
   {
     kind = token_kind::Hash;
     data = "#";
+  } break;
+  case '|':
+  {
+    kind = token_kind::Pipe;
+    data = "|";
   } break;
   case '*':
   {

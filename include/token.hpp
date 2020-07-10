@@ -38,6 +38,7 @@ enum class token_kind : std::int8_t
     Colon = ':',
     LBrace = '{',
     RBrace = '}',
+    Pipe = '|',
     Plus = '+',
     Minus = '-',
     Asterisk = '*',

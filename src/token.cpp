@@ -16,6 +16,7 @@ std::string_view kind_to_str(token_kind kind)
   case token_kind::Backslash: return "Backslash";
   case token_kind::Semi: return "Semicolon";
   case token_kind::Colon: return "Colon";
+  case token_kind::Pipe: return "Pipe";
   case token_kind::LBrace: return "LBrace";
   case token_kind::RBrace: return "RBrace";
   case token_kind::Plus: return "Plus";

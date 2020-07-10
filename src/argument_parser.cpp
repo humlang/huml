@@ -31,9 +31,10 @@ void parse(int argc, const char** argv, std::FILE* out)
 {
   detail::CmdOptions options("h-lang", "The compiler for the h-language.");
   options.add_options()
-    ("h,?,-help", "Prints this text.", std::make_any<bool>(false), "false", [](auto x){ return std::make_any<bool>(true); })
+    ("h,?,-help", "Prints this text.", std::make_any<bool>(false), "false",
+     [](auto x){ return std::make_any<bool>(true); })
     (",f,-files", "Accepts arbitrary list of files.", std::make_any<std::vector<std::string_view>>(), "STDIN",
-      [out](auto x){ std::vector<std::string_view> w; for(auto v : x) w.push_back(v); return w; })
+      [](auto x){ std::vector<std::string_view> w; for(auto v : x) w.push_back(v); return w; })
     ("-emit=", "Choose what to emit. Set to \"help\" to get a list.", std::make_any<emit_classes>(emit_classes::help), "help",
       [](auto x)
       {
@@ -69,7 +70,7 @@ void parse(int argc, const char** argv, std::FILE* out)
 
   auto map = options.parse(argc, argv);
 
-  if(std::any_cast<bool>(map["h"]))
+  if(std::any_cast<bool>(map["-help"]))
   {
     options.print_help(out);
     config.print_help = true;
