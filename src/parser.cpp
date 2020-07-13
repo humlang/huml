@@ -320,6 +320,9 @@ ast_ptr hx_reader::parse_function()
 
   for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
     lam = std::make_shared<lambda>(*it, lam, fn_name);
+
+  scoping_ctx->cur_scope->bindings.emplace(fn_name, lam);
+
   return lam;
 }
 
@@ -367,6 +370,8 @@ ast_ptr hx_reader::parse_data_ctor()
   auto tail = parse_expression();
   scoping_ctx->disallow_recursion = nullptr;
 
+  scoping_ctx->cur_scope->bindings.emplace(type_name_id, tail);
+
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || tail == error_ref)
     error = true;
 
@@ -399,6 +404,8 @@ ast_ptr hx_reader::parse_type_ctor()
   auto tail = parse_expression();
   scoping_ctx->disallow_recursion = nullptr;
 
+  scoping_ctx->cur_scope->bindings.emplace(type_name_id, tail);
+
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || tail == error_ref)
     error = true;
 
@@ -424,6 +431,8 @@ ast_ptr hx_reader::parse_assign()
   auto arg = parse_expression();
   if(arg == error_ref)
     error = true;
+
+  scoping_ctx->cur_scope->bindings.emplace(var_symb, arg);
 
   if(!expect(token_kind::Semi, diagnostic_db::parser::statement_expects_semicolon_at_end) || error)
     return mk_error();

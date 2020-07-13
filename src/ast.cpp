@@ -301,36 +301,6 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
   return ret || (in->annot && !ign_type ? used(what, in->annot, binders, ign_type) : false);
 }
 
-bool hx_ast::type_checks() const
-{
-  hx_ast_type_checking checker;
-  bool type_checks = true;
-
-  typing_context ctx;
-  for(auto& root : data)
-  {
-    auto typ = checker.find_type(ctx, root);
-
-    if(typ == nullptr)
-      type_checks = false;
-  }
-  return type_checks;
-}
-
-void hx_ast::cogen(std::string output_file) const
-{
-  ir::builder mach;
-
-  std::vector<ir::Node::cRef> nodes;
-  for(auto& x : data)
-    nodes.emplace_back(::cogen(mach, x));
-
-  auto entry = mach.root(nodes);
-
-  ir::supercompile(mach, entry);
-  ir::cogen(output_file, entry);
-}
-
 void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
 {
   if(node == nullptr)
@@ -520,13 +490,48 @@ void hx_ast::consider_scoping(scoping_context& ctx)
     consider_scoping(ctx.base, seen, child_indices, p);
 }
 
-void hx_ast::add_basic_defs(scoping_context& ctx)
+bool hx_ast::type_checks(scoping_context& ctx)
 {
+  hx_ast_type_checking checker;
+  bool type_checks = true;
+
+  typing_context tctx;
+
+  /// Add basic defs
   // Nat
   auto nat_id = std::make_shared<identifier>(symbol("Nat"));
   auto nat_type = std::make_shared<assign_type>(nat_id, std::make_shared<type>());
 
   ctx.base.bindings.emplace(symbol("Nat"), nat_id);
   data.insert(data.begin(), nat_type);
+
+  /// fixup
+  consider_scoping(ctx);
+  tctx.data.emplace_back(nat_id, nat_id);
+
+  /// typecheck
+  for(auto& root : data)
+  {
+    auto typ = checker.find_type(tctx, root);
+
+    if(typ == nullptr)
+      type_checks = false;
+  }
+  return type_checks;
 }
+
+void hx_ast::cogen(std::string output_file) const
+{
+  ir::builder mach;
+
+  std::vector<ir::Node::cRef> nodes;
+  for(auto& x : data)
+    nodes.emplace_back(::cogen(mach, x));
+
+  auto entry = mach.root(nodes);
+
+  ir::supercompile(mach, entry);
+  ir::cogen(output_file, entry);
+}
+
 

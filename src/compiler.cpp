@@ -49,10 +49,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
       
-      global_ir.add_basic_defs(ctx);
-      global_ir.consider_scoping(ctx);
-
-      if(global_ir.type_checks())
+      if(global_ir.type_checks(ctx))
         global_ir.print(std::cout);
     } },
   { emit_classes::cogen, [](std::string_view t)
@@ -64,10 +61,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
 
-      global_ir.add_basic_defs(ctx);
-      global_ir.consider_scoping(ctx);
-
-      if(!global_ir.type_checks())
+      if(!global_ir.type_checks(ctx))
         diagnostic <<= mk_diag::error(source_range{}, 1967, "Program does not typecheck.");
       else
         global_ir.cogen(config.output_file);

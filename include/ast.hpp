@@ -197,8 +197,6 @@ struct hx_ast
   void consider_scoping(scoping_context& ctx);
   void consider_scoping(scope_base& ctx, ASTNodePtrCache& seen, ScopingIndices& child_indices, ast_ptr at);
 
-  void add_basic_defs(scoping_context& ctx);
-
   void print(std::ostream& os) const;
   static void print(std::ostream& os, ast_ptr node);
   static void print_as_type(std::ostream& os, ast_ptr node);
@@ -207,7 +205,7 @@ struct hx_ast
   { tsl::robin_set<identifier::ptr> binders; return used(what, in, binders, ign_type); }
   static bool used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders, bool ign_type);
 
-  bool type_checks() const;
+  bool type_checks(scoping_context& ctx);
   void cogen(std::string output_file) const;
 
   std::vector<ast_ptr> data;
