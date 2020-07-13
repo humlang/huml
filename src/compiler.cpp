@@ -48,6 +48,9 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
       if(w.empty())
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
+      
+      global_ir.add_basic_defs(ctx);
+      global_ir.consider_scoping(ctx);
 
       if(global_ir.type_checks())
         global_ir.print(std::cout);
@@ -60,6 +63,9 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
       if(w.empty())
         return; // <- diagnostic will contain an error
       auto& global_ir = w.back();
+
+      global_ir.add_basic_defs(ctx);
+      global_ir.consider_scoping(ctx);
 
       if(!global_ir.type_checks())
         diagnostic <<= mk_diag::error(source_range{}, 1967, "Program does not typecheck.");

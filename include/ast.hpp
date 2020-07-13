@@ -193,6 +193,8 @@ struct hx_ast
   void consider_scoping(scoping_context& ctx);
   void consider_scoping(scope_base& ctx, tsl::robin_set<ast_ptr>& seen, tsl::robin_map<scope_base*, std::size_t>& child_indices, ast_ptr at);
 
+  void add_basic_defs(scoping_context& ctx);
+
   void print(std::ostream& os) const;
   static void print(std::ostream& os, ast_ptr node);
   static void print_as_type(std::ostream& os, ast_ptr node);

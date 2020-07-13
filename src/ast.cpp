@@ -519,3 +519,13 @@ void hx_ast::consider_scoping(scoping_context& ctx)
     consider_scoping(ctx.base, seen, child_indices, p);
 }
 
+void hx_ast::add_basic_defs(scoping_context& ctx)
+{
+  // Nat
+  auto nat_id = std::make_shared<identifier>(symbol("Nat"));
+  auto nat_type = std::make_shared<assign_type>(nat_id, std::make_shared<type>());
+
+  ctx.base.bindings.emplace(symbol("Nat"), nat_id);
+  data.insert(data.begin(), nat_type);
+}
+
