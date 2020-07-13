@@ -2,6 +2,7 @@
 #include "exist.hpp" //<- stored under src/
 
 #include <type_checking.hpp>
+#include <reader.hpp>
 #include <cogen.hpp>
 
 #include <backend/builder.hpp>
@@ -43,10 +44,11 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
   case ASTNodeKind::ptr: os << "*"; print(os, std::static_pointer_cast<pointer>(node)->of); break;
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(node);
-      print(os, as->lhs);
+      print(os, as->identifier);
       os << " := ";
-      print(os, as->rhs);
-      os << ";";
+      print(os, as->definition);
+      os << " ; ";
+      print(os, as->in);
     } break;
   case ASTNodeKind::assign_data: {
       assign_data::ptr as = std::static_pointer_cast<assign_data>(node);
@@ -197,7 +199,9 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(in);
 
-      if(used(what, as->rhs, binders, ign_type))
+      if(used(what, as->definition, binders, ign_type))
+        ret = true;
+      else if(used(what, as->in, binders, ign_type))
         ret = true;
     } break;
   case ASTNodeKind::assign_data: {
@@ -419,5 +423,99 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
     print_as_type(os, node->type);
     os << "))";
   }
+}
+
+ast_ptr handle_id(ast_ptr potential_id, scope_base& sc, tsl::robin_set<ast_ptr>& seen, tsl::robin_map<scope_base*, std::size_t>& child_indices, hx_ast* self)
+{
+  if(!potential_id)
+    return potential_id;
+  else if(potential_id->kind != ASTNodeKind::identifier)
+  {
+    self->consider_scoping(sc, seen, child_indices, potential_id);
+    return potential_id;
+  }
+  auto id = std::static_pointer_cast<identifier>(potential_id);
+  
+  if(id->is_binding)
+    return id;
+
+  // We need to substitute this identifier with its binding
+  auto symb_binding = sc.get(id->symb);
+  
+  // TODO: emit diagnostic instead of assert
+  assert(symb_binding != nullptr && "binding for unbound identifier must exist");
+
+  return symb_binding;
+}
+
+void hx_ast::consider_scoping(scope_base& sc, tsl::robin_set<ast_ptr>& seen, tsl::robin_map<scope_base*, std::size_t>& child_indices, ast_ptr p)
+{
+  switch(p->kind)
+  {
+    case ASTNodeKind::ptr: {
+      auto x = std::static_pointer_cast<pointer>(p);
+
+      x->of = handle_id(x->of, sc, seen, child_indices, this);
+    } break;
+    case ASTNodeKind::app: {
+      auto x = std::static_pointer_cast<app>(p);
+
+      x->lhs = handle_id(x->lhs, sc, seen, child_indices, this);
+      x->rhs = handle_id(x->rhs, sc, seen, child_indices, this);
+    } break;
+    case ASTNodeKind::lambda: {
+      auto x = std::static_pointer_cast<lambda>(p);
+
+      x->lhs->annot = handle_id(x->lhs->annot, sc, seen, child_indices, this);
+      x->rhs = handle_id(x->rhs, *sc.children[child_indices[&sc]++], seen, child_indices, this);
+    } break;
+    case ASTNodeKind::match: {
+      auto x = std::static_pointer_cast<match>(p);
+
+      x->pat = handle_id(x->pat, *sc.children[child_indices[&sc]++], seen, child_indices, this);
+      x->exp = handle_id(x->exp, *sc.children[child_indices[&sc]++], seen, child_indices, this);
+    } break;
+    case ASTNodeKind::pattern_matcher: {
+      auto x = std::static_pointer_cast<pattern_matcher>(p);
+
+      x->to_match = handle_id(x->to_match, sc, seen, child_indices, this);
+
+      for(auto& a : x->data)
+        a = handle_id(a, sc, seen, child_indices, this);
+    } break;
+    case ASTNodeKind::assign: {
+      auto x = std::static_pointer_cast<assign>(p);
+
+      x->definition = handle_id(x->definition, sc, seen, child_indices, this);
+      x->in = handle_id(x->in, *sc.children[child_indices[&sc]++], seen, child_indices, this);
+    } break;
+    case ASTNodeKind::assign_type: {
+      auto x = std::static_pointer_cast<assign_type>(p);
+
+      x->rhs = handle_id(x->rhs, sc, seen, child_indices, this);
+    } break;
+    case ASTNodeKind::assign_data: {
+      auto x = std::static_pointer_cast<assign_data>(p);
+
+      x->rhs = handle_id(x->rhs, sc, seen, child_indices, this);
+    } break;
+    case ASTNodeKind::expr_stmt: {
+      auto x = std::static_pointer_cast<expr_stmt>(p);
+
+      x->lhs = handle_id(x->lhs, sc, seen, child_indices, this);
+    } break;
+  }
+  if(p->annot && !seen.contains(p))
+    consider_scoping(sc, seen, child_indices, p->annot);
+}
+
+void hx_ast::consider_scoping(scoping_context& ctx)
+{
+  // visit all identifiers, see if they need fixing
+  tsl::robin_set<ast_ptr> seen;
+  tsl::robin_map<scope_base*, std::size_t> child_indices;
+  std::queue<ast_ptr> to_visit;
+  for(auto& p : data)
+    consider_scoping(ctx.base, seen, child_indices, p);
 }
 

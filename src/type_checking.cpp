@@ -84,7 +84,7 @@ bool eqb(ast_ptr A, ast_ptr B)
       assign::ptr a = std::static_pointer_cast<assign>(A);
       assign::ptr b = std::static_pointer_cast<assign>(B);
 
-      return eqb(a->lhs, b->lhs) && eqb(a->rhs, b->rhs);
+      return eqb(a->identifier, b->identifier) && eqb(a->definition, b->definition) && eqb(a->in, b->in);
     } break;
   case ASTNodeKind::assign_type: {
       assign_type::ptr a = std::static_pointer_cast<assign_type>(A);
@@ -171,7 +171,6 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
         assert(false && "TODO: Make sure the binding works as expected.");
       } break;
 
-
     case ASTNodeKind::exist: {
         exist::ptr a = std::static_pointer_cast<exist>(in);
 
@@ -182,7 +181,6 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
       } break;
     }
   }
-
   if(in->type != nullptr)
     to_ret->type = subst(what, for_, in->type);
   if(in->annot != nullptr)
@@ -347,7 +345,7 @@ bool has_existentials(ast_ptr a)
   } break;
   case ASTNodeKind::assign: {
     assign::ptr al = std::static_pointer_cast<assign>(a);
-    return has_existentials(al->lhs) || has_existentials(al->rhs);
+    return has_existentials(al->definition) || has_existentials(al->in);
   } break;
   case ASTNodeKind::assign_data: {
     assign_data::ptr al = std::static_pointer_cast<assign_data>(a);
@@ -377,7 +375,6 @@ ast_ptr hx_ast_type_checking::find_type(typing_context& ctx, ast_ptr of)
 
     return nullptr;
   }
-
   return A;
 }
 
@@ -783,29 +780,30 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(what);
 
-      if(as->lhs->annot != nullptr)
+      if(as->identifier->annot != nullptr)
       {
-        if(!is_wellformed(ctx, as->lhs->annot))
+        if(!is_wellformed(ctx, as->identifier->annot))
         {
           std::stringstream a;
-          hx_ast::print(a, as->lhs->annot);
+          hx_ast::print(a, as->identifier->annot);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
           return nullptr;
         }
-        ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), as->lhs->annot);
+        ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->identifier), as->identifier->annot);
 
-        if(!check(ctx, as->rhs, as->lhs->annot))
+        if(!check(ctx, as->identifier, as->identifier->annot))
           return nullptr;
-        return as->lhs->annot;
+        return synthesize(ctx, as->in);
       }
-
-      auto A = synthesize(ctx, as->rhs);
+      auto A = synthesize(ctx, as->definition);
       if(A == nullptr)
         return nullptr;
 
-      ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->lhs), A);
-      return what->type = A;
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->identifier), A);
+      what->type = A;
+
+      return synthesize(ctx, as->in);
     } break;
   // S-AssignData
   case ASTNodeKind::assign_data: {

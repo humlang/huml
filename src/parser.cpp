@@ -92,30 +92,41 @@ ast_ptr hx_reader::parse_identifier()
   auto present = std::find_if(scoping_ctx.binder_stack.rbegin(), scoping_ctx.binder_stack.rend(),
         [&id](auto x) { return x.first == id; });
 
-  if(present != scoping_ctx.binder_stack.rend()) // && !scoping_ctx.is_binding)
+  if(present != scoping_ctx.binder_stack.rend())
   {
     if(id == symbol("_"))
     {
       // Do not reference
       return std::make_shared<identifier>(id);
     }
-    else
+    else if(!scoping_ctx.is_binding) // only use the known var if this occurence isn't binding
     {
       if(scoping_ctx.disallow_recursion == present->second)
       {
         diagnostic <<= diagnostic_db::sema::disallow_recursion(old.loc, old.data.get_string());
         return mk_error();
       }
-
+      assert(scoping_ctx.cur_scope->contains(id) && "symboltable and binder stack must not disagree");
       // literally use the binding as reference
       return present->second;
+    }
+    else
+    {
+      // > shadowing, we've seen this binder before, now it's bound to something new
+      goto bind;
     }
   }
   else
   {
+bind:
     auto to_ret = std::make_shared<identifier>(id); // <- free variable
     if(scoping_ctx.is_binding)
+    {
       scoping_ctx.binder_stack.emplace_back(id, to_ret);
+      scoping_ctx.cur_scope->bindings.emplace(id, to_ret);
+
+      to_ret->is_binding = true;
+    }
     return to_ret;
   }
 }
@@ -150,7 +161,10 @@ ast_ptr hx_reader::parse_lambda()
       error = true;
 
     // No scoping, the argument implicitly is "_" so there is nothing to bind!
+    auto oldsc = scoping_ctx.cur_scope;
+    scoping_ctx.cur_scope = oldsc->new_child();
     auto expr = parse_expression();
+    oldsc = scoping_ctx.cur_scope;
     if(expr == error_ref)
       error = true;
 
@@ -172,7 +186,11 @@ ast_ptr hx_reader::parse_lambda()
     parentheses++;
 
   parsing_pattern = true;
+  scoping_ctx.is_binding = true;
+  auto oldsc = scoping_ctx.cur_scope;
+  scoping_ctx.cur_scope = oldsc->new_child();
   auto param = parse_identifier();
+  scoping_ctx.is_binding = false;
   parsing_pattern = false;
   auto psymb = old.data;
 
@@ -208,6 +226,7 @@ ast_ptr hx_reader::parse_lambda()
   scoping_ctx.binder_stack.emplace_back(psymb, param);
   auto expr = parse_expression();
   scoping_ctx.binder_stack.pop_back();
+  scoping_ctx.cur_scope = oldsc;
 
   if(expr == error_ref)
     error = true;
@@ -228,6 +247,8 @@ ast_ptr hx_reader::parse_function()
 
   bool error = id == error_ref;
 
+  auto oldsc = scoping_ctx.cur_scope;
+  scoping_ctx.cur_scope = oldsc->new_child();
   std::vector<ast_ptr> params;
   if(!expect('(', diagnostic_db::parser::type_expects_lparen))
     error = true;
@@ -237,7 +258,9 @@ ast_ptr hx_reader::parse_function()
 
     {
     parsing_pattern = true;
+    scoping_ctx.is_binding = true;
     auto id = parse_identifier();
+    scoping_ctx.is_binding = false;
     parsing_pattern = false;
     ids_of_same_type.emplace_back(id, old.data);
     while(current.kind == token_kind::Identifier)
@@ -279,7 +302,7 @@ ast_ptr hx_reader::parse_function()
   auto expr = parse_expression();
   for(auto& x : params)
     scoping_ctx.binder_stack.pop_back();
-
+  scoping_ctx.cur_scope = oldsc;
 
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || expr == error_ref)
     error = true;
@@ -379,23 +402,32 @@ ast_ptr hx_reader::parse_type_ctor()
   return std::make_shared<assign_type>(type_name, tail);
 }
 
-
-ast_ptr hx_reader::parse_assign(ast_ptr to)
+// e := let x := y; e
+ast_ptr hx_reader::parse_assign()
 {
+  scoping_ctx.is_binding = true;
+  auto type_name = parse_identifier();
+  scoping_ctx.is_binding = false;
+
   auto var_symb = old.data;
   auto current_source_loc = old.loc;
 
-  bool error = to == error_ref;
+  bool error = type_name == error_ref;
   if(!expect(token_kind::ColonEqual, diagnostic_db::parser::assign_expects_equal))
     error = true;
   auto arg = parse_expression();
   if(arg == error_ref)
     error = true;
 
-  if(error)
+  if(!expect(token_kind::Semi, diagnostic_db::parser::statement_expects_semicolon_at_end) || error)
     return mk_error();
-  auto ass = std::make_shared<assign>(to, arg);
-  ass->lhs->annot = arg->annot;
+
+  auto* old = scoping_ctx.cur_scope;
+  scoping_ctx.cur_scope = old->new_child();
+  auto ass = std::make_shared<assign>(type_name, arg, parse_expression());
+  scoping_ctx.cur_scope = old;
+
+  ass->identifier->annot = arg->annot;
 
   return ass;
 }
@@ -454,6 +486,7 @@ ast_ptr hx_reader::parse_keyword()
   case hash_string("Kind"): return parse_Kind();
   case hash_string("Prop"): return parse_Prop();
   case hash_string("case"): return parse_case();
+  case hash_string("let"):  return parse_assign();
   }
   assert(false && "bug in lexer, we would not see a keyword token otherwise");
   return mk_error();
@@ -519,7 +552,9 @@ ast_ptr hx_reader::parse_with_parentheses()
     // type checking or lambda
     {
     parsing_pattern = true;
+    scoping_ctx.is_binding = true;
     auto id = parse_identifier();
+    scoping_ctx.is_binding = false;
     parsing_pattern = false;
     ids_of_same_type.emplace_back(id, old.data);
     while(current.kind == token_kind::Identifier)
@@ -542,12 +577,18 @@ ast_ptr hx_reader::parse_with_parentheses()
 
     if(accept(token_kind::Arrow))
     {
+      auto oldsc = scoping_ctx.cur_scope;
       // lambda
       for(auto& p : ids_of_same_type)
+      {
         scoping_ctx.binder_stack.emplace_back(p.second, p.first);
+        
+        scoping_ctx.cur_scope = scoping_ctx.cur_scope->new_child();
+      }
       auto body = parse_expression();
       for(auto& p : ids_of_same_type)
         scoping_ctx.binder_stack.pop_back();
+      scoping_ctx.cur_scope = oldsc;
 
       if(body == error_ref)
         error = true;
@@ -654,7 +695,10 @@ ast_ptr hx_reader::parse_arrow_lam(ast_ptr argument)
 {
   assert(expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow));
 
+  auto old = scoping_ctx.cur_scope;
+  scoping_ctx.cur_scope = old->new_child();
   auto bdy = parse_expression();
+  scoping_ctx.cur_scope = old;
 
   auto arg = std::make_shared<identifier>("_");
   arg->annot = argument;
@@ -693,11 +737,6 @@ ast_ptr hx_reader::parse_expression(int precedence)
       case token_kind::Colon:
       {
         return parse_type_check(prefix);
-      } break;
-
-      case token_kind::ColonEqual:
-      {
-        return parse_assign(prefix);
       } break;
 
       default:

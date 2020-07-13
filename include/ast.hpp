@@ -37,6 +37,7 @@ struct identifier : ast_base
   {  }
 
   symbol symb;
+  bool is_binding { false };
 
   ir::Node::cRef irn;
 };
@@ -137,11 +138,13 @@ struct assign : ast_base
 {
   using ptr = std::shared_ptr<assign>;
 
-  assign(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::assign), lhs(lhs), rhs(rhs)
+  assign(ast_ptr identifier, ast_ptr definition, ast_ptr in)
+    : ast_base(ASTNodeKind::assign), identifier(identifier), definition(definition), in(in)
   {  }
 
-  ast_ptr lhs;
-  ast_ptr rhs;
+  ast_ptr identifier;
+  ast_ptr definition;
+  ast_ptr in;
 };
 
 struct assign_type : ast_base
@@ -176,9 +179,19 @@ struct expr_stmt : ast_base
   ast_ptr lhs;
 };
 
+struct scoping_context;
+struct scope_base;
+
 struct hx_ast
 {
   hx_ast();
+
+  // Transforms trees of structure
+  //   def x = +      def x  +
+  //          / \   to    |_/_\  <- uses of identifiers now
+  //         x   x                  point to their definition
+  void consider_scoping(scoping_context& ctx);
+  void consider_scoping(scope_base& ctx, tsl::robin_set<ast_ptr>& seen, tsl::robin_map<scope_base*, std::size_t>& child_indices, ast_ptr at);
 
   void print(std::ostream& os) const;
   static void print(std::ostream& os, ast_ptr node);

@@ -36,12 +36,43 @@ private:
 };
 
 /// HX_READER
+struct scope_base
+{
+  scope_base() {}
+  scope_base(scope_base* p) : parent(p) {}
+
+  scope_base* parent;
+  std::vector<std::shared_ptr<scope_base>> children;
+
+  symbol_map<ast_ptr> bindings;
+
+  scope_base* new_child()
+  {
+    children.emplace_back(std::make_shared<scope_base>(this));
+    return children.back().get();
+  }
+  bool contains(symbol name)
+  {
+    if(bindings.contains(name))
+      return true;
+    return parent ? parent->contains(name) : false;
+  }
+  ast_ptr get(symbol name)
+  {
+    if(auto it = bindings.find(name); it != bindings.end())
+      return it->second;
+    return parent ? parent->get(name) : nullptr;
+  }
+};
 
 struct scoping_context
 {
   bool is_binding { false };
   ast_ptr disallow_recursion { nullptr };
   std::vector<std::pair<symbol, ast_ptr>> binder_stack;
+
+  scope_base base;
+  scope_base* cur_scope { &base };
 };
 
 class hx_reader : base_reader
@@ -92,7 +123,7 @@ private:
 
   ast_ptr parse_directive();
 
-  ast_ptr parse_assign(ast_ptr to);
+  ast_ptr parse_assign();
   ast_ptr parse_case();
   ast_ptr parse_with_parentheses();
   ast_ptr parse_type_check(ast_ptr left);
@@ -113,9 +144,9 @@ private:
   token old;
   token current;
   std::array<token, lookahead_size> next_toks;
-  scoping_context scoping_ctx;
 
   bool parsing_pattern { false };
+  scoping_context scoping_ctx;
 
   std::vector<fixit_info> fixits_stack;
 };
