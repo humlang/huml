@@ -2,6 +2,8 @@
 
 #include <source_range.hpp>
 #include <ast_nodes.hpp>
+
+#include <unordered_set>
 #include <memory>
 
 #include <backend/node.hpp>
@@ -181,6 +183,8 @@ struct expr_stmt : ast_base
 
 struct scoping_context;
 struct scope_base;
+using ScopingIndices = std::unordered_map<scope_base*, std::size_t>;
+using ASTNodePtrCache = std::unordered_set<ast_ptr>;
 
 struct hx_ast
 {
@@ -188,10 +192,10 @@ struct hx_ast
 
   // Transforms trees of structure
   //   def x = +      def x  +
-  //          / \   to    |_/_\  <- uses of identifiers now
-  //         x   x                  point to their definition
+  //          / \   to      / \  <- uses of identifiers now
+  //         x   x         def x    point to their definition
   void consider_scoping(scoping_context& ctx);
-  void consider_scoping(scope_base& ctx, tsl::robin_set<ast_ptr>& seen, tsl::robin_map<scope_base*, std::size_t>& child_indices, ast_ptr at);
+  void consider_scoping(scope_base& ctx, ASTNodePtrCache& seen, ScopingIndices& child_indices, ast_ptr at);
 
   void add_basic_defs(scoping_context& ctx);
 

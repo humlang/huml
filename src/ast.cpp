@@ -425,7 +425,7 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   }
 }
 
-ast_ptr handle_id(ast_ptr potential_id, scope_base& sc, tsl::robin_set<ast_ptr>& seen, tsl::robin_map<scope_base*, std::size_t>& child_indices, hx_ast* self)
+ast_ptr handle_id(ast_ptr potential_id, scope_base& sc, ASTNodePtrCache& seen, ScopingIndices& child_indices, hx_ast* self)
 {
   if(!potential_id)
     return potential_id;
@@ -448,7 +448,7 @@ ast_ptr handle_id(ast_ptr potential_id, scope_base& sc, tsl::robin_set<ast_ptr>&
   return symb_binding;
 }
 
-void hx_ast::consider_scoping(scope_base& sc, tsl::robin_set<ast_ptr>& seen, tsl::robin_map<scope_base*, std::size_t>& child_indices, ast_ptr p)
+void hx_ast::consider_scoping(scope_base& sc, ASTNodePtrCache& seen, ScopingIndices& child_indices, ast_ptr p)
 {
   switch(p->kind)
   {
@@ -472,8 +472,9 @@ void hx_ast::consider_scoping(scope_base& sc, tsl::robin_set<ast_ptr>& seen, tsl
     case ASTNodeKind::match: {
       auto x = std::static_pointer_cast<match>(p);
 
-      x->pat = handle_id(x->pat, *sc.children[child_indices[&sc]++], seen, child_indices, this);
-      x->exp = handle_id(x->exp, *sc.children[child_indices[&sc]++], seen, child_indices, this);
+      auto lower = *sc.children[child_indices[&sc]++];
+      x->pat = handle_id(x->pat, lower, seen, child_indices, this);
+      x->exp = handle_id(x->exp, lower, seen, child_indices, this);
     } break;
     case ASTNodeKind::pattern_matcher: {
       auto x = std::static_pointer_cast<pattern_matcher>(p);
@@ -505,15 +506,15 @@ void hx_ast::consider_scoping(scope_base& sc, tsl::robin_set<ast_ptr>& seen, tsl
       x->lhs = handle_id(x->lhs, sc, seen, child_indices, this);
     } break;
   }
-  if(p->annot && !seen.contains(p))
+  if(p->annot && !seen.count(p))
     consider_scoping(sc, seen, child_indices, p->annot);
 }
 
 void hx_ast::consider_scoping(scoping_context& ctx)
 {
   // visit all identifiers, see if they need fixing
-  tsl::robin_set<ast_ptr> seen;
-  tsl::robin_map<scope_base*, std::size_t> child_indices;
+  ASTNodePtrCache seen;
+  ScopingIndices child_indices;
   std::queue<ast_ptr> to_visit;
   for(auto& p : data)
     consider_scoping(ctx.base, seen, child_indices, p);
