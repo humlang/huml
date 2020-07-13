@@ -82,13 +82,10 @@ public:
   static const ast_ptr error_ref; // see parser.cpp
 
   template<typename T>
-  static std::vector<T> read(std::string_view module) { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
-
-  template<typename T>
-  static std::vector<std::pair<T, scoping_context>> read_with_ctx(std::string_view module, scoping_context&& ctx)
+  static std::vector<T> read(std::string_view module, scoping_context& ctx)
   { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
 
-  static std::pair<hx_ast, scoping_context> read_text(const std::string& str, scoping_context&& ctx);
+  static hx_ast read_text(const std::string& str, scoping_context& ctx);
 private:
   hx_reader(std::string_view module) : base_reader(module)
   {
@@ -146,7 +143,7 @@ private:
   std::array<token, lookahead_size> next_toks;
 
   bool parsing_pattern { false };
-  scoping_context scoping_ctx;
+  scoping_context* scoping_ctx;
 
   std::vector<fixit_info> fixits_stack;
 };

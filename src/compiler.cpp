@@ -42,7 +42,8 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
     } },
   { emit_classes::ast_print, [](std::string_view t)
     {
-      auto w = hx_reader::read<hx_ast>(t);
+      scoping_context ctx;
+      auto w = hx_reader::read<hx_ast>(t, ctx);
 
       if(w.empty())
         return; // <- diagnostic will contain an error
@@ -53,7 +54,8 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
     } },
   { emit_classes::cogen, [](std::string_view t)
     {
-      auto w = hx_reader::read<hx_ast>(t);
+      scoping_context ctx;
+      auto w = hx_reader::read<hx_ast>(t, ctx);
 
       if(w.empty())
         return; // <- diagnostic will contain an error
@@ -66,7 +68,8 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
     } },
   { emit_classes::tokens, [](std::string_view t)
     {
-      auto w = hx_reader::read<token>(t);
+      scoping_context ctx;
+      auto w = hx_reader::read<token>(t, ctx);
 
       for(auto& tok : w)
       {

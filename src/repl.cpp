@@ -74,10 +74,9 @@ namespace hx
   {
     if(t == "STDIN")
       return;
-    auto w = hx_reader::read_with_ctx<hx_ast>(t, std::move(sctx));
-    sctx = std::move(w.back().second);
+    auto w = hx_reader::read<hx_ast>(t, sctx);
 
-    auto& global_ir = w.back().first;
+    auto& global_ir = w.back();
     if(!diagnostic.empty())
     {
       diagnostic.print(stdout);
@@ -113,7 +112,7 @@ R"(
     while(!stopped)
     {
       if(!buf_upto_semi.empty())
-        std::cout << "><(need;)°> ";
+        std::cout << "><(....;)°> ";
       else
         std::cout << "><(typ-c)°> ";
 
@@ -169,8 +168,7 @@ R"(
       if(to_compute.empty())
         return;
 
-      auto [global_ir, new_sctx] = hx_reader::read_text(to_compute, std::move(sctx));
-      sctx = std::move(new_sctx);
+      auto global_ir = hx_reader::read_text(to_compute, sctx);
 
       if(global_ir.data.empty())
       {
