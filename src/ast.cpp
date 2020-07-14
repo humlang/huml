@@ -499,12 +499,20 @@ bool hx_ast::type_checks(scoping_context& ctx)
 
   /// Add basic defs
   // Nat
-  auto nat_id = std::make_shared<identifier>(symbol("Nat"));
+  auto nat_id = std::make_shared<identifier>(symbol("nat"));
   auto nat_type = std::make_shared<assign_type>(nat_id, std::make_shared<type>());
 
   ctx.base.bindings.emplace(symbol("Nat"), nat_id);
   data.insert(data.begin(), nat_type);
+  // bytes
+  auto bytes_id   = std::make_shared<identifier>(symbol("bytes"));
 
+  auto bytes_underscore = std::make_shared<identifier>(symbol("_"));
+  bytes_underscore->annot = nat_id;
+  auto bytes_type = std::make_shared<assign_type>(bytes_id,
+                                                  std::make_shared<lambda>(bytes_underscore, std::make_shared<type>()));
+  ctx.base.bindings.emplace(symbol("bytes"), bytes_id);
+  data.insert(data.begin(), bytes_type);
   /// fixup
   consider_scoping(ctx);
   tctx.data.emplace_back(nat_id, nat_id);
