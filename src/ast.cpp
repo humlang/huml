@@ -66,6 +66,43 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
       print(os, as->rhs);
       os << ";";
     } break;
+  case ASTNodeKind::trait: {
+      trait::ptr t = std::static_pointer_cast<trait>(node);
+
+      os << "trait ";
+      print(os, t->name);
+      os << " ";
+      for(auto& x : t->params)
+      {
+        os << "(";
+        print(os, x);
+        os << " : ";
+        print(os, x->annot);
+        os << ") ";
+      }
+      os << "{\n";
+      for(auto& x : t->methods)
+      {
+        os << "  ";
+        print(os, x);
+        os << ";\n";
+      }
+      os << "}";
+    } break;
+  case ASTNodeKind::implement: {
+      implement::ptr imp = std::static_pointer_cast<implement>(node);
+
+      os << "implement ";
+      print(os, imp->trait);
+      os << " {\n";
+      for(auto& x : imp->methods)
+      {
+        os << "  ";
+        print(os, x);
+        os << ";\n";
+      }
+      os << "}";
+    } break;
   case ASTNodeKind::expr_stmt:   {
       expr_stmt::ptr ex = std::static_pointer_cast<expr_stmt>(node);
       print(os, ex->lhs);
@@ -196,6 +233,47 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
                                  used(std::static_pointer_cast<pointer>(what)->of,
                                       std::static_pointer_cast<pointer>(in)->of,
                                       binders, ign_type); break;
+  case ASTNodeKind::trait: {
+      trait::ptr tr = std::static_pointer_cast<trait>(in);
+
+      // Note: We don't need to add the binder, because traits may not reference themselves.   TODO: yet?
+
+      for(auto& x : tr->methods)
+      {
+        if(used(what, x, binders, ign_type))
+        {
+          ret = true;
+          break;
+        }
+      }
+      for(auto& x : tr->params)
+      {
+        if(used(what, x, binders, ign_type))
+        {
+          ret = true;
+          break;
+        }
+      }
+    } break;
+  case ASTNodeKind::implement: {
+      implement::ptr im = std::static_pointer_cast<implement>(in);
+
+      if(used(what, im->trait, binders, ign_type))
+      {
+        ret = true;
+      }
+      else
+      {
+        for(auto& x : im->methods)
+        {
+          if(used(what, x, binders, ign_type))
+          {
+            ret = true;
+            break;
+          }
+        }
+      }
+    } break;
   case ASTNodeKind::assign: {
       assign::ptr as = std::static_pointer_cast<assign>(in);
 
@@ -331,7 +409,9 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   case ASTNodeKind::assign_type:
   case ASTNodeKind::expr_stmt:
   case ASTNodeKind::directive:
+  case ASTNodeKind::implement:
   case ASTNodeKind::assign:
+  case ASTNodeKind::trait:
                           assert(false && "Statements are no types."); break;
 
   case ASTNodeKind::identifier:  {
@@ -422,6 +502,23 @@ void hx_ast::consider_scoping(scope_base& sc, ASTNodePtrCache& seen, ScopingIndi
 {
   switch(p->kind)
   {
+    default: assert(false && "Unconsidered case"); break;
+
+    case ASTNodeKind::trait: {
+      auto x = std::static_pointer_cast<trait>(p);
+
+      for(auto& v : x->params)
+        v = handle_id(v, sc, seen, child_indices, this);
+      for(auto& v : x->methods)
+        v = handle_id(v, sc, seen, child_indices, this);
+    } break;
+    case ASTNodeKind::implement: {
+      auto x = std::static_pointer_cast<implement>(p);
+
+      x->trait = handle_id(x->trait, sc, seen, child_indices, this);
+      for(auto& v : x->methods)
+        v = handle_id(v, sc, seen, child_indices, this);
+    } break;
     case ASTNodeKind::ptr: {
       auto x = std::static_pointer_cast<pointer>(p);
 

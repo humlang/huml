@@ -38,6 +38,37 @@ bool eqb(ast_ptr A, ast_ptr B)
       return A == B;
     } break;
 
+  case ASTNodeKind::trait: {
+      auto a = std::static_pointer_cast<trait>(A);
+      auto b = std::static_pointer_cast<trait>(B);
+
+      if(a->params.size() != b->params.size() || a->methods.size() != b->methods.size())
+        return false;
+      if(!eqb(a->name, b->name))
+        return false;
+      for(std::size_t i = 0, e = a->params.size(); i < e; ++i)
+        if(!eqb(a->params[i], b->params[i]))
+          return false;
+      for(std::size_t i = 0, e = a->methods.size(); i < e; ++i)
+        if(!eqb(a->methods[i], b->methods[i]))
+          return false;
+      return true;
+    } break;
+
+  case ASTNodeKind::implement: {
+      auto a = std::static_pointer_cast<implement>(A);
+      auto b = std::static_pointer_cast<implement>(B);
+
+      if(a->methods.size() != b->methods.size())
+        return false;
+      if(!eqb(a->trait, b->trait))
+        return false;
+      for(std::size_t i = 0, e = a->methods.size(); i < e; ++i)
+        if(!eqb(a->methods[i], b->methods[i]))
+          return false;
+      return true;
+    } break;
+
   case ASTNodeKind::app: {
       app::ptr a = std::static_pointer_cast<app>(A);
       app::ptr b = std::static_pointer_cast<app>(B);
@@ -163,6 +194,9 @@ ast_ptr subst(ast_ptr what, ast_ptr for_, ast_ptr in)
         to_ret = std::make_shared<lambda>(a->lhs, y);
       } break;
 
+    case ASTNodeKind::trait: assert(false && "Cannot execute trait."); break;
+    case ASTNodeKind::implement: assert(false && "Cannot execute implement."); break;
+
     case ASTNodeKind::pattern_matcher: {
         assert(false && "TODO: Make sure the binding works as expected.");
       } break;
@@ -200,6 +234,35 @@ ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& clo
   case ASTNodeKind::unit: ret = std::make_shared<unit>(); break;
   case ASTNodeKind::ptr: ret = std::make_shared<pointer>(clone_ast_part_graph(std::static_pointer_cast<pointer>(what)->of,
                                                                               cloned_ids)); break;
+
+  case ASTNodeKind::trait: {
+    trait::ptr tr = std::static_pointer_cast<trait>(what);
+
+    auto name = clone_ast_part_graph(tr->name, cloned_ids);
+    cloned_ids.emplace(tr->name, name);
+
+    std::vector<ast_ptr> params;
+    for(auto& x : tr->params)
+      params.emplace_back(clone_ast_part_graph(x, cloned_ids));
+    std::vector<ast_ptr> methods;
+    for(auto& x : tr->methods)
+      methods.emplace_back(clone_ast_part_graph(x, cloned_ids));
+
+    ret = std::make_shared<trait>(name, params, methods);
+  } break;
+
+  case ASTNodeKind::implement: {
+    implement::ptr im = std::static_pointer_cast<implement>(what);
+
+    auto name = clone_ast_part_graph(im->trait, cloned_ids);
+    cloned_ids.emplace(im->trait, name);
+
+    std::vector<ast_ptr> methods;
+    for(auto& x : im->methods)
+      methods.emplace_back(clone_ast_part_graph(x, cloned_ids));
+
+    ret = std::make_shared<implement>(name, methods);
+  } break;
 
   case ASTNodeKind::identifier: {
     identifier::ptr id = std::static_pointer_cast<identifier>(what);

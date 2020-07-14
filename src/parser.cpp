@@ -278,7 +278,6 @@ ast_ptr hx_reader::parse_function()
     }
     if(!expect(':', diagnostic_db::parser::lambda_param_type_decl_expects_colon))
       error = true;
-
     auto typ = parse_expression();
 
     for(auto& p : ids_of_same_type)

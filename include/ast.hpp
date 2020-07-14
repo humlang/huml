@@ -30,6 +30,32 @@ struct directive : ast_base
   bool implicit_typing;
 };
 
+struct trait : ast_base
+{
+  using ptr = std::shared_ptr<trait>;
+
+  trait(ast_ptr name, const std::vector<ast_ptr>& params,
+                     const std::vector<ast_ptr>& methods)
+    : ast_base(ASTNodeKind::trait), name(name), params(params), methods(methods)
+  {  }
+
+  ast_ptr name;
+  std::vector<ast_ptr> params;
+  std::vector<ast_ptr> methods;
+};
+
+struct implement : ast_base
+{
+  using ptr = std::shared_ptr<implement>;
+
+  implement(ast_ptr trait, const std::vector<ast_ptr>& methods)
+    : ast_base(ASTNodeKind::implement), trait(trait), methods(methods)
+  {  }
+
+  ast_ptr trait;
+  std::vector<ast_ptr> methods;
+};
+
 struct identifier : ast_base
 {
   using ptr = std::shared_ptr<identifier>;
