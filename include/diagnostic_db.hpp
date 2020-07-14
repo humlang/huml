@@ -45,6 +45,7 @@ db_entry_arg(error, function_expects_colon_eq, "Function expects \":=\", instead
 db_entry_arg(error, expected_keyword_Prop, "Keyword \"Prop\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_Kind, "Keyword \"Kind\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_Type, "Keyword \"Type\" expected, instead got \"{}\".");
+db_entry_arg(error, expected_keyword_Trait, "Keyword \"Trait\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_top, "Keyword \"TOP\" expected, instead got \"{}\".");
 db_entry_arg(error, expected_keyword_bot, "Keyword \"BOT\" expected, instead got \"{}\".");
 db_entry_arg(error, tuple_or_unit_expr_expect_lparen, "Tuple or unit expression expected a '(', instead got \"{}\".");
@@ -94,6 +95,8 @@ db_entry_arg2(error, cannot_unify_existentials, "\"{}\" and \"{}\" are different
 db_entry_arg(error, existential_not_in_context, "\"{}\" is not in the typing context.");
 db_entry_arg(error, not_invokable, "\"{}\" is not an invokable type.");
 db_entry_arg(error, unsolved_ex, "Cannot resolve dummy types for inferred type \"{}\". Add an annotation.");
+db_entry_arg(error, not_a_trait, "\"{}\" is not of trait type.");
+db_entry(error, trait_needs_at_least_one_param, "trait declaration needs at least one parameter.");
 }
 
 

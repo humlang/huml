@@ -110,6 +110,11 @@ struct kind : ast_base
   using ptr = std::shared_ptr<kind>; kind() : ast_base(ASTNodeKind::Kind) {}
 };
 
+struct trait_type : ast_base
+{
+  using ptr = std::shared_ptr<trait_type>; trait_type() : ast_base(ASTNodeKind::trait_type) {}
+};
+
 struct app : ast_base
 {
   using ptr = std::shared_ptr<app>;

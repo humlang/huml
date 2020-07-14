@@ -128,6 +128,7 @@ private:
   ast_ptr parse_Prop();
   ast_ptr parse_Type();
   ast_ptr parse_Kind();
+  ast_ptr parse_Trait();
   ast_ptr parse_app(ast_ptr lhs);
   ast_ptr parse_lambda();
   ast_ptr parse_arrow_lam(ast_ptr argument);

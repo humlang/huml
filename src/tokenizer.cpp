@@ -41,6 +41,7 @@ auto keyword_set = tsl::robin_set<std::string_view>({
   "Type"sv,
   "Kind"sv,
   "Prop"sv,
+  "Trait"sv,
   "type"sv,
   "data"sv,
   "case"sv,

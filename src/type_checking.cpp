@@ -27,6 +27,7 @@ bool eqb(ast_ptr A, ast_ptr B)
   case ASTNodeKind::Kind:
   case ASTNodeKind::Prop:
   case ASTNodeKind::Type:
+  case ASTNodeKind::trait_type:
   case ASTNodeKind::unit:
     return true;
 
@@ -232,6 +233,7 @@ ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& clo
   case ASTNodeKind::Prop: ret = std::make_shared<prop>(); break;
   case ASTNodeKind::Type: ret = std::make_shared<type>(); break;
   case ASTNodeKind::unit: ret = std::make_shared<unit>(); break;
+  case ASTNodeKind::trait_type: ret = std::make_shared<trait_type>(); break;
   case ASTNodeKind::ptr: ret = std::make_shared<pointer>(clone_ast_part_graph(std::static_pointer_cast<pointer>(what)->of,
                                                                               cloned_ids)); break;
 
@@ -401,7 +403,29 @@ bool has_existentials(ast_ptr a)
 
     return has_existentials(am->pat) || has_existentials(am->exp);
   } break;
-
+  case ASTNodeKind::trait: {
+    trait::ptr tr = std::static_pointer_cast<trait>(a);
+    
+    if(has_existentials(tr->name))
+      return true;
+    for(auto& x : tr->params)
+      if(has_existentials(x))
+        return true;
+    for(auto& x : tr->methods)
+      if(has_existentials(x))
+        return true;
+    return false;
+  } break;
+  case ASTNodeKind::implement: {
+    implement::ptr im = std::static_pointer_cast<implement>(a);
+    
+    if(has_existentials(im->trait))
+      return true;
+    for(auto& x : im->methods)
+      if(has_existentials(x))
+        return true;
+    return false;
+  } break;
   case ASTNodeKind::expr_stmt: {
     expr_stmt::ptr al = std::static_pointer_cast<expr_stmt>(a);
     return has_existentials(al->lhs);
@@ -485,6 +509,7 @@ ast_ptr typing_context::subst(ast_ptr what)
   case ASTNodeKind::Prop: 
   case ASTNodeKind::Type: 
   case ASTNodeKind::unit:
+  case ASTNodeKind::trait_type:
   case ASTNodeKind::identifier:
     return what;
 
@@ -547,6 +572,8 @@ ast_ptr typing_context::subst(ast_ptr what)
   case ASTNodeKind::expr_stmt:
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
+  case ASTNodeKind::trait:
+  case ASTNodeKind::implement:
     assert(false && "Statements are not types.");
   }
   return nullptr;
@@ -909,6 +936,72 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       implicit = std::static_pointer_cast<directive>(what)->implicit_typing;
       return what; // <- directive is basically its own type
     } break;
+  // S-Trait
+  case ASTNodeKind::trait: {
+      trait::ptr tr = std::static_pointer_cast<trait>(what);
+
+      if(tr->params.empty())
+      {
+        // TODO: fix diagnostic location
+        diagnostic <<= diagnostic_db::sema::trait_needs_at_least_one_param(source_range{});
+        return nullptr;
+      }
+      for(auto& x : tr->params)
+      {
+        // TODO: Add parameters to context
+        // TODO: Do we enforce Type parameters to trait?
+        if(!is_wellformed(ctx, x->annot))
+        {
+          std::stringstream a;
+          hx_ast::print(a, x->annot);
+
+          diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        }
+      }
+      for(auto& x : tr->methods)
+      {
+        if(!is_wellformed(ctx, x))
+        {
+          std::stringstream a;
+          hx_ast::print(a, x);
+
+          diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        }
+      }
+
+      // build trait type, basically a function with paams to Trait
+      auto jt = tr->params.rbegin();
+      assert(jt != tr->params.rend() && "trait needs at least one parameter");
+
+      lambda::ptr lam = std::make_shared<lambda>(*jt, std::make_shared<trait_type>());
+      for(jt = jt + 1; jt != tr->params.rend(); ++jt)
+        lam = std::make_shared<lambda>(*jt, lam);
+
+      return what->type = lam; // <- TODO: return lambda consisting of the trait params going to Type
+    } break;
+  // S-Implement
+  case ASTNodeKind::implement: {
+      implement::ptr im = std::static_pointer_cast<implement>(what);
+
+      if(!check(ctx, im->trait, std::make_shared<trait_type>()))
+      {
+        std::stringstream a;
+        hx_ast::print(a, im->trait);
+
+        diagnostic <<= diagnostic_db::sema::not_a_trait(source_range { }, a.str());
+      }
+      for(auto& x : im->methods)
+      {
+        if(!is_wellformed(ctx, x))
+        {
+          std::stringstream a;
+          hx_ast::print(a, x);
+
+          diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        }
+      }
+      return what->type = std::make_shared<trait_type>(); // <- TODO: ok?
+    } break;
   }
   assert(false && "Unimplemented synthesis.");
   return nullptr;
@@ -993,6 +1086,8 @@ bool hx_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
   case ASTNodeKind::Type: return B->kind == ASTNodeKind::Type;
   // <:-Prop
   case ASTNodeKind::Prop: return B->kind == ASTNodeKind::Prop;
+  // <:-Trait
+  case ASTNodeKind::trait_type: return B->kind == ASTNodeKind::trait_type;
   // <:-Id
   case ASTNodeKind::identifier: return eqb(A, B);
   // <:-Ptr
@@ -1243,6 +1338,7 @@ bool hx_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
   case ASTNodeKind::Kind:
   case ASTNodeKind::Prop:
   case ASTNodeKind::Type:
+  case ASTNodeKind::trait_type:
   case ASTNodeKind::unit:
   case ASTNodeKind::number:
     return (A->annot ? is_wellformed(ctx, A->annot) : true);
@@ -1287,6 +1383,8 @@ bool hx_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
 
       return ret;
     } break;
+
+  // TODO: add "not a type" diagnostic
 
   default: assert(false && "Unimplemented.");
   }

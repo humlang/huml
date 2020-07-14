@@ -10,6 +10,7 @@ enum class ASTNodeKind : std::int_fast8_t
   Kind,
   Type,
   Prop,
+  trait_type,
   unit,
   ptr,
   app,

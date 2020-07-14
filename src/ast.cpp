@@ -39,6 +39,7 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
   case ASTNodeKind::Kind: os << "Kind"; break;
   case ASTNodeKind::Type: os << "Type"; break;
   case ASTNodeKind::Prop: os << "Prop"; break;
+  case ASTNodeKind::trait_type: os << "Trait"; break;
   case ASTNodeKind::unit: os << "()"; break;
   case ASTNodeKind::number: os << std::static_pointer_cast<number>(node)->symb.get_string(); break;
   case ASTNodeKind::ptr: os << "*"; print(os, std::static_pointer_cast<pointer>(node)->of); break;
@@ -226,6 +227,7 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
   case ASTNodeKind::Kind: ret = what->kind == ASTNodeKind::Kind; break;
   case ASTNodeKind::Type: ret = what->kind == ASTNodeKind::Type; break;
   case ASTNodeKind::Prop: ret = what->kind == ASTNodeKind::Prop; break;
+  case ASTNodeKind::trait_type: ret = what->kind == ASTNodeKind::trait_type; break;
   case ASTNodeKind::unit: ret = what->kind == ASTNodeKind::unit; break;
   case ASTNodeKind::number: ret = what->kind == ASTNodeKind::number
                             && std::static_pointer_cast<number>(in)->symb == std::static_pointer_cast<number>(what)->symb; break;
@@ -401,6 +403,7 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   case ASTNodeKind::Kind: os << "Kind"; break;
   case ASTNodeKind::Type: os << "Type"; break;
   case ASTNodeKind::Prop: os << "Prop"; break;
+  case ASTNodeKind::trait_type: os << "Trait"; break;
   case ASTNodeKind::unit: os << "()"; break;
   case ASTNodeKind::number: os << std::static_pointer_cast<number>(node)->symb.get_string(); break;
   case ASTNodeKind::ptr: os << "*"; print(os, std::static_pointer_cast<pointer>(node)->of); break;
@@ -503,6 +506,13 @@ void hx_ast::consider_scoping(scope_base& sc, ASTNodePtrCache& seen, ScopingIndi
   switch(p->kind)
   {
     default: assert(false && "Unconsidered case"); break;
+
+    case ASTNodeKind::Kind:
+    case ASTNodeKind::Type:
+    case ASTNodeKind::unit:
+    case ASTNodeKind::Prop:
+    case ASTNodeKind::trait_type:
+      break;
 
     case ASTNodeKind::trait: {
       auto x = std::static_pointer_cast<trait>(p);

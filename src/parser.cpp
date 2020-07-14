@@ -349,6 +349,14 @@ ast_ptr hx_reader::parse_Prop()
   return std::make_shared<prop>();
 }
 
+// e := Trait
+ast_ptr hx_reader::parse_Trait()
+{
+  if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Trait))
+    return mk_error();
+  return std::make_shared<trait_type>();
+}
+
 // s := `data` name ( `(` id `:` type `)` )* `:` type `;`
 ast_ptr hx_reader::parse_data_ctor()
 {
@@ -496,11 +504,12 @@ ast_ptr hx_reader::parse_keyword()
 {
   switch(current.data.get_hash())
   {
-  case hash_string("Type"): return parse_Type();
-  case hash_string("Kind"): return parse_Kind();
-  case hash_string("Prop"): return parse_Prop();
-  case hash_string("case"): return parse_case();
-  case hash_string("let"):  return parse_assign();
+  case hash_string("Type"):  return parse_Type();
+  case hash_string("Kind"):  return parse_Kind();
+  case hash_string("Prop"):  return parse_Prop();
+  case hash_string("Trait"): return parse_Trait();
+  case hash_string("case"):  return parse_case();
+  case hash_string("let"):   return parse_assign();
   }
   assert(false && "bug in lexer, we would not see a keyword token otherwise");
   return mk_error();
