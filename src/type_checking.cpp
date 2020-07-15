@@ -777,7 +777,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   case ASTNodeKind::number: {
       auto it = std::find_if(ctx.data.begin(), ctx.data.end(), [](auto& a)
                              { return a.type && a.type->kind == ASTNodeKind::identifier
-                                  && std::static_pointer_cast<number>(a.type)->symb == symbol("Nat"); });
+                                  && std::static_pointer_cast<number>(a.type)->symb == symbol("nat"); });
       if(it == ctx.data.end())
       {
         std::stringstream a;
@@ -1000,7 +1000,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         }
       }
-      return what->type = std::make_shared<trait_type>(); // <- TODO: ok?
+      return what->type = std::make_shared<unit>(); // <- TODO: ok?
     } break;
   }
   assert(false && "Unimplemented synthesis.");

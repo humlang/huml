@@ -116,7 +116,9 @@ private:
   ast_ptr parse_type_ctor();
   ast_ptr parse_data_ctor();
   ast_ptr parse_map_impl();
-  ast_ptr parse_function();
+  ast_ptr parse_function(bool no_body = false);
+  ast_ptr parse_trait();
+  ast_ptr parse_implement();
 
   ast_ptr parse_directive();
 

@@ -609,7 +609,7 @@ bool hx_ast::type_checks(scoping_context& ctx)
   auto nat_id = std::make_shared<identifier>(symbol("nat"));
   auto nat_type = std::make_shared<assign_type>(nat_id, std::make_shared<type>());
 
-  ctx.base.bindings.emplace(symbol("Nat"), nat_id);
+  ctx.base.bindings.emplace(symbol("nat"), nat_id);
   data.insert(data.begin(), nat_type);
   // bytes
   auto bytes_id   = std::make_shared<identifier>(symbol("bytes"));

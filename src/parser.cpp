@@ -240,7 +240,7 @@ ast_ptr hx_reader::parse_lambda()
 }
 
 // s := id (a : type)...(z : type) := e ;
-ast_ptr hx_reader::parse_function()
+ast_ptr hx_reader::parse_function(bool no_body)
 {
   auto id = parse_identifier();
   auto fn_name = old.data;
@@ -294,12 +294,35 @@ ast_ptr hx_reader::parse_function()
 
   // check if the return type is annotated
   ast_ptr return_type = nullptr;
-  if(accept(token_kind::Arrow))
+  if(!no_body && accept(token_kind::Arrow))
   {
     return_type = parse_expression();
 
     if(return_type == error_ref)
       error = true;
+  }
+  else if(no_body)
+  {
+    if(!expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow))
+      error = true;
+
+    return_type = parse_expression();
+    for(auto& x : params)
+      scoping_ctx->binder_stack.pop_back();
+    scoping_ctx->cur_scope = oldsc;
+
+    if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || return_type == error_ref)
+      error = true;
+
+    if(error)
+      return mk_error();
+    lambda::ptr lam = std::make_shared<lambda>(params.back(), return_type, fn_name);
+
+    for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
+      lam = std::make_shared<lambda>(*it, lam, fn_name);
+
+    scoping_ctx->cur_scope->bindings.emplace(fn_name, lam);
+    return lam;
   }
   if(!expect(token_kind::ColonEqual, diagnostic_db::parser::function_expects_colon_eq))
     error = true;
@@ -315,8 +338,6 @@ ast_ptr hx_reader::parse_function()
   if(error)
     return mk_error();
   lambda::ptr lam = std::make_shared<lambda>(params.back(), expr, fn_name);
-  // TODO: set type of function
-
   for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
     lam = std::make_shared<lambda>(*it, lam, fn_name);
 
@@ -482,14 +503,142 @@ ast_ptr hx_reader::parse_expr_stmt()
   return std::make_shared<expr_stmt>(expr);
 }
 
+// s := trait id param-list { function-decl+; };
+ast_ptr hx_reader::parse_trait()
+{
+  assert(accept(token_kind::Keyword) && "expected \"trait\" keyword");
+  auto trait_name = parse_identifier();
+  auto trait_name_id = old.data;
+
+  bool error = trait_name == error_ref;
+  if(error)
+    return mk_error();
+
+  auto oldsc = scoping_ctx->cur_scope;
+  std::vector<ast_ptr> params;
+  if(!expect('(', diagnostic_db::parser::type_expects_lparen))
+    error = true;
+  do {
+    std::vector<std::pair<ast_ptr, symbol>> ids_of_same_type;
+    ids_of_same_type.reserve(32);
+
+    // each parameter corresponds to a new lambda!
+    scoping_ctx->cur_scope = scoping_ctx->cur_scope->new_child();
+    {
+    parsing_pattern = true;
+    scoping_ctx->is_binding = true;
+    auto id = parse_identifier();
+    scoping_ctx->is_binding = false;
+    parsing_pattern = false;
+    ids_of_same_type.emplace_back(id, old.data);
+    while(current.kind == token_kind::Identifier)
+    {
+      // each parameter corresponds to a new lambda!
+      scoping_ctx->cur_scope = scoping_ctx->cur_scope->new_child();
+      parsing_pattern = true;
+      scoping_ctx->is_binding = true;
+      id = parse_identifier();
+      scoping_ctx->is_binding = false;
+      parsing_pattern = false;
+      ids_of_same_type.emplace_back(id, old.data);
+    }
+    }
+    if(!expect(':', diagnostic_db::parser::lambda_param_type_decl_expects_colon))
+      error = true;
+    auto typ = parse_expression();
+
+    for(auto& p : ids_of_same_type)
+    {
+      p.first->annot = typ;
+      params.push_back(p.first);
+
+      scoping_ctx->binder_stack.emplace_back(p.second, p.first);
+      scoping_ctx->cur_scope->bindings.emplace(p.second, p.first);
+    }
+    if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
+      error = true;
+  } while(accept('('));
+
+  if(!expect('{', diagnostic_db::parser::trait_decl_expects_lbrace))
+    error = true;
+
+  std::vector<ast_ptr> fns;
+  do
+  {
+    auto fn = parse_function(true);
+    if(fn == error_ref)
+      error = true;
+    else
+      fns.emplace_back(fn);
+  } while(accept(';'));
+
+  if(!expect('}', diagnostic_db::parser::trait_decl_expects_rbrace))
+    error = true;
+
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+    error = true;
+
+  for(auto& x : params)
+    scoping_ctx->binder_stack.pop_back();
+  scoping_ctx->cur_scope = oldsc;
+
+  if(error)
+    return mk_error();
+  auto ret = std::make_shared<trait>(trait_name, params, fns);
+
+  auto it = params.rbegin();
+  auto lam = std::make_shared<lambda>(*it, std::make_shared<trait_type>());
+  for(it = it + 1; it != params.rend(); ++it)
+    lam = std::make_shared<lambda>(*it, lam);
+
+  scoping_ctx->cur_scope->bindings.emplace(trait_name_id, lam);
+  return ret;
+}
+
+// s := implement expr { function+; };
+ast_ptr hx_reader::parse_implement()
+{
+  assert(accept(token_kind::Keyword) && "expected \"implement\" keyword");
+  auto trait = parse_expression();
+
+  bool error = trait == error_ref;
+  if(error)
+    return mk_error();
+
+  if(!expect('{', diagnostic_db::parser::trait_decl_expects_lbrace))
+    error = true;
+
+  std::vector<ast_ptr> fns;
+  do
+  {
+    auto fn = parse_function();
+    fns.emplace_back(fn);
+  } while(accept(';'));
+
+  if(!expect('}', diagnostic_db::parser::trait_decl_expects_rbrace))
+    error = true;
+  if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
+    error = true;
+  if(error)
+    return mk_error();
+
+  return std::make_shared<implement>(trait, fns);
+}
+
 ast_ptr hx_reader::parse_statement()
 {
   ast_ptr to_ret = nullptr;
   fixits_stack.emplace_back();
-  if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("type").get_hash())
-    to_ret = parse_type_ctor();
-  else if(current.kind == token_kind::Keyword && current.data.get_hash() == symbol("data").get_hash())
-    to_ret = parse_data_ctor();
+  if(current.kind == token_kind::Keyword)
+  {
+    switch(current.data.get_hash())
+    {
+    case hash_string("type"): to_ret = parse_type_ctor(); break;
+    case hash_string("data"): to_ret = parse_data_ctor(); break;
+    case hash_string("trait"): to_ret = parse_trait(); break;
+    case hash_string("implement"): to_ret = parse_implement(); break;
+    }
+  }
   else if(current.kind == token_kind::Hash)
     to_ret = parse_directive();
   else if(current.kind == token_kind::Identifier && next_toks[0].kind == token_kind::LParen)
@@ -752,6 +901,7 @@ ast_ptr hx_reader::parse_expression(int precedence)
       case token_kind::RBracket:
       case token_kind::RBrace:
       case token_kind::Comma:
+      case token_kind::LBrace:
       case token_kind::LBracket:
       case token_kind::Doublearrow:
       {

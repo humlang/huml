@@ -42,6 +42,8 @@ auto keyword_set = tsl::robin_set<std::string_view>({
   "Kind"sv,
   "Prop"sv,
   "Trait"sv,
+  "trait"sv,
+  "implement"sv,
   "type"sv,
   "data"sv,
   "case"sv,
@@ -234,6 +236,11 @@ restart_get:
   {
     kind = token_kind::Hash;
     data = "#";
+  } break;
+  case '.':
+  {
+    kind = token_kind::Dot;
+    data = ".";
   } break;
   case '|':
   {

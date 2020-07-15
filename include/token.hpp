@@ -36,6 +36,7 @@ enum class token_kind : std::int8_t
     Backslash = '\\',
     Semi = ';',
     Colon = ':',
+    Dot = '.',
     LBrace = '{',
     RBrace = '}',
     Pipe = '|',

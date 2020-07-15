@@ -81,6 +81,10 @@ db_entry_arg(error, type_expects_lparen, "Type expects a `(` here, instead got \
 db_entry_arg(error, pi_expects_lparen, "Pi type expects a `(` here, instead got \"{}\".");
 db_entry_arg(error, pi_expects_rparen, "Pi type expects a `)` here, instead got \"{}\".");
 db_entry_arg(error, pi_requires_explicit_domain, "Pi type requires a domain introduced with a `:` type check, instead got \"{}\".");
+db_entry_arg(error, trait_decl_expects_lbrace, "Trait declaration expects a `{{` here, instead got \"{}\".");
+db_entry_arg(error, trait_decl_expects_rbrace, "Trait declaration expects a `}}` here, instead got \"{}\".");
+db_entry_arg(error, implement_decl_expects_lbrace, "Implement declaration expects a `{{` here, instead got \"{}\".");
+db_entry_arg(error, implement_decl_expects_rbrace, "Implement declaration expects a `}}` here, instead got \"{}\".");
 
 }
 
