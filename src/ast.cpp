@@ -511,16 +511,22 @@ void hx_ast::consider_scoping(scope_base& sc, ASTNodePtrCache& seen, ScopingIndi
     case ASTNodeKind::Type:
     case ASTNodeKind::unit:
     case ASTNodeKind::Prop:
+    case ASTNodeKind::number:
     case ASTNodeKind::trait_type:
       break;
 
     case ASTNodeKind::trait: {
       auto x = std::static_pointer_cast<trait>(p);
 
+      auto* lower = sc.children[child_indices[&sc]++].get();
       for(auto& v : x->params)
-        v = handle_id(v, sc, seen, child_indices, this);
+      {
+        v = handle_id(v->annot, *lower, seen, child_indices, this);
+
+        lower = lower->children[child_indices[lower]++].get();
+      }
       for(auto& v : x->methods)
-        v = handle_id(v, sc, seen, child_indices, this);
+        v = handle_id(v, *lower, seen, child_indices, this);
     } break;
     case ASTNodeKind::implement: {
       auto x = std::static_pointer_cast<implement>(p);
@@ -603,26 +609,61 @@ bool hx_ast::type_checks(scoping_context& ctx)
   bool type_checks = true;
 
   typing_context tctx;
-
-  /// Add basic defs
-  // Nat
+  //// Add basic defs
+  /// __reinterpret        ~        \(A : Type). \(a : A). \(B : Type). B
+  auto reinterpret_id = std::make_shared<identifier>(symbol("__reinterpret"));
+  {
+  auto A = std::make_shared<identifier>(symbol("A")); A->annot = A->type = std::make_shared<type>();
+  auto a = std::make_shared<identifier>(symbol("a")); a->annot = a->type = A;
+  auto B = std::make_shared<identifier>(symbol("B")); B->annot = B->type = std::make_shared<type>();
+  auto reinterpret_type = std::make_shared<lambda>(A, std::make_shared<lambda>(a, std::make_shared<lambda>(B, B)));
+  tctx.data.emplace_back(reinterpret_id, reinterpret_type);
+  }
+  ctx.base.bindings.emplace(symbol("__reinterpret"), reinterpret_id);
+      // TODO: do we need to add stuff to `ctx.cur_scope->bindings`?
+  /// nat
   auto nat_id = std::make_shared<identifier>(symbol("nat"));
-  auto nat_type = std::make_shared<assign_type>(nat_id, std::make_shared<type>());
+  auto nat_type = std::make_shared<type>();
+  auto nat_type_assign = std::make_shared<assign_type>(nat_id, nat_type);
 
   ctx.base.bindings.emplace(symbol("nat"), nat_id);
-  data.insert(data.begin(), nat_type);
-  // bytes
+  tctx.data.emplace_back(nat_id, nat_type);
+  /// bytes
   auto bytes_id   = std::make_shared<identifier>(symbol("bytes"));
 
   auto bytes_underscore = std::make_shared<identifier>(symbol("_"));
   bytes_underscore->annot = nat_id;
-  auto bytes_type = std::make_shared<assign_type>(bytes_id,
-                                                  std::make_shared<lambda>(bytes_underscore, std::make_shared<type>()));
+  auto bytes_type = std::make_shared<lambda>(bytes_underscore, std::make_shared<type>());
+  auto bytes_type_assign = std::make_shared<assign_type>(bytes_id, bytes_type);
+
   ctx.base.bindings.emplace(symbol("bytes"), bytes_id);
-  data.insert(data.begin(), bytes_type);
-  /// fixup
+  tctx.data.emplace_back(bytes_id, bytes_type);
+  /// __nat_to_bytes_signed   ~     \(A : Type). \(n : Nat). \(a : A). bytes n
+  auto nat_to_bytes_signed_id = std::make_shared<identifier>(symbol("__nat_to_bytes_signed"));
+  {
+  auto A = std::make_shared<identifier>(symbol("A")); A->annot = A->type = std::make_shared<type>();
+  auto n = std::make_shared<identifier>(symbol("n")); n->annot = n->type = nat_id;
+  auto a = std::make_shared<identifier>(symbol("a")); a->annot = a->type = A;
+  auto bytes_n = std::make_shared<app>(bytes_id, n);
+  tctx.data.emplace_back(nat_to_bytes_signed_id, std::make_shared<lambda>(A,
+                                                    std::make_shared<lambda>(n,
+                                                      std::make_shared<lambda>(a, bytes_n))));
+  }
+  ctx.base.bindings.emplace(symbol("__nat_to_bytes_signed"), nat_to_bytes_signed_id);
+  /// __nat_to_bytes_unsigned   ~     \(A : Type). \(n : Nat). \(a : A). bytes n
+  auto nat_to_bytes_unsigned_id = std::make_shared<identifier>(symbol("__nat_to_bytes_unsigned"));
+  {
+  auto A = std::make_shared<identifier>(symbol("A")); A->annot = A->type = std::make_shared<type>();
+  auto n = std::make_shared<identifier>(symbol("n")); n->annot = n->type = nat_id;
+  auto a = std::make_shared<identifier>(symbol("a")); a->annot = a->type = A;
+  auto bytes_n = std::make_shared<app>(bytes_id, n);
+  tctx.data.emplace_back(nat_to_bytes_unsigned_id, std::make_shared<lambda>(A,
+                                                    std::make_shared<lambda>(n,
+                                                      std::make_shared<lambda>(a, bytes_n))));
+  }
+  ctx.base.bindings.emplace(symbol("__nat_to_bytes_unsigned"), nat_to_bytes_unsigned_id);
+  //// fixup
   consider_scoping(ctx);
-  tctx.data.emplace_back(nat_id, nat_id);
 
   /// typecheck
   for(auto& root : data)
