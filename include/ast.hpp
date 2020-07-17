@@ -212,11 +212,6 @@ struct expr_stmt : ast_base
   ast_ptr lhs;
 };
 
-struct scoping_context;
-struct scope_base;
-using ScopingIndices = std::unordered_map<scope_base*, std::size_t>;
-using ASTNodePtrCache = std::unordered_set<ast_ptr>;
-
 struct hx_ast
 {
   hx_ast();
@@ -225,8 +220,7 @@ struct hx_ast
   //   def x = +      def x  +
   //          / \   to      / \  <- uses of identifiers now
   //         x   x         def x    point to their definition
-  void consider_scoping(scoping_context& ctx);
-  void consider_scoping(scope_base& ctx, ASTNodePtrCache& seen, ScopingIndices& child_indices, ast_ptr at);
+  void consider_scoping();
 
   void print(std::ostream& os) const;
   static void print(std::ostream& os, ast_ptr node);
@@ -236,7 +230,7 @@ struct hx_ast
   { tsl::robin_set<identifier::ptr> binders; return used(what, in, binders, ign_type); }
   static bool used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders, bool ign_type);
 
-  bool type_checks(scoping_context& ctx);
+  bool type_checks();
   void cogen(std::string output_file) const;
 
   std::vector<ast_ptr> data;

@@ -478,30 +478,8 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
   }
 }
 
-ast_ptr handle_id(ast_ptr potential_id, scope_base& sc, ASTNodePtrCache& seen, ScopingIndices& child_indices, hx_ast* self)
-{
-  if(!potential_id)
-    return potential_id;
-  else if(potential_id->kind != ASTNodeKind::identifier)
-  {
-    self->consider_scoping(sc, seen, child_indices, potential_id);
-    return potential_id;
-  }
-  auto id = std::static_pointer_cast<identifier>(potential_id);
-  
-  if(id->is_binding)
-    return id;
-
-  // We need to substitute this identifier with its binding
-  auto symb_binding = sc.get(id->symb);
-  
-  // TODO: emit diagnostic instead of assert
-  assert(symb_binding != nullptr && "binding for unbound identifier must exist");
-
-  return symb_binding;
-}
-
-void hx_ast::consider_scoping(scope_base& sc, ASTNodePtrCache& seen, ScopingIndices& child_indices, ast_ptr p)
+/*
+void hx_ast::consider_scoping()
 {
   switch(p->kind)
   {
@@ -518,92 +496,58 @@ void hx_ast::consider_scoping(scope_base& sc, ASTNodePtrCache& seen, ScopingIndi
     case ASTNodeKind::trait: {
       auto x = std::static_pointer_cast<trait>(p);
 
-      auto* lower = sc.children[child_indices[&sc]++].get();
-      for(auto& v : x->params)
-      {
-        v = handle_id(v->annot, *lower, seen, child_indices, this);
-
-        lower = lower->children[child_indices[lower]++].get();
-      }
-      for(auto& v : x->methods)
-        v = handle_id(v, *lower, seen, child_indices, this);
     } break;
     case ASTNodeKind::implement: {
       auto x = std::static_pointer_cast<implement>(p);
 
-      x->trait = handle_id(x->trait, sc, seen, child_indices, this);
-      for(auto& v : x->methods)
-        v = handle_id(v, sc, seen, child_indices, this);
     } break;
     case ASTNodeKind::ptr: {
       auto x = std::static_pointer_cast<pointer>(p);
 
-      x->of = handle_id(x->of, sc, seen, child_indices, this);
     } break;
     case ASTNodeKind::app: {
       auto x = std::static_pointer_cast<app>(p);
 
-      x->lhs = handle_id(x->lhs, sc, seen, child_indices, this);
-      x->rhs = handle_id(x->rhs, sc, seen, child_indices, this);
     } break;
     case ASTNodeKind::lambda: {
       auto x = std::static_pointer_cast<lambda>(p);
 
-      x->lhs->annot = handle_id(x->lhs->annot, sc, seen, child_indices, this);
-      x->rhs = handle_id(x->rhs, *sc.children[child_indices[&sc]++], seen, child_indices, this);
     } break;
     case ASTNodeKind::match: {
       auto x = std::static_pointer_cast<match>(p);
 
-      auto lower = *sc.children[child_indices[&sc]++];
-      x->pat = handle_id(x->pat, lower, seen, child_indices, this);
-      x->exp = handle_id(x->exp, lower, seen, child_indices, this);
     } break;
     case ASTNodeKind::pattern_matcher: {
       auto x = std::static_pointer_cast<pattern_matcher>(p);
 
-      x->to_match = handle_id(x->to_match, sc, seen, child_indices, this);
-
-      for(auto& a : x->data)
-        a = handle_id(a, sc, seen, child_indices, this);
     } break;
     case ASTNodeKind::assign: {
       auto x = std::static_pointer_cast<assign>(p);
 
-      x->definition = handle_id(x->definition, sc, seen, child_indices, this);
-      x->in = handle_id(x->in, *sc.children[child_indices[&sc]++], seen, child_indices, this);
     } break;
     case ASTNodeKind::assign_type: {
       auto x = std::static_pointer_cast<assign_type>(p);
 
-      x->rhs = handle_id(x->rhs, sc, seen, child_indices, this);
     } break;
     case ASTNodeKind::assign_data: {
       auto x = std::static_pointer_cast<assign_data>(p);
 
-      x->rhs = handle_id(x->rhs, sc, seen, child_indices, this);
     } break;
     case ASTNodeKind::expr_stmt: {
       auto x = std::static_pointer_cast<expr_stmt>(p);
 
-      x->lhs = handle_id(x->lhs, sc, seen, child_indices, this);
     } break;
   }
   if(p->annot && !seen.count(p))
     consider_scoping(sc, seen, child_indices, p->annot);
 }
+*/
 
-void hx_ast::consider_scoping(scoping_context& ctx)
+void hx_ast::consider_scoping()
 {
-  // visit all identifiers, see if they need fixing
-  ASTNodePtrCache seen;
-  ScopingIndices child_indices;
-  std::queue<ast_ptr> to_visit;
-  for(auto& p : data)
-    consider_scoping(ctx.base, seen, child_indices, p);
 }
 
-bool hx_ast::type_checks(scoping_context& ctx)
+bool hx_ast::type_checks()
 {
   hx_ast_type_checking checker;
   bool type_checks = true;
@@ -617,16 +561,15 @@ bool hx_ast::type_checks(scoping_context& ctx)
   auto a = std::make_shared<identifier>(symbol("a")); a->annot = a->type = A;
   auto B = std::make_shared<identifier>(symbol("B")); B->annot = B->type = std::make_shared<type>();
   auto reinterpret_type = std::make_shared<lambda>(A, std::make_shared<lambda>(a, std::make_shared<lambda>(B, B)));
+  data.insert(data.begin(), std::make_shared<assign_data>(reinterpret_id, reinterpret_type));
   tctx.data.emplace_back(reinterpret_id, reinterpret_type);
   }
-  ctx.base.bindings.emplace(symbol("__reinterpret"), reinterpret_id);
       // TODO: do we need to add stuff to `ctx.cur_scope->bindings`?
   /// nat
   auto nat_id = std::make_shared<identifier>(symbol("nat"));
   auto nat_type = std::make_shared<type>();
   auto nat_type_assign = std::make_shared<assign_type>(nat_id, nat_type);
 
-  ctx.base.bindings.emplace(symbol("nat"), nat_id);
   tctx.data.emplace_back(nat_id, nat_type);
   /// bytes
   auto bytes_id   = std::make_shared<identifier>(symbol("bytes"));
@@ -634,10 +577,9 @@ bool hx_ast::type_checks(scoping_context& ctx)
   auto bytes_underscore = std::make_shared<identifier>(symbol("_"));
   bytes_underscore->annot = nat_id;
   auto bytes_type = std::make_shared<lambda>(bytes_underscore, std::make_shared<type>());
-  auto bytes_type_assign = std::make_shared<assign_type>(bytes_id, bytes_type);
 
-  ctx.base.bindings.emplace(symbol("bytes"), bytes_id);
-  tctx.data.emplace_back(bytes_id, bytes_type);
+  data.insert(data.begin(), std::make_shared<assign_type>(bytes_id, bytes_type));
+  tctx.data.emplace_back(bytes_id, std::make_shared<type>());
   /// __nat_to_bytes_signed   ~     \(A : Type). \(n : Nat). \(a : A). bytes n
   auto nat_to_bytes_signed_id = std::make_shared<identifier>(symbol("__nat_to_bytes_signed"));
   {
@@ -645,11 +587,12 @@ bool hx_ast::type_checks(scoping_context& ctx)
   auto n = std::make_shared<identifier>(symbol("n")); n->annot = n->type = nat_id;
   auto a = std::make_shared<identifier>(symbol("a")); a->annot = a->type = A;
   auto bytes_n = std::make_shared<app>(bytes_id, n);
-  tctx.data.emplace_back(nat_to_bytes_signed_id, std::make_shared<lambda>(A,
-                                                    std::make_shared<lambda>(n,
-                                                      std::make_shared<lambda>(a, bytes_n))));
+  auto nat_to_bytes_signed_type = std::make_shared<lambda>(A,
+                                    std::make_shared<lambda>(n,
+                                      std::make_shared<lambda>(a, bytes_n)));
+  tctx.data.emplace_back(nat_to_bytes_signed_id, nat_to_bytes_signed_type);
+  data.insert(data.begin(), std::make_shared<assign_data>(nat_to_bytes_signed_id, nat_to_bytes_signed_type));
   }
-  ctx.base.bindings.emplace(symbol("__nat_to_bytes_signed"), nat_to_bytes_signed_id);
   /// __nat_to_bytes_unsigned   ~     \(A : Type). \(n : Nat). \(a : A). bytes n
   auto nat_to_bytes_unsigned_id = std::make_shared<identifier>(symbol("__nat_to_bytes_unsigned"));
   {
@@ -657,13 +600,14 @@ bool hx_ast::type_checks(scoping_context& ctx)
   auto n = std::make_shared<identifier>(symbol("n")); n->annot = n->type = nat_id;
   auto a = std::make_shared<identifier>(symbol("a")); a->annot = a->type = A;
   auto bytes_n = std::make_shared<app>(bytes_id, n);
-  tctx.data.emplace_back(nat_to_bytes_unsigned_id, std::make_shared<lambda>(A,
-                                                    std::make_shared<lambda>(n,
-                                                      std::make_shared<lambda>(a, bytes_n))));
+  auto nat_to_bytes_unsigned_type = std::make_shared<lambda>(A,
+                                      std::make_shared<lambda>(n,
+                                        std::make_shared<lambda>(a, bytes_n)));
+  tctx.data.emplace_back(nat_to_bytes_unsigned_id, nat_to_bytes_unsigned_type);
+  data.insert(data.begin(), std::make_shared<assign_data>(nat_to_bytes_unsigned_id, nat_to_bytes_unsigned_type));
   }
-  ctx.base.bindings.emplace(symbol("__nat_to_bytes_unsigned"), nat_to_bytes_unsigned_id);
   //// fixup
-  consider_scoping(ctx);
+  consider_scoping();
 
   /// typecheck
   for(auto& root : data)

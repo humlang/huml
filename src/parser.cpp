@@ -89,46 +89,8 @@ ast_ptr hx_reader::parse_identifier()
     return mk_error();
   }
   auto id = old.data;
-  auto present = std::find_if(scoping_ctx->binder_stack.rbegin(), scoping_ctx->binder_stack.rend(),
-        [&id](auto x) { return x.first == id; });
 
-  if(present != scoping_ctx->binder_stack.rend())
-  {
-    if(id == symbol("_"))
-    {
-      // Do not reference
-      return std::make_shared<identifier>(id);
-    }
-    else if(!scoping_ctx->is_binding) // only use the known var if this occurence isn't binding
-    {
-      if(scoping_ctx->disallow_recursion == present->second)
-      {
-        diagnostic <<= diagnostic_db::sema::disallow_recursion(old.loc, old.data.get_string());
-        return mk_error();
-      }
-      //assert(scoping_ctx->cur_scope->contains(id) && "symboltable and binder stack must not disagree");
-      // literally use the binding as reference
-      return present->second;
-    }
-    else
-    {
-      // > shadowing, we've seen this binder before, now it's bound to something new
-      goto bind;
-    }
-  }
-  else
-  {
-bind:
-    auto to_ret = std::make_shared<identifier>(id); // <- free variable
-    if(scoping_ctx->is_binding)
-    {
-      scoping_ctx->binder_stack.emplace_back(id, to_ret);
-      scoping_ctx->cur_scope->bindings.emplace(id, to_ret);
-
-      to_ret->is_binding = true;
-    }
-    return to_ret;
-  }
+  return std::make_shared<identifier>(old.data);
 }
 
 // e := e1 e2
@@ -152,8 +114,6 @@ ast_ptr hx_reader::parse_lambda()
   {
     /// Shorthand for \_:A.B
     // A -> B
-    auto oldsc = scoping_ctx->cur_scope;
-    scoping_ctx->cur_scope = oldsc->new_child();
     parsing_pattern = true;
     auto param = parse_identifier();
     parsing_pattern = false;
@@ -164,7 +124,6 @@ ast_ptr hx_reader::parse_lambda()
 
     // No scoping, the argument implicitly is "_" so there is nothing to bind!
     auto expr = parse_expression();
-    scoping_ctx->cur_scope = oldsc;
     if(expr == error_ref)
       error = true;
 
@@ -186,11 +145,7 @@ ast_ptr hx_reader::parse_lambda()
     parentheses++;
 
   parsing_pattern = true;
-  scoping_ctx->is_binding = true;
-  auto oldsc = scoping_ctx->cur_scope;
-  scoping_ctx->cur_scope = oldsc->new_child();
   auto param = parse_identifier();
-  scoping_ctx->is_binding = false;
   parsing_pattern = false;
   auto psymb = old.data;
 
@@ -223,10 +178,7 @@ ast_ptr hx_reader::parse_lambda()
   }
   if(!expect('.', diagnostic_db::parser::lambda_expects_dot))
     error = true;
-  scoping_ctx->binder_stack.emplace_back(psymb, param);
   auto expr = parse_expression();
-  scoping_ctx->binder_stack.pop_back();
-  scoping_ctx->cur_scope = oldsc;
 
   if(expr == error_ref)
     error = true;
@@ -247,7 +199,6 @@ ast_ptr hx_reader::parse_function(bool no_body)
 
   bool error = id == error_ref;
 
-  auto oldsc = scoping_ctx->cur_scope;
   std::vector<ast_ptr> params;
   if(!expect('(', diagnostic_db::parser::type_expects_lparen))
     error = true;
@@ -256,22 +207,16 @@ ast_ptr hx_reader::parse_function(bool no_body)
     ids_of_same_type.reserve(32);
 
     // each parameter corresponds to a new lambda!
-    scoping_ctx->cur_scope = scoping_ctx->cur_scope->new_child();
     {
     parsing_pattern = true;
-    scoping_ctx->is_binding = true;
     auto id = parse_identifier();
-    scoping_ctx->is_binding = false;
     parsing_pattern = false;
     ids_of_same_type.emplace_back(id, old.data);
     while(current.kind == token_kind::Identifier)
     {
       // each parameter corresponds to a new lambda!
-      scoping_ctx->cur_scope = scoping_ctx->cur_scope->new_child();
       parsing_pattern = true;
-      scoping_ctx->is_binding = true;
       id = parse_identifier();
-      scoping_ctx->is_binding = false;
       parsing_pattern = false;
       ids_of_same_type.emplace_back(id, old.data);
     }
@@ -284,9 +229,6 @@ ast_ptr hx_reader::parse_function(bool no_body)
     {
       p.first->annot = typ;
       params.push_back(p.first);
-
-      scoping_ctx->binder_stack.emplace_back(p.second, p.first);
-      scoping_ctx->cur_scope->bindings.emplace(p.second, p.first);
     }
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       error = true;
@@ -307,10 +249,6 @@ ast_ptr hx_reader::parse_function(bool no_body)
       error = true;
 
     return_type = parse_expression();
-    for(auto& x : params)
-      scoping_ctx->binder_stack.pop_back();
-    scoping_ctx->cur_scope = oldsc;
-
     if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || return_type == error_ref)
       error = true;
 
@@ -320,18 +258,12 @@ ast_ptr hx_reader::parse_function(bool no_body)
 
     for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
       lam = std::make_shared<lambda>(*it, lam, fn_name);
-
-    scoping_ctx->cur_scope->bindings.emplace(fn_name, lam);
     return lam;
   }
   if(!expect(token_kind::ColonEqual, diagnostic_db::parser::function_expects_colon_eq))
     error = true;
 
   auto expr = parse_expression();
-  for(auto& x : params)
-    scoping_ctx->binder_stack.pop_back();
-  scoping_ctx->cur_scope = oldsc;
-
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || expr == error_ref)
     error = true;
 
@@ -340,9 +272,6 @@ ast_ptr hx_reader::parse_function(bool no_body)
   lambda::ptr lam = std::make_shared<lambda>(params.back(), expr, fn_name);
   for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
     lam = std::make_shared<lambda>(*it, lam, fn_name);
-
-  scoping_ctx->cur_scope->bindings.emplace(fn_name, lam);
-
   return lam;
 }
 
@@ -386,19 +315,13 @@ ast_ptr hx_reader::parse_data_ctor()
   if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
     error = false;
 
-  scoping_ctx->is_binding = true;
   auto type_name = parse_identifier();
-  scoping_ctx->is_binding = false;
   auto type_name_id = old.data;
 
   if(!expect(':', diagnostic_db::parser::type_assign_expects_colon) || type_name == error_ref)
     error = true;
 
-  scoping_ctx->disallow_recursion = type_name;
   auto tail = parse_expression();
-  scoping_ctx->disallow_recursion = nullptr;
-
-  scoping_ctx->cur_scope->bindings.emplace(type_name_id, tail);
 
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || tail == error_ref)
     error = true;
@@ -406,8 +329,6 @@ ast_ptr hx_reader::parse_data_ctor()
   if(error)
     return mk_error();
 
-  scoping_ctx->binder_stack.emplace_back(type_name_id, type_name);
-  
   type_name->annot = tail;
   return std::make_shared<assign_data>(type_name, tail);
 }
@@ -420,19 +341,13 @@ ast_ptr hx_reader::parse_type_ctor()
   if(!expect(token_kind::Keyword, diagnostic_db::parser::type_keyword_expected))
     error = true;
 
-  scoping_ctx->is_binding = true;
   auto type_name = parse_identifier();
-  scoping_ctx->is_binding = false;
   auto type_name_id = old.data;
 
   if(!expect(':', diagnostic_db::parser::type_assign_expects_colon) || type_name == error_ref)
     error = true;
 
-  scoping_ctx->disallow_recursion = type_name;
   auto tail = parse_expression();
-  scoping_ctx->disallow_recursion = nullptr;
-
-  scoping_ctx->cur_scope->bindings.emplace(type_name_id, tail);
 
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || tail == error_ref)
     error = true;
@@ -446,9 +361,7 @@ ast_ptr hx_reader::parse_type_ctor()
 // e := let x := y; e
 ast_ptr hx_reader::parse_assign()
 {
-  scoping_ctx->is_binding = true;
   auto type_name = parse_identifier();
-  scoping_ctx->is_binding = false;
 
   auto var_symb = old.data;
   auto current_source_loc = old.loc;
@@ -460,16 +373,10 @@ ast_ptr hx_reader::parse_assign()
   if(arg == error_ref)
     error = true;
 
-  scoping_ctx->cur_scope->bindings.emplace(var_symb, arg);
-
   if(!expect(token_kind::Semi, diagnostic_db::parser::statement_expects_semicolon_at_end) || error)
     return mk_error();
 
-  auto* old = scoping_ctx->cur_scope;
-  scoping_ctx->cur_scope = old->new_child();
   auto ass = std::make_shared<assign>(type_name, arg, parse_expression());
-  scoping_ctx->cur_scope = old;
-
   ass->identifier->annot = arg->annot;
 
   return ass;
@@ -514,7 +421,6 @@ ast_ptr hx_reader::parse_trait()
   if(error)
     return mk_error();
 
-  auto oldsc = scoping_ctx->cur_scope;
   std::vector<ast_ptr> params;
   if(!expect('(', diagnostic_db::parser::type_expects_lparen))
     error = true;
@@ -523,22 +429,16 @@ ast_ptr hx_reader::parse_trait()
     ids_of_same_type.reserve(32);
 
     // each parameter corresponds to a new lambda!
-    scoping_ctx->cur_scope = scoping_ctx->cur_scope->new_child();
     {
     parsing_pattern = true;
-    scoping_ctx->is_binding = true;
     auto id = parse_identifier();
-    scoping_ctx->is_binding = false;
     parsing_pattern = false;
     ids_of_same_type.emplace_back(id, old.data);
     while(current.kind == token_kind::Identifier)
     {
       // each parameter corresponds to a new lambda!
-      scoping_ctx->cur_scope = scoping_ctx->cur_scope->new_child();
       parsing_pattern = true;
-      scoping_ctx->is_binding = true;
       id = parse_identifier();
-      scoping_ctx->is_binding = false;
       parsing_pattern = false;
       ids_of_same_type.emplace_back(id, old.data);
     }
@@ -551,9 +451,6 @@ ast_ptr hx_reader::parse_trait()
     {
       p.first->annot = typ;
       params.push_back(p.first);
-
-      scoping_ctx->binder_stack.emplace_back(p.second, p.first);
-      scoping_ctx->cur_scope->bindings.emplace(p.second, p.first);
     }
     if(!expect(')', diagnostic_db::parser::closing_parenthesis_expected))
       error = true;
@@ -578,10 +475,6 @@ ast_ptr hx_reader::parse_trait()
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end))
     error = true;
 
-  for(auto& x : params)
-    scoping_ctx->binder_stack.pop_back();
-  scoping_ctx->cur_scope = oldsc;
-
   if(error)
     return mk_error();
   auto ret = std::make_shared<trait>(trait_name, params, fns);
@@ -590,8 +483,6 @@ ast_ptr hx_reader::parse_trait()
   auto lam = std::make_shared<lambda>(*it, std::make_shared<trait_type>());
   for(it = it + 1; it != params.rend(); ++it)
     lam = std::make_shared<lambda>(*it, lam);
-
-  scoping_ctx->cur_scope->bindings.emplace(trait_name_id, lam);
   return ret;
 }
 
@@ -680,17 +571,11 @@ ast_ptr hx_reader::parse_case()
   std::vector<ast_ptr> match_arms;
   if(current.kind != token_kind::LBracket)
   {
-    auto oldsc = scoping_ctx->cur_scope;
-
     // we actually have match arms
     do
     {
-      scoping_ctx->cur_scope = oldsc->new_child();
-
       parsing_pattern = true;
-      scoping_ctx->is_binding = true;
       auto pat = parse_expression();
-      scoping_ctx->is_binding = false;
       parsing_pattern = false;
 
       if(!expect(token_kind::Doublearrow, diagnostic_db::parser::pattern_expects_double_arrow) || pat == error_ref)
@@ -702,8 +587,6 @@ ast_ptr hx_reader::parse_case()
         error = true;
       match_arms.emplace_back(std::make_shared<match>(pat, expr));
     } while(accept('|'));
-
-    scoping_ctx->cur_scope = oldsc;
   }
   if(!expect(']', diagnostic_db::parser::case_expects_rbracket))
     error = true;
@@ -730,9 +613,7 @@ ast_ptr hx_reader::parse_with_parentheses()
     // type checking or lambda
     {
     parsing_pattern = true;
-    scoping_ctx->is_binding = true;
     auto id = parse_identifier();
-    scoping_ctx->is_binding = false;
     parsing_pattern = false;
     ids_of_same_type.emplace_back(id, old.data);
     while(current.kind == token_kind::Identifier)
@@ -755,19 +636,7 @@ ast_ptr hx_reader::parse_with_parentheses()
 
     if(accept(token_kind::Arrow))
     {
-      auto oldsc = scoping_ctx->cur_scope;
-      // lambda
-      for(auto& p : ids_of_same_type)
-      {
-        scoping_ctx->binder_stack.emplace_back(p.second, p.first);
-        
-        scoping_ctx->cur_scope = scoping_ctx->cur_scope->new_child();
-      }
       auto body = parse_expression();
-      for(auto& p : ids_of_same_type)
-        scoping_ctx->binder_stack.pop_back();
-      scoping_ctx->cur_scope = oldsc;
-
       if(body == error_ref)
         error = true;
 
@@ -873,11 +742,7 @@ ast_ptr hx_reader::parse_arrow_lam(ast_ptr argument)
 {
   assert(expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow));
 
-  auto old = scoping_ctx->cur_scope;
-  scoping_ctx->cur_scope = old->new_child();
   auto bdy = parse_expression();
-  scoping_ctx->cur_scope = old;
-
   auto arg = std::make_shared<identifier>("_");
   arg->annot = argument;
   return std::make_shared<lambda>(arg, bdy);
@@ -934,10 +799,9 @@ ast_ptr hx_reader::parse_expression(int precedence)
 }
 
 template<>
-std::vector<hx_ast> hx_reader::read(std::string_view module, scoping_context& ctx)
+std::vector<hx_ast> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
-  r.scoping_ctx = &ctx;
 
   hx_ast ast;
   while(r.current.kind != token_kind::EndOfFile)
@@ -958,7 +822,7 @@ std::vector<hx_ast> hx_reader::read(std::string_view module, scoping_context& ct
 }
 
 template<>
-std::vector<token> hx_reader::read(std::string_view module, scoping_context& )
+std::vector<token> hx_reader::read(std::string_view module)
 {
   hx_reader r(module);
 
@@ -973,11 +837,10 @@ std::vector<token> hx_reader::read(std::string_view module, scoping_context& )
   return toks;
 }
 
-hx_ast hx_reader::read_text(const std::string& text, scoping_context& ctx)
+hx_ast hx_reader::read_text(const std::string& text)
 {
   std::stringstream ss(text);
   hx_reader r(ss);
-  r.scoping_ctx = &ctx;
 
   hx_ast ast;
   while(r.current.kind != token_kind::EndOfFile)
@@ -1080,7 +943,7 @@ ass::instruction asm_reader::parse_labeldef()
 {
   return { std::nullopt, current, std::nullopt, {} };
 }
-
+ 
 template<>
 std::vector<ass::instruction> asm_reader::read(std::string_view module)
 {

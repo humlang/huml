@@ -41,8 +41,8 @@ namespace hx
     void process_command(const std::string& str);
   private:
     typing_context tctx;
-    scoping_context sctx;
     hx_ast_type_checking checker;
+    hx_ast ast;
 
     std::string buf_upto_semi;
 

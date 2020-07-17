@@ -74,7 +74,7 @@ namespace hx
   {
     if(t == "STDIN")
       return;
-    auto w = hx_reader::read<hx_ast>(t, sctx);
+    auto w = hx_reader::read<hx_ast>(t);
 
     auto& global_ir = w.back();
     if(!diagnostic.empty())
@@ -96,6 +96,7 @@ namespace hx
         std::cout << "\n";
       }
     }
+    ast.data.insert(ast.data.end(), global_ir.data.begin(), global_ir.data.end());
   }
 
   void REPL::run_impl()
@@ -141,7 +142,6 @@ R"(
       history();
     else if(line == "'clear-context")
     {
-      sctx.binder_stack.clear();
       tctx.data.clear();
     }
     else
@@ -168,7 +168,7 @@ R"(
       if(to_compute.empty())
         return;
 
-      auto global_ir = hx_reader::read_text(to_compute, sctx);
+      auto global_ir = hx_reader::read_text(to_compute);
 
       if(global_ir.data.empty())
       {
@@ -185,6 +185,8 @@ R"(
         diagnostic.print(stdout);
         diagnostic.reset();
       }
+      ast.data.insert(ast.data.end(), global_ir.data.begin(), global_ir.data.end());
+      ast.consider_scoping(); // <- rewire identifiers
       for(auto& r : global_ir.data)
       {
         if(r == nullptr)

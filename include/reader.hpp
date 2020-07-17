@@ -36,45 +36,6 @@ private:
 };
 
 /// HX_READER
-struct scope_base
-{
-  scope_base() {}
-  scope_base(scope_base* p) : parent(p) {}
-
-  scope_base* parent;
-  std::vector<std::shared_ptr<scope_base>> children;
-
-  symbol_map<ast_ptr> bindings;
-
-  scope_base* new_child()
-  {
-    children.emplace_back(std::make_shared<scope_base>(this));
-    return children.back().get();
-  }
-  bool contains(symbol name)
-  {
-    if(bindings.contains(name))
-      return true;
-    return parent ? parent->contains(name) : false;
-  }
-  ast_ptr get(symbol name)
-  {
-    if(auto it = bindings.find(name); it != bindings.end())
-      return it->second;
-    return parent ? parent->get(name) : nullptr;
-  }
-};
-
-struct scoping_context
-{
-  bool is_binding { false };
-  ast_ptr disallow_recursion { nullptr };
-  std::vector<std::pair<symbol, ast_ptr>> binder_stack;
-
-  scope_base base;
-  scope_base* cur_scope { &base };
-};
-
 class hx_reader : base_reader
 {
 public:
@@ -82,10 +43,10 @@ public:
   static const ast_ptr error_ref; // see parser.cpp
 
   template<typename T>
-  static std::vector<T> read(std::string_view module, scoping_context& ctx)
+  static std::vector<T> read(std::string_view module)
   { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
 
-  static hx_ast read_text(const std::string& str, scoping_context& ctx);
+  static hx_ast read_text(const std::string& str);
 private:
   hx_reader(std::string_view module) : base_reader(module)
   {
@@ -146,7 +107,6 @@ private:
   std::array<token, lookahead_size> next_toks;
 
   bool parsing_pattern { false };
-  scoping_context* scoping_ctx;
 
   std::vector<fixit_info> fixits_stack;
 };
