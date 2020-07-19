@@ -13,11 +13,11 @@
 #include <iostream>
 #include <queue>
 
-hx_ast::hx_ast()
+huml_ast::huml_ast()
 {
 }
 
-void hx_ast::print(std::ostream& os, ast_ptr node)
+void huml_ast::print(std::ostream& os, ast_ptr node)
 {
   if(node == nullptr)
   {
@@ -142,7 +142,7 @@ void hx_ast::print(std::ostream& os, ast_ptr node)
       }
       else
       {
-        if(lam->lhs->annot != nullptr && !hx_ast::used(lam->lhs, lam->rhs))
+        if(lam->lhs->annot != nullptr && !huml_ast::used(lam->lhs, lam->rhs))
         {
           os << "(";
           print(os, lam->lhs->annot);
@@ -210,7 +210,7 @@ std::pair<std::vector<ast_ptr>, ast_ptr> lambda::uncurry() const
   return { args, lam };
 }
 
-void hx_ast::print(std::ostream& os) const
+void huml_ast::print(std::ostream& os) const
 {
   for(auto& root : data)
   {
@@ -219,7 +219,7 @@ void hx_ast::print(std::ostream& os) const
   }
 }
 
-bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders, bool ign_type)
+bool huml_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& binders, bool ign_type)
 {
   bool ret = false;
   switch(in->kind)
@@ -381,7 +381,7 @@ bool hx_ast::used(ast_ptr what, ast_ptr in, tsl::robin_set<identifier::ptr>& bin
   return ret || (in->annot && !ign_type ? used(what, in->annot, binders, ign_type) : false);
 }
 
-void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
+void huml_ast::print_as_type(std::ostream& os, ast_ptr node)
 {
   if(node == nullptr)
   {
@@ -425,7 +425,7 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
       lambda::ptr lam = std::static_pointer_cast<lambda>(node);
 
       assert(lam->name != symbol("") && "must not be external");
-      if(lam->lhs->type != nullptr && !hx_ast::used(lam->lhs, lam->rhs))
+      if(lam->lhs->type != nullptr && !huml_ast::used(lam->lhs, lam->rhs))
       {
         os << "(";
         print_as_type(os, lam->lhs->type);
@@ -479,7 +479,7 @@ void hx_ast::print_as_type(std::ostream& os, ast_ptr node)
 }
 
 /*
-void hx_ast::consider_scoping()
+void huml_ast::consider_scoping()
 {
   switch(p->kind)
   {
@@ -543,13 +543,13 @@ void hx_ast::consider_scoping()
 }
 */
 
-void hx_ast::consider_scoping()
+void huml_ast::consider_scoping()
 {
 }
 
-bool hx_ast::type_checks()
+bool huml_ast::type_checks()
 {
-  hx_ast_type_checking checker;
+  huml_ast_type_checking checker;
   bool type_checks = true;
 
   typing_context tctx;
@@ -620,7 +620,7 @@ bool hx_ast::type_checks()
   return type_checks;
 }
 
-void hx_ast::cogen(std::string output_file) const
+void huml_ast::cogen(std::string output_file) const
 {
   ir::builder mach;
 

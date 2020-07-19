@@ -36,13 +36,13 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
   { emit_classes::help, [](auto){ assert(false); } },
   { emit_classes::repl, [](std::string_view t)
     {
-      hx::REPL repl(t);
+      huml::REPL repl(t);
 
       repl.run();
     } },
   { emit_classes::ast_print, [](std::string_view t)
     {
-      auto w = hx_reader::read<hx_ast>(t);
+      auto w = huml_reader::read<huml_ast>(t);
 
       if(w.empty())
         return; // <- diagnostic will contain an error
@@ -53,7 +53,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
     } },
   { emit_classes::cogen, [](std::string_view t)
     {
-      auto w = hx_reader::read<hx_ast>(t);
+      auto w = huml_reader::read<huml_ast>(t);
 
       if(w.empty())
         return; // <- diagnostic will contain an error
@@ -66,7 +66,7 @@ static const std::map<emit_classes, std::function<void(std::string_view)>> emitt
     } },
   { emit_classes::tokens, [](std::string_view t)
     {
-      auto w = hx_reader::read<token>(t);
+      auto w = huml_reader::read<token>(t);
 
       for(auto& tok : w)
       {

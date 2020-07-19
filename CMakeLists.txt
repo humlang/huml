@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(hx-lang LANGUAGES CXX VERSION 0.0.1)
+project(huml LANGUAGES CXX VERSION 0.0.1)
 
-set(hx-lang_files src/token.cpp
+set(huml_files src/token.cpp
   src/backend/builder.cpp
   src/backend/cogen.cpp
   src/backend/node.cpp
@@ -24,7 +24,7 @@ set(hx-lang_files src/token.cpp
   src/assembler.cpp
   )
 
-set(hx-lang_vm_files src/vm.cpp
+set(huml_vm_files src/vm.cpp
   src/backend/builder.cpp
   src/backend/cogen.cpp
   src/backend/node.cpp
@@ -46,13 +46,12 @@ set(hx-lang_vm_files src/vm.cpp
   )
 
 # Dependencies
-add_subdirectory(lib/hat-trie)
 add_subdirectory(lib/robin-map)
 find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Threads REQUIRED)
 
-option(USE_WERROR_DBG "Treat warnings as errors when compiling hx-lang." ON)
+option(USE_WERROR_DBG "Treat warnings as errors when compiling huml." ON)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -ggdb -Wpedantic -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -Wno-implicit-fallthrough -Wno-switch")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
 
@@ -63,31 +62,31 @@ endif()
 # tests
 find_package(Catch2 REQUIRED)
 
-add_executable(hx-lang_vm_tests test/vm.cpp
-  "${hx-lang_vm_files}")
-target_compile_definitions(hx-lang_vm_tests PUBLIC -DH_LANG_TESTING)
-target_link_libraries(hx-lang_vm_tests Catch2::Catch2 fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json gccjit)
-set_property(TARGET hx-lang_vm_tests PROPERTY CXX_STANDARD 17)
+add_executable(huml_vm_tests test/vm.cpp
+  "${huml_vm_files}")
+target_compile_definitions(huml_vm_tests PUBLIC -DH_LANG_TESTING)
+target_link_libraries(huml_vm_tests Catch2::Catch2 fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::robin_map nlohmann_json::nlohmann_json gccjit)
+set_property(TARGET huml_vm_tests PROPERTY CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/lib/Catch2/contrib/")
 
 include(CTest)
 include(ParseAndAddCatchTests)
-ParseAndAddCatchTests(hx-lang_vm_tests)
+ParseAndAddCatchTests(huml_vm_tests)
 
 ## integration tests
-add_test(NAME hx-lang_run_integration_test
+add_test(NAME huml_run_integration_test
   COMMAND bash -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/test/integration/ ; ./run_all.sh"
 )
 
 # main program
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
-add_executable(hx-lang src/main.cpp src/argument_parser.cpp "${hx-lang_files}")
-target_link_libraries(hx-lang PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json gccjit)
-set_property(TARGET hx-lang PROPERTY CXX_STANDARD 17)
+add_executable(huml src/main.cpp src/argument_parser.cpp "${huml_files}")
+target_link_libraries(huml PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::robin_map nlohmann_json::nlohmann_json gccjit)
+set_property(TARGET huml PROPERTY CXX_STANDARD 17)
 
 # virtual machine REPL
-add_executable(hx-vm src/vm_main.cpp "${hx-lang_vm_files}")
-target_link_libraries(hx-vm PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::hat_trie tsl::robin_map nlohmann_json::nlohmann_json gccjit)
-set_property(TARGET hx-vm PROPERTY CXX_STANDARD 17)
+add_executable(hum-vm src/vm_main.cpp "${huml_vm_files}")
+target_link_libraries(hum-vm PRIVATE fmt::fmt-header-only stdc++fs ${CMAKE_THREAD_LIBS_INIT} tsl::robin_map nlohmann_json::nlohmann_json gccjit)
+set_property(TARGET hum-vm PROPERTY CXX_STANDARD 17)
 

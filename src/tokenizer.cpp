@@ -4,7 +4,6 @@
 #include <stream_lookup.hpp>
 #include <fixit_info.hpp>
 
-
 #include <vm.hpp>
 
 using namespace std::literals::string_view_literals;
@@ -135,7 +134,7 @@ char base_reader::getc()
 
 ///// Tokenization
 
-token hx_reader::gett()
+token huml_reader::gett()
 {
 restart_get:
   symbol data("");

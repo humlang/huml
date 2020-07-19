@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-export HX_LANG_PATH=$(cd "$PWD"/../../build ; echo $PWD)
-export HX_LANG_TEST=$(cd "$PWD"/../../test ; echo $PWD)
+export HUML_PATH=$(cd "$PWD"/../../build ; echo $PWD)
+export HUML_TEST=$(cd "$PWD"/../../test ; echo $PWD)
 
 success=0
 for i in cmdargs/*.bats lexing/*.bats parsing/*.bats; do

@@ -6,7 +6,7 @@
 
 #include <sstream>
 
-const ast_ptr hx_reader::error_ref = nullptr;
+const ast_ptr huml_reader::error_ref = nullptr;
 
 auto token_precedence_map = tsl::robin_map<token_kind, int>( {
   {token_kind::Arrow, 1},
@@ -20,7 +20,7 @@ auto token_precedence_map = tsl::robin_map<token_kind, int>( {
   {token_kind::LiteralNumber, 65535},
 });
 
-void hx_reader::consume()
+void huml_reader::consume()
 {
   old = current;
   current = next_toks[0];
@@ -41,10 +41,10 @@ void hx_reader::consume()
     return false; \
     } consume(); return true; })())
 
-ast_ptr hx_reader::mk_error()
+ast_ptr huml_reader::mk_error()
 { return error_ref; }
 
-ast_ptr hx_reader::parse_directive()
+ast_ptr huml_reader::parse_directive()
 {
   assert(expect('#', diagnostic_db::parser::directive_expects_hashtag));
 
@@ -72,7 +72,7 @@ ast_ptr hx_reader::parse_directive()
 }
 
 // id  or special identifier "_" if pattern parsing is enabled
-ast_ptr hx_reader::parse_identifier()
+ast_ptr huml_reader::parse_identifier()
 {
   if(!expect(token_kind::Identifier, diagnostic_db::parser::identifier_expected))
   {
@@ -94,7 +94,7 @@ ast_ptr hx_reader::parse_identifier()
 }
 
 // e := e1 e2
-ast_ptr hx_reader::parse_app(ast_ptr lhs)
+ast_ptr huml_reader::parse_app(ast_ptr lhs)
 {
   auto rhs = parse_expression(65535);
   if(rhs == error_ref)
@@ -107,7 +107,7 @@ ast_ptr hx_reader::parse_app(ast_ptr lhs)
 //   For types we have a Pi type
 // e := `\\` `(` x `:` A  `)` `.` B        where both A,B are types.
 //                                         parantheses are needed to distinguish between pi and tuple access
-ast_ptr hx_reader::parse_lambda()
+ast_ptr huml_reader::parse_lambda()
 {
   bool error = false;
   if(current.kind == token_kind::Identifier)
@@ -192,7 +192,7 @@ ast_ptr hx_reader::parse_lambda()
 }
 
 // s := id (a : type)...(z : type) := e ;
-ast_ptr hx_reader::parse_function(bool no_body)
+ast_ptr huml_reader::parse_function(bool no_body)
 {
   auto id = parse_identifier();
   auto fn_name = old.data;
@@ -276,7 +276,7 @@ ast_ptr hx_reader::parse_function(bool no_body)
 }
 
 // e := Kind
-ast_ptr hx_reader::parse_Kind()
+ast_ptr huml_reader::parse_Kind()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Kind))
     return mk_error();
@@ -284,7 +284,7 @@ ast_ptr hx_reader::parse_Kind()
 }
 
 // e := Type
-ast_ptr hx_reader::parse_Type()
+ast_ptr huml_reader::parse_Type()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Type))
     return mk_error();
@@ -292,7 +292,7 @@ ast_ptr hx_reader::parse_Type()
 }
 
 // e := Prop
-ast_ptr hx_reader::parse_Prop()
+ast_ptr huml_reader::parse_Prop()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Prop))
     return mk_error();
@@ -300,7 +300,7 @@ ast_ptr hx_reader::parse_Prop()
 }
 
 // e := Trait
-ast_ptr hx_reader::parse_Trait()
+ast_ptr huml_reader::parse_Trait()
 {
   if(!expect(token_kind::Keyword, diagnostic_db::parser::expected_keyword_Trait))
     return mk_error();
@@ -308,7 +308,7 @@ ast_ptr hx_reader::parse_Trait()
 }
 
 // s := `data` name ( `(` id `:` type `)` )* `:` type `;`
-ast_ptr hx_reader::parse_data_ctor()
+ast_ptr huml_reader::parse_data_ctor()
 {
   auto old_loc = current.loc;
   bool error = false;
@@ -334,7 +334,7 @@ ast_ptr hx_reader::parse_data_ctor()
 }
 
 // s := `type` name ( `(` id `:` type `)` )* `:` Sort `;`
-ast_ptr hx_reader::parse_type_ctor()
+ast_ptr huml_reader::parse_type_ctor()
 {
   auto old_loc = current.loc;
   bool error = false;
@@ -359,7 +359,7 @@ ast_ptr hx_reader::parse_type_ctor()
 }
 
 // e := let x := y; e
-ast_ptr hx_reader::parse_assign()
+ast_ptr huml_reader::parse_assign()
 {
   auto type_name = parse_identifier();
 
@@ -382,7 +382,7 @@ ast_ptr hx_reader::parse_assign()
   return ass;
 }
 
-ast_ptr hx_reader::parse_expr_stmt()
+ast_ptr huml_reader::parse_expr_stmt()
 {
   auto current_source_loc = current.loc;
 
@@ -411,7 +411,7 @@ ast_ptr hx_reader::parse_expr_stmt()
 }
 
 // s := trait id param-list { function-decl+; };
-ast_ptr hx_reader::parse_trait()
+ast_ptr huml_reader::parse_trait()
 {
   assert(accept(token_kind::Keyword) && "expected \"trait\" keyword");
   auto trait_name = parse_identifier();
@@ -487,7 +487,7 @@ ast_ptr hx_reader::parse_trait()
 }
 
 // s := implement expr { function+; };
-ast_ptr hx_reader::parse_implement()
+ast_ptr huml_reader::parse_implement()
 {
   assert(accept(token_kind::Keyword) && "expected \"implement\" keyword");
   auto trait = parse_expression();
@@ -516,7 +516,7 @@ ast_ptr hx_reader::parse_implement()
   return std::make_shared<implement>(trait, fns);
 }
 
-ast_ptr hx_reader::parse_statement()
+ast_ptr huml_reader::parse_statement()
 {
   ast_ptr to_ret = nullptr;
   fixits_stack.emplace_back();
@@ -540,7 +540,7 @@ ast_ptr hx_reader::parse_statement()
   return to_ret;
 }
 
-ast_ptr hx_reader::parse_keyword()
+ast_ptr huml_reader::parse_keyword()
 {
   switch(current.data.get_hash())
   {
@@ -556,7 +556,7 @@ ast_ptr hx_reader::parse_keyword()
 }
 
 // e := `case` e `[` p1 `=>` e1 `|` ... `|` pN `=>` eN `]`
-ast_ptr hx_reader::parse_case()
+ast_ptr huml_reader::parse_case()
 {
   assert(expect(token_kind::Keyword, diagnostic_db::parser::case_expects_keyword));
 
@@ -596,7 +596,7 @@ ast_ptr hx_reader::parse_case()
   return std::make_shared<pattern_matcher>(what_to_match, match_arms);
 }
 
-ast_ptr hx_reader::parse_with_parentheses()
+ast_ptr huml_reader::parse_with_parentheses()
 {
   bool error = false;
   if(!expect('(', diagnostic_db::parser::tuple_or_unit_expr_expect_lparen))
@@ -669,7 +669,7 @@ ast_ptr hx_reader::parse_with_parentheses()
 }
 
 // e := identifier 
-ast_ptr hx_reader::parse_prefix()
+ast_ptr huml_reader::parse_prefix()
 {
   switch(current.kind)
   {
@@ -720,7 +720,7 @@ ast_ptr hx_reader::parse_prefix()
 }
 
 // e `:` t
-ast_ptr hx_reader::parse_type_check(ast_ptr left)
+ast_ptr huml_reader::parse_type_check(ast_ptr left)
 {
   // We only call this function if we have seen the colon before!
   assert(expect(':', diagnostic_db::parser::unknown_token));
@@ -738,7 +738,7 @@ ast_ptr hx_reader::parse_type_check(ast_ptr left)
 }
 
 // Pi    (A -> B) -> C    will be    \(_ : A -> B). C
-ast_ptr hx_reader::parse_arrow_lam(ast_ptr argument)
+ast_ptr huml_reader::parse_arrow_lam(ast_ptr argument)
 {
   assert(expect(token_kind::Arrow, diagnostic_db::parser::lambda_expects_arrow));
 
@@ -749,7 +749,7 @@ ast_ptr hx_reader::parse_arrow_lam(ast_ptr argument)
 }
 
 // e
-ast_ptr hx_reader::parse_expression(int precedence)
+ast_ptr huml_reader::parse_expression(int precedence)
 {
   auto prefix = parse_prefix();
   
@@ -799,11 +799,11 @@ ast_ptr hx_reader::parse_expression(int precedence)
 }
 
 template<>
-std::vector<hx_ast> hx_reader::read(std::string_view module)
+std::vector<huml_ast> huml_reader::read(std::string_view module)
 {
-  hx_reader r(module);
+  huml_reader r(module);
 
-  hx_ast ast;
+  huml_ast ast;
   while(r.current.kind != token_kind::EndOfFile)
   {
     auto stmt = r.parse_statement();
@@ -822,9 +822,9 @@ std::vector<hx_ast> hx_reader::read(std::string_view module)
 }
 
 template<>
-std::vector<token> hx_reader::read(std::string_view module)
+std::vector<token> huml_reader::read(std::string_view module)
 {
-  hx_reader r(module);
+  huml_reader r(module);
 
   std::vector<token> toks;
   while(r.current.kind != token_kind::EndOfFile)
@@ -837,12 +837,12 @@ std::vector<token> hx_reader::read(std::string_view module)
   return toks;
 }
 
-hx_ast hx_reader::read_text(const std::string& text)
+huml_ast huml_reader::read_text(const std::string& text)
 {
   std::stringstream ss(text);
-  hx_reader r(ss);
+  huml_reader r(ss);
 
-  hx_ast ast;
+  huml_ast ast;
   while(r.current.kind != token_kind::EndOfFile)
   {
     auto stmt = r.parse_statement();
@@ -858,7 +858,7 @@ hx_ast hx_reader::read_text(const std::string& text)
   return { ast };
 }
 
-int hx_reader::precedence() {
+int huml_reader::precedence() {
   token_kind prec = current.kind;
   if (prec == token_kind::Undef || prec == token_kind::EndOfFile || prec == token_kind::Semi)
     return 0;

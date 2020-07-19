@@ -44,9 +44,9 @@ struct typing_context
   std::vector<CTXElement> data;
 };
 
-struct hx_ast_type_checking
+struct huml_ast_type_checking
 {
-  hx_ast_type_checking()
+  huml_ast_type_checking()
   {  }
 
   ast_ptr find_type(typing_context& ctx, ast_ptr of);

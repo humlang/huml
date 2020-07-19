@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# assume that you have cloned hx-lang and are in the respective directory
+# assume that you have cloned huml and are in the respective directory
 
 git submodule update --init --recursive
 git submodule update --remote

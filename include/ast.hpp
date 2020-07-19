@@ -212,9 +212,9 @@ struct expr_stmt : ast_base
   ast_ptr lhs;
 };
 
-struct hx_ast
+struct huml_ast
 {
-  hx_ast();
+  huml_ast();
 
   // Transforms trees of structure
   //   def x = +      def x  +

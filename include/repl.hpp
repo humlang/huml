@@ -9,7 +9,7 @@
 
 /**
  * This REPL ("Repeat, Enter, Process"-Loop) is intended
- * to work for both hx-lang and the hx-vm.
+ * to work for both huml and the huml-vm.
  * It allows us to get direct feedback upon entering code.
  */
 
@@ -28,7 +28,7 @@ struct base_repl
   bool stopped { false };
 };
 
-namespace hx
+namespace huml
 {
 
   struct REPL : base_repl<REPL>
@@ -41,8 +41,8 @@ namespace hx
     void process_command(const std::string& str);
   private:
     typing_context tctx;
-    hx_ast_type_checking checker;
-    hx_ast ast;
+    huml_ast_type_checking checker;
+    huml_ast ast;
 
     std::string buf_upto_semi;
 

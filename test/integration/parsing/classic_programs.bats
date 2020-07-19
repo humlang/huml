@@ -9,11 +9,11 @@
 #   skip
 
 #   # run populates variables "output" and "status", containing the output and statuscode
-#   run "$HX_LANG_PATH"/hx-lang --emit-ast -f "$HX_LANG_TEST"/integration/programs/fibonacci.hx
+#   run "$HUML_PATH"/huml --emit-ast -f "$HUML_TEST"/integration/programs/fibonacci.hx
 
 #   tmp1=$(echo $output | md5sum)
-#   tmp2=$(cat "$HX_LANG_TEST"/integration/parsing/fibonacci.hx-ast | md5sum)
+#   tmp2=$(cat "$HUML_TEST"/integration/parsing/fibonacci.hx-ast | md5sum)
 
-#   [ "$tmp1" = "$tmp2" ] || ( echo -ne "Hx-lang output:\n$output\n" && test -n "" )
+#   [ "$tmp1" = "$tmp2" ] || ( echo -ne "huml output:\n$output\n" && test -n "" )
 # }
 

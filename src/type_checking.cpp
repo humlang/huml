@@ -344,7 +344,7 @@ lambda::ptr truncate_implicit_arguments(typing_context& ctx, lambda::ptr lam)
   {
     auto sublam = std::static_pointer_cast<lambda>(bdy);
 
-    appears_in_parameter_list = appears_in_parameter_list || hx_ast::used(lam->lhs, sublam->lhs);
+    appears_in_parameter_list = appears_in_parameter_list || huml_ast::used(lam->lhs, sublam->lhs);
 
     bdy = sublam->rhs;
   }
@@ -449,7 +449,7 @@ bool has_existentials(ast_ptr a)
 }
 
 
-ast_ptr hx_ast_type_checking::find_type(typing_context& ctx, ast_ptr of)
+ast_ptr huml_ast_type_checking::find_type(typing_context& ctx, ast_ptr of)
 {
   auto A = synthesize(ctx, of); 
 
@@ -457,7 +457,7 @@ ast_ptr hx_ast_type_checking::find_type(typing_context& ctx, ast_ptr of)
   {
     // A is unsolved! -> We need an annotation.
     std::stringstream ss;
-    hx_ast::print(ss, A);
+    huml_ast::print(ss, A);
     diagnostic <<= diagnostic_db::sema::unsolved_ex(source_range {}, ss.str());
 
     return nullptr;
@@ -477,7 +477,7 @@ void typing_context::print(std::ostream& os)
       if(root.existential->is_solved())
       {
         os << " = ";
-        hx_ast::print(os, root.existential->solution);
+        huml_ast::print(os, root.existential->solution);
       }
     }
     else if(root.marker != static_cast<std::size_t>(-1))
@@ -486,9 +486,9 @@ void typing_context::print(std::ostream& os)
     }
     else if(root.id_def != nullptr && root.type != nullptr)
     {
-      hx_ast::print(os, root.id_def);
+      huml_ast::print(os, root.id_def);
       os << " : ";
-      hx_ast::print(os, root.type);
+      huml_ast::print(os, root.type);
     }
     if(std::next(it) != data.end())
       os << ", ";
@@ -612,7 +612,7 @@ typing_context::pos typing_context::lookup_ex(typing_context::pos begin, ast_ptr
       (auto& elem) { return elem.id_def == nullptr && elem.type == nullptr && eqb(elem.existential, ex); });
 }
 
-bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type) 
+bool huml_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type) 
 {
   switch(what->kind)
   {
@@ -670,7 +670,7 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
           if(!is_wellformed(ctx, lam->lhs->type))
           {
             std::stringstream a;
-            hx_ast::print(a, lam->lhs->type);
+            huml_ast::print(a, lam->lhs->type);
 
             // TODO: fix diagnostic location
             diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
@@ -679,8 +679,8 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
           if(!is_subtype(ctx, lam->lhs->type, pi->lhs->type))
           {
             std::stringstream a, b;
-            hx_ast::print(a, lam->lhs->type);
-            hx_ast::print(b, pi->lhs->type);
+            huml_ast::print(a, lam->lhs->type);
+            huml_ast::print(b, pi->lhs->type);
 
             // TODO: fix diagnostic location
             //assert(false);
@@ -692,7 +692,7 @@ bool hx_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr type
         if(!is_wellformed(ctx, pi->lhs->type))
         {
           std::stringstream a;
-          hx_ast::print(a, pi->lhs->type);
+          huml_ast::print(a, pi->lhs->type);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
 
@@ -719,8 +719,8 @@ c_sub:
       if(!is_subtype(ctx, A, type))
       {
         std::stringstream a, b;
-        hx_ast::print(a, A);
-        hx_ast::print(b, type);
+        huml_ast::print(a, A);
+        huml_ast::print(b, type);
 
         // TODO: fix diagnostic location
         //assert(false);
@@ -734,7 +734,7 @@ c_sub:
   }
 }
 
-ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
+ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 {
   if(what->annot != nullptr)
   {
@@ -742,7 +742,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
     if(!is_wellformed(ctx, what->annot))
     {
       std::stringstream a;
-      hx_ast::print(a, what->annot);
+      huml_ast::print(a, what->annot);
 
       diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
 
@@ -765,7 +765,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       if(it == ctx.data.end())
       {
         std::stringstream a;
-        hx_ast::print(a, what);
+        huml_ast::print(a, what);
 
         diagnostic <<= diagnostic_db::sema::id_not_in_context(source_range { }, a.str());
         return nullptr;
@@ -781,7 +781,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       if(it == ctx.data.end())
       {
         std::stringstream a;
-        hx_ast::print(a, what);
+        huml_ast::print(a, what);
 
         // TODO: be more expressive
         diagnostic <<= diagnostic_db::sema::id_not_in_context(source_range { }, a.str());
@@ -825,7 +825,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         if(!is_wellformed(ctx, lam->lhs->type))
         {
           std::stringstream a;
-          hx_ast::print(a, lam->lhs->type);
+          huml_ast::print(a, lam->lhs->type);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
           return nullptr;
@@ -833,8 +833,8 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         if(!is_subtype(ctx, lam->lhs->type, alpha1))
         {
           std::stringstream a, b;
-          hx_ast::print(a, alpha1);
-          hx_ast::print(b, lam->lhs->type);
+          huml_ast::print(a, alpha1);
+          huml_ast::print(b, lam->lhs->type);
 
           // TODO: fix diagnostic location
           //assert(false);
@@ -875,7 +875,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         if(!is_wellformed(ctx, as->identifier->annot))
         {
           std::stringstream a;
-          hx_ast::print(a, as->identifier->annot);
+          huml_ast::print(a, as->identifier->annot);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
           return nullptr;
@@ -902,7 +902,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       if(!is_wellformed(ctx, as->rhs))
       {
         std::stringstream a;
-        hx_ast::print(a, as->rhs);
+        huml_ast::print(a, as->rhs);
 
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return nullptr;
@@ -917,7 +917,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       if(!is_wellformed(ctx, as->rhs))
       {
         std::stringstream a;
-        hx_ast::print(a, as->rhs);
+        huml_ast::print(a, as->rhs);
 
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return nullptr;
@@ -953,7 +953,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         if(!is_wellformed(ctx, x->annot))
         {
           std::stringstream a;
-          hx_ast::print(a, x->annot);
+          huml_ast::print(a, x->annot);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         }
@@ -963,7 +963,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         if(!is_wellformed(ctx, x))
         {
           std::stringstream a;
-          hx_ast::print(a, x);
+          huml_ast::print(a, x);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         }
@@ -986,7 +986,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       if(!check(ctx, im->trait, std::make_shared<trait_type>()))
       {
         std::stringstream a;
-        hx_ast::print(a, im->trait);
+        huml_ast::print(a, im->trait);
 
         diagnostic <<= diagnostic_db::sema::not_a_trait(source_range { }, a.str());
       }
@@ -995,7 +995,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         if(!is_wellformed(ctx, x))
         {
           std::stringstream a;
-          hx_ast::print(a, x);
+          huml_ast::print(a, x);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         }
@@ -1007,7 +1007,7 @@ ast_ptr hx_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   return nullptr;
 }
 
-ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast_ptr e)
+ast_ptr huml_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast_ptr e)
 {
   switch(A->kind)
   {
@@ -1046,7 +1046,7 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
       if(!is_wellformed(ctx, lam->lhs->type))
       {
         std::stringstream a;
-        hx_ast::print(a, lam->lhs->type);
+        huml_ast::print(a, lam->lhs->type);
 
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return nullptr;
@@ -1066,7 +1066,7 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
 
   default: {
       std::stringstream ss;
-      hx_ast::print(ss, A);
+      huml_ast::print(ss, A);
       diagnostic <<= diagnostic_db::sema::not_invokable(source_range {}, ss.str());
 
       return nullptr;
@@ -1074,7 +1074,7 @@ ast_ptr hx_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, ast
   }
 }
 
-bool hx_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
+bool huml_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
 {
   if(B->kind == ASTNodeKind::exist)
     goto def;
@@ -1154,11 +1154,11 @@ def:
       else if(A->kind == ASTNodeKind::exist && B->kind != ASTNodeKind::exist)
       {
         // <:-InstL
-        if(hx_ast::used(A, B))
+        if(huml_ast::used(A, B))
         {
           std::stringstream a, b;
-          hx_ast::print(a, A);
-          hx_ast::print(b, B);
+          huml_ast::print(a, A);
+          huml_ast::print(b, B);
 
           // TODO: fix diagnostic location
           diagnostic <<= diagnostic_db::sema::free_var_in_type(source_range { }, a.str(), b.str());
@@ -1169,11 +1169,11 @@ def:
       else if(A->kind != ASTNodeKind::exist && B->kind == ASTNodeKind::exist)
       {
         // <:-InstR
-        if(hx_ast::used(B, A))
+        if(huml_ast::used(B, A))
         {
           std::stringstream a, b;
-          hx_ast::print(a, B);
-          hx_ast::print(b, A);
+          huml_ast::print(a, B);
+          huml_ast::print(b, A);
 
           // TODO: fix diagnostic location
           diagnostic <<= diagnostic_db::sema::free_var_in_type(source_range { }, a.str(), b.str());
@@ -1186,7 +1186,7 @@ def:
   }
 }
 
-bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr A)
+bool huml_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr A)
 {
   switch(A->kind)
   {
@@ -1247,7 +1247,7 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
       if(!is_wellformed(ctx, A))
       {
         std::stringstream a;
-        hx_ast::print(a, A);
+        huml_ast::print(a, A);
 
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return false;
@@ -1258,7 +1258,7 @@ bool hx_ast_type_checking::inst_l(typing_context& ctx, exist::ptr alpha, ast_ptr
   }
 }
 
-bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alpha)
+bool huml_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alpha)
 {
   switch(A->kind)
   {
@@ -1320,7 +1320,7 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
       if(!is_wellformed(ctx, A))
       {
         std::stringstream a;
-        hx_ast::print(a, A);
+        huml_ast::print(a, A);
 
         diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         return false;
@@ -1331,7 +1331,7 @@ bool hx_ast_type_checking::inst_r(typing_context& ctx, ast_ptr A, exist::ptr alp
   }
 }
 
-bool hx_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
+bool huml_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
 {
   switch(A->kind)
   {

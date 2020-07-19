@@ -64,17 +64,17 @@ void base_repl<T>::write()
   fmt::print("\nState written to \"{}\".\n", filepath);
 }
 
-template struct base_repl<hx::REPL>;
+template struct base_repl<huml::REPL>;
 template struct base_repl<virt::REPL>;
 
 
-namespace hx
+namespace huml
 {
   REPL::REPL(std::string_view t) : base_repl()
   {
     if(t == "STDIN")
       return;
-    auto w = hx_reader::read<hx_ast>(t);
+    auto w = huml_reader::read<huml_ast>(t);
 
     auto& global_ir = w.back();
     if(!diagnostic.empty())
@@ -102,13 +102,18 @@ namespace hx
   void REPL::run_impl()
   {
   std::cout << 
+    /*
 R"(
     ─┐   ╷   ┌─┐ ┌┐╷ ┌─┐
     ┌┘ ─ │   ├─┤ │││ │┌┐
     •    └── ╵ ╵ ╵└┘ └─┘
-    
+)"
+*/
+R"(
+           \\//  //         ╷   ┌─┐ ┌┐╷ ┌─┐
+  .-''-_.. (|||>(°>   [-->  │   ├─┤ │││ │┌┐
+            " "             └── ╵ ╵ ╵└┘ └─┘
 )";
-  //  std::cout << ">> Welcome to hx-lang. Happy Hacking!\n";
 
     while(!stopped)
     {
@@ -168,7 +173,7 @@ R"(
       if(to_compute.empty())
         return;
 
-      auto global_ir = hx_reader::read_text(to_compute);
+      auto global_ir = huml_reader::read_text(to_compute);
 
       if(global_ir.data.empty())
       {
@@ -223,7 +228,7 @@ namespace virt
 
   void REPL::run_impl()
   {
-    std::cout << ">> Welcome to hx-vm. Happy Hacking!\n";
+    std::cout << ">> Welcome to huml-vm. Happy Hacking!\n";
 
     while(!stopped)
     {

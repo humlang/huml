@@ -36,7 +36,7 @@ private:
 };
 
 /// HX_READER
-class hx_reader : base_reader
+class huml_reader : base_reader
 {
 public:
   static constexpr std::size_t lookahead_size = 2;
@@ -46,9 +46,9 @@ public:
   static std::vector<T> read(std::string_view module)
   { static_assert(sizeof(T) != 0, "unimplemented"); return {}; }
 
-  static hx_ast read_text(const std::string& str);
+  static huml_ast read_text(const std::string& str);
 private:
-  hx_reader(std::string_view module) : base_reader(module)
+  huml_reader(std::string_view module) : base_reader(module)
   {
     for(std::size_t i = 0; i < next_toks.size(); ++i)
       consume();
@@ -57,7 +57,7 @@ private:
     consume(); 
   }
 
-  hx_reader(std::istream& is) : base_reader(is)
+  huml_reader(std::istream& is) : base_reader(is)
   {
     for(std::size_t i = 0; i < next_toks.size(); ++i)
       consume();
