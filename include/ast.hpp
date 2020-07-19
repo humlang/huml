@@ -212,12 +212,16 @@ struct expr_stmt : ast_base
   ast_ptr lhs;
 };
 
+template<typename T>
+using ASTMap = tsl::robin_map<ast_ptr, T>;
+using ASTSet = tsl::robin_set<ast_ptr>;
+
 struct huml_ast
 {
   huml_ast();
 
   // Transforms trees of structure
-  //   def x = +      def x  +
+  //   def x = +             +
   //          / \   to      / \  <- uses of identifiers now
   //         x   x         def x    point to their definition
   void consider_scoping();

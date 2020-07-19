@@ -478,9 +478,27 @@ void huml_ast::print_as_type(std::ostream& os, ast_ptr node)
   }
 }
 
-/*
-void huml_ast::consider_scoping()
+struct Scope : std::enable_shared_from_this<Scope>
 {
+  std::shared_ptr<Scope> parent;
+  symbol_map<ast_ptr>& binders;
+
+  bool contains(symbol name)
+  { return binders.contains(name) || (parent && parent->contains(name)); }
+
+  std::shared_ptr<Scope> mk_child()
+  {
+    auto sc = std::make_shared<Scope>();
+
+    sc->parent = shared_from_this();
+
+    return sc;
+  }
+};
+
+ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
+{
+  ast_ptr to_ret = nullptr;
   switch(p->kind)
   {
     default: assert(false && "Unconsidered case"); break;
@@ -491,60 +509,106 @@ void huml_ast::consider_scoping()
     case ASTNodeKind::Prop:
     case ASTNodeKind::number:
     case ASTNodeKind::trait_type:
+        to_ret = p;
       break;
 
     case ASTNodeKind::trait: {
       auto x = std::static_pointer_cast<trait>(p);
 
+      to_ret = x;
     } break;
     case ASTNodeKind::implement: {
       auto x = std::static_pointer_cast<implement>(p);
 
+      to_ret = x;
     } break;
     case ASTNodeKind::ptr: {
       auto x = std::static_pointer_cast<pointer>(p);
 
+      x->of = consider_scoping(x->of, seen, sc);
+
+      to_ret = x;
     } break;
     case ASTNodeKind::app: {
       auto x = std::static_pointer_cast<app>(p);
 
+      x->lhs = consider_scoping(x->lhs, seen, sc);
+      x->rhs = consider_scoping(x->rhs, seen, sc);
+      to_ret = x;
     } break;
     case ASTNodeKind::lambda: {
       auto x = std::static_pointer_cast<lambda>(p);
 
+      to_ret = x;
     } break;
     case ASTNodeKind::match: {
       auto x = std::static_pointer_cast<match>(p);
 
+      // TODO: consider binding occurences
+      x->exp = consider_scoping(x->exp, seen, sc);
+      to_ret = x;
     } break;
     case ASTNodeKind::pattern_matcher: {
       auto x = std::static_pointer_cast<pattern_matcher>(p);
 
+      x->to_match = consider_scoping(x->to_match, seen, sc);
+      for(auto& v : x->data)
+        v = consider_scoping(v, seen, sc);
+      to_ret = x;
     } break;
     case ASTNodeKind::assign: {
       auto x = std::static_pointer_cast<assign>(p);
 
+     // TODO: consider binding occurences 
+     
+      auto id = std::static_pointer_cast<identifier>(x->identifier)->symb;
+      if(sc->contains(id))
+      {
+        // TODO: emit diagnostic
+        assert(false && "Redefinition of existing identifier.");
+      }
+      sc->binders.emplace(id, x->identifier);
+      x->definition = consider_scoping(x->definition, seen, sc);
+
+      // identifier stays in scope
+
+      to_ret = x;
     } break;
     case ASTNodeKind::assign_type: {
       auto x = std::static_pointer_cast<assign_type>(p);
 
+      x->rhs = consider_scoping(x->rhs, seen, sc);
+
+      to_ret = x;
     } break;
     case ASTNodeKind::assign_data: {
       auto x = std::static_pointer_cast<assign_data>(p);
 
+      x->rhs = consider_scoping(x->rhs, seen, sc);
+
+      to_ret = x;
     } break;
     case ASTNodeKind::expr_stmt: {
       auto x = std::static_pointer_cast<expr_stmt>(p);
 
+      x->lhs = consider_scoping(x->lhs, seen, sc);
+
+      to_ret = x;
     } break;
   }
   if(p->annot && !seen.count(p))
-    consider_scoping(sc, seen, child_indices, p->annot);
+    p->annot = consider_scoping(p->annot, seen, sc);
+  return to_ret;
 }
-*/
 
 void huml_ast::consider_scoping()
 {
+  ASTSet seen;
+  std::shared_ptr<Scope> sc = std::make_shared<Scope>();
+  for(auto& p : data)
+  {
+    ::consider_scoping(p, seen, sc);
+  }
 }
 
 bool huml_ast::type_checks()
