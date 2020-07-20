@@ -481,10 +481,14 @@ void huml_ast::print_as_type(std::ostream& os, ast_ptr node)
 struct Scope : std::enable_shared_from_this<Scope>
 {
   std::shared_ptr<Scope> parent;
-  symbol_map<ast_ptr>& binders;
+  symbol_map<ast_ptr> binders;
 
-  bool contains(symbol name)
-  { return binders.contains(name) || (parent && parent->contains(name)); }
+  ast_ptr contains(symbol name)
+  {
+    if(auto it = binders.find(name); it != binders.end())
+      return it->second;
+    return parent ? parent->contains(name) : nullptr;
+  }
 
   std::shared_ptr<Scope> mk_child()
   {
@@ -512,21 +516,61 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
         to_ret = p;
       break;
 
+    case ASTNodeKind::identifier: {
+        if(auto x = sc->contains(std::static_pointer_cast<identifier>(p)->symb); x != nullptr)
+        {
+          to_ret = x;
+        }
+        else
+        {
+          // TODO: emit useful diagnostic
+          assert(false && "Unbound identifier.");
+        }
+      } break;
+
     case ASTNodeKind::trait: {
       auto x = std::static_pointer_cast<trait>(p);
 
+      auto id = std::static_pointer_cast<identifier>(x->name)->symb;
+      if(id != symbol("_"))
+      {
+        if(sc->contains(id))
+        {
+          // TODO: emit diagnostic
+          assert(false && "Redefinition of existing identifier.");
+        }
+        sc->binders.emplace(id, x->name);
+      }
+      for(auto& v : x->params)
+      {
+        sc = sc->mk_child();
+        auto id = std::static_pointer_cast<identifier>(v)->symb;
+        if(id != symbol("_"))
+        {
+          if(sc->contains(id))
+          {
+            // TODO: emit diagnostic
+            assert(false && "Redefinition of existing identifier.");
+          }
+          sc->binders.emplace(id, v);
+        }
+      }
+      for(auto& v : x->methods)
+        v = consider_scoping(v, seen, sc);
       to_ret = x;
     } break;
     case ASTNodeKind::implement: {
       auto x = std::static_pointer_cast<implement>(p);
 
+      x->trait = consider_scoping(x->trait, seen, sc);
+      for(auto& v : x->methods)
+        v = consider_scoping(v, seen, sc);
       to_ret = x;
     } break;
     case ASTNodeKind::ptr: {
       auto x = std::static_pointer_cast<pointer>(p);
 
       x->of = consider_scoping(x->of, seen, sc);
-
       to_ret = x;
     } break;
     case ASTNodeKind::app: {
@@ -538,7 +582,20 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
     } break;
     case ASTNodeKind::lambda: {
       auto x = std::static_pointer_cast<lambda>(p);
-
+  
+      // may shadow
+      sc = sc->mk_child();
+      auto id = std::static_pointer_cast<identifier>(x->lhs)->symb;
+      if(id != symbol("_"))
+      {
+        if(sc->contains(id))
+        {
+          // TODO: emit diagnostic
+          assert(false && "Redefinition of existing identifier.");
+        }
+        sc->binders.emplace(id, x->lhs);
+      }
+      x->rhs = consider_scoping(x->rhs, seen, sc);
       to_ret = x;
     } break;
     case ASTNodeKind::match: {
@@ -559,19 +616,17 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
     case ASTNodeKind::assign: {
       auto x = std::static_pointer_cast<assign>(p);
 
-     // TODO: consider binding occurences 
-     
       auto id = std::static_pointer_cast<identifier>(x->identifier)->symb;
-      if(sc->contains(id))
+      if(id != symbol("_"))
       {
-        // TODO: emit diagnostic
-        assert(false && "Redefinition of existing identifier.");
+        if(sc->contains(id))
+        {
+          // TODO: emit diagnostic
+          assert(false && "Redefinition of existing identifier.");
+        }
+        sc->binders.emplace(id, x->identifier);
       }
-      sc->binders.emplace(id, x->identifier);
       x->definition = consider_scoping(x->definition, seen, sc);
-
-      // identifier stays in scope
-
       to_ret = x;
     } break;
     case ASTNodeKind::assign_type: {
