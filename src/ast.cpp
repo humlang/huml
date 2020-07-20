@@ -480,13 +480,12 @@ struct Scope : std::enable_shared_from_this<Scope>
   }
 };
 
-ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
+ast_ptr consider_scoping(ast_ptr p, ASTMap<ast_ptr>& seen, std::shared_ptr<Scope> sc)
 {
   ast_ptr to_ret = nullptr;
 
-  if(seen.contains(p))
-    return p;
-  seen.emplace(p);
+  if(auto it = seen.find(p); it != seen.end())
+    return it->second;
   switch(p->kind)
   {
     default: assert(false && "Unconsidered case"); break;
@@ -551,6 +550,8 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
       auto x = std::static_pointer_cast<implement>(p);
 
       x->trait = consider_scoping(x->trait, seen, sc);
+
+      sc = sc->mk_child();
       for(auto& v : x->methods)
         v = consider_scoping(v, seen, sc);
       to_ret = x;
@@ -572,6 +573,7 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
       auto x = std::static_pointer_cast<lambda>(p);
   
       // may shadow
+      auto oldsc = sc;
       sc = sc->mk_child();
       auto id = std::static_pointer_cast<identifier>(x->lhs)->symb;
       if(id != symbol("_"))
@@ -584,9 +586,9 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
         sc->binders.emplace(id, x->lhs);
       }
       if(x->lhs->annot)
-        x->lhs->annot = consider_scoping(x->lhs->annot, seen, sc);
+        x->lhs->annot = consider_scoping(x->lhs->annot, seen, oldsc);
       if(x->lhs->type)
-        x->lhs->type = consider_scoping(x->lhs->type, seen, sc);
+        x->lhs->type = consider_scoping(x->lhs->type, seen, oldsc);
 
       x->rhs = consider_scoping(x->rhs, seen, sc);
       to_ret = x;
@@ -609,6 +611,9 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
     case ASTNodeKind::assign: {
       auto x = std::static_pointer_cast<assign>(p);
 
+      // May not be recursive
+      x->definition = consider_scoping(x->definition, seen, sc);
+
       auto id = std::static_pointer_cast<identifier>(x->identifier)->symb;
       if(id != symbol("_"))
       {
@@ -623,8 +628,6 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
         x->identifier->annot = consider_scoping(x->identifier->annot, seen, sc);
       if(x->identifier->type)
         x->identifier->type = consider_scoping(x->identifier->type, seen, sc);
-
-      x->definition = consider_scoping(x->definition, seen, sc);
       to_ret = x;
     } break;
     case ASTNodeKind::assign_type: {
@@ -680,12 +683,14 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
     p->annot = consider_scoping(p->annot, seen, sc);
   if(p->type)
     p->type = consider_scoping(p->type, seen, sc);
+
+  seen.emplace(p, to_ret);
   return to_ret;
 }
 
 void huml_ast::consider_scoping()
 {
-  ASTSet seen;
+  ASTMap<ast_ptr> seen;
   std::shared_ptr<Scope> sc = std::make_shared<Scope>();
   for(auto& p : data)
   {

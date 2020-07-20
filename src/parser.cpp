@@ -268,6 +268,8 @@ ast_ptr huml_reader::parse_function(bool no_body)
     error = true;
   if(error)
     return mk_error();
+
+  expr->annot = return_type;
   lambda::ptr lam = std::make_shared<lambda>(params.back(), expr);
   for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
     lam = std::make_shared<lambda>(*it, lam);

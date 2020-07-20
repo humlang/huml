@@ -92,6 +92,7 @@ namespace sema
 {
 db_entry_arg(error, disallow_recursion, "\"{}\" was seen before and must not occur in this statement again.");
 db_entry_arg(error, id_not_in_context, "\"{}\" was never seen before.");
+db_entry_arg(error, no_nat_in_context, "\"{}\" has no corresponding \"nat\" type.");
 db_entry_arg(error, not_wellformed, "\"{}\" is not wellformed.");
 db_entry_arg2(error, not_a_subtype, "\"{}\" is not a subtype of \"{}\".");
 db_entry_arg2(error, free_var_in_type, "\"{}\" must not occur in \"{}\".");
@@ -100,6 +101,7 @@ db_entry_arg(error, existential_not_in_context, "\"{}\" is not in the typing con
 db_entry_arg(error, not_invokable, "\"{}\" is not an invokable type.");
 db_entry_arg(error, unsolved_ex, "Cannot resolve dummy types for inferred type \"{}\". Add an annotation.");
 db_entry_arg(error, not_a_trait, "\"{}\" is not of trait type.");
+db_entry_arg2(error, impl_illformed, "\"{}\" of implementation \"{}\" is ill-formed.");
 db_entry(error, trait_needs_at_least_one_param, "trait declaration needs at least one parameter.");
 }
 

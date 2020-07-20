@@ -310,11 +310,11 @@ ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& clo
     return ex;
   } break;
 
-  case ASTNodeKind::assign: assert(false && "unimplemented"); return nullptr;
 
   case ASTNodeKind::directive:
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
+  case ASTNodeKind::assign:
   case ASTNodeKind::expr_stmt: assert(false && "Cannot clone statements."); return nullptr;
   }
 
@@ -566,12 +566,12 @@ ast_ptr typing_context::subst(ast_ptr what)
       return ex;
     } break;
 
-  case ASTNodeKind::assign: assert(false && "unimplemented"); return nullptr;
 
   case ASTNodeKind::directive:
   case ASTNodeKind::expr_stmt:
   case ASTNodeKind::assign_data:
   case ASTNodeKind::assign_type:
+  case ASTNodeKind::assign: 
   case ASTNodeKind::trait:
   case ASTNodeKind::implement:
     assert(false && "Statements are not types.");
@@ -683,7 +683,7 @@ bool huml_ast_type_checking::check(typing_context& ctx, ast_ptr what, ast_ptr ty
             huml_ast::print(b, pi->lhs->type);
 
             // TODO: fix diagnostic location
-            //assert(false);
+            assert(false);
             diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
             return false;
@@ -723,7 +723,7 @@ c_sub:
         huml_ast::print(b, type);
 
         // TODO: fix diagnostic location
-        //assert(false);
+        assert(false);
         diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
         return false;
@@ -775,16 +775,18 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
   // S-Num
   case ASTNodeKind::number: {
-      auto it = std::find_if(ctx.data.begin(), ctx.data.end(), [](auto& a)
-                             { return a.type && a.type->kind == ASTNodeKind::identifier
-                                  && std::static_pointer_cast<number>(a.type)->symb == symbol("nat"); });
+
+      auto it  = std::find_if(ctx.data.begin(), ctx.data.end(), [](auto& elem)
+                              { return elem.existential == nullptr
+                                      && elem.type != nullptr && elem.type->kind == ASTNodeKind::Type
+                                      && elem.id_def->kind == ASTNodeKind::identifier
+                                      && std::static_pointer_cast<identifier>(elem.id_def)->symb == symbol("nat"); });
       if(it == ctx.data.end())
       {
         std::stringstream a;
         huml_ast::print(a, what);
 
-        // TODO: be more expressive
-        diagnostic <<= diagnostic_db::sema::id_not_in_context(source_range { }, a.str());
+        diagnostic <<= diagnostic_db::sema::no_nat_in_context(source_range { }, a.str());
         return nullptr;
       }
       return what->type = it->type;
@@ -837,7 +839,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
           huml_ast::print(b, lam->lhs->type);
 
           // TODO: fix diagnostic location
-          //assert(false);
+          assert(false);
           diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
           return nullptr;
         }
@@ -895,6 +897,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
       return synthesize(ctx, as->in);
     } break;
+
   // S-AssignData
   case ASTNodeKind::assign_data: {
       assign_data::ptr as = std::static_pointer_cast<assign_data>(what);
@@ -976,6 +979,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       lambda::ptr lam = std::make_shared<lambda>(*jt, std::make_shared<trait_type>());
       for(jt = jt + 1; jt != tr->params.rend(); ++jt)
         lam = std::make_shared<lambda>(*jt, lam);
+      ctx.data.emplace_back(CTXElement(std::static_pointer_cast<identifier>(tr->name), lam));
 
       return what->type = lam; // <- TODO: return lambda consisting of the trait params going to Type
     } break;
@@ -983,23 +987,31 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   case ASTNodeKind::implement: {
       implement::ptr im = std::static_pointer_cast<implement>(what);
 
-      if(!check(ctx, im->trait, std::make_shared<trait_type>()))
+      auto trait = im->trait; // TODO: subst //ctx.subst(subst(lm->lhs, e, lm->rhs));
+      if(!check(ctx, trait, std::make_shared<trait_type>()))
       {
         std::stringstream a;
-        huml_ast::print(a, im->trait);
+        huml_ast::print(a, trait);
 
         diagnostic <<= diagnostic_db::sema::not_a_trait(source_range { }, a.str());
       }
+      /*
       for(auto& x : im->methods)
       {
-        if(x->annot && !is_wellformed(ctx, x->annot))
-        {
-          std::stringstream a;
-          huml_ast::print(a, x);
+        assert(x->kind == ASTNodeKind::assign && "bug in parser");
 
-          diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
+        auto as = std::static_pointer_cast<assign>(x);
+        auto def = as->definition;
+        if(synthesize(ctx, def) == nullptr)
+        {
+          std::stringstream a, b;
+          huml_ast::print(a, as->identifier);
+          huml_ast::print(b, trait);
+
+          diagnostic <<= diagnostic_db::sema::impl_illformed(source_range { }, a.str(), b.str());
         }
       }
+      */ // TODO: uncomment and debug using valgrind...
       return what->type = std::make_shared<unit>(); // <- TODO: ok?
     } break;
   }
@@ -1076,6 +1088,8 @@ ast_ptr huml_ast_type_checking::eta_synthesize(typing_context& ctx, ast_ptr A, a
 
 bool huml_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr B)
 {
+  if(A == B)
+    return true;
   if(B->kind == ASTNodeKind::exist)
     goto def;
   switch(A->kind)
@@ -1083,22 +1097,47 @@ bool huml_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr 
   // <:-Kind
   case ASTNodeKind::Kind: return B->kind == ASTNodeKind::Kind; // <- Is kind a type where any other type is a subtype?
   // <:-Type
-  case ASTNodeKind::Type: return B->kind == ASTNodeKind::Type;
+  case ASTNodeKind::Type: return B->kind == ASTNodeKind::Type || B->kind == ASTNodeKind::Kind;
   // <:-Prop
-  case ASTNodeKind::Prop: return B->kind == ASTNodeKind::Prop;
+  case ASTNodeKind::Prop: return B->kind == ASTNodeKind::Prop || B->kind == ASTNodeKind::Type;
+  // <:-Unit
+  case ASTNodeKind::unit: return B->kind == ASTNodeKind::unit || B->kind == ASTNodeKind::Type;
+  // <:-Number
+  case ASTNodeKind::number: return B->kind == ASTNodeKind::number || B->kind == ASTNodeKind::Type; // <- TODO: Set?
   // <:-Trait
-  case ASTNodeKind::trait_type: return B->kind == ASTNodeKind::trait_type;
+  case ASTNodeKind::trait_type: return B->kind == ASTNodeKind::trait_type || B->kind == ASTNodeKind::Type;
   // <:-Id
-  case ASTNodeKind::identifier: return eqb(A, B);
+  case ASTNodeKind::identifier: {
+      if(B->kind == ASTNodeKind::Type)
+      {
+        if(auto it = ctx.lookup_id(std::static_pointer_cast<identifier>(A)); it != ctx.data.end() && it->type)
+        {
+          return is_subtype(ctx, it->type, B);
+        }
+        return false;
+      }
+      return eqb(A, B);
+    } break;
   // <:-Ptr
-  case ASTNodeKind::ptr: return B->kind == ASTNodeKind::ptr
-                         && eqb(std::static_pointer_cast<pointer>(A)->of,
-                                std::static_pointer_cast<pointer>(B)->of);
+  case ASTNodeKind::ptr: {
+     if(B->kind == ASTNodeKind::Type)
+     {
+       return is_subtype(ctx, std::static_pointer_cast<pointer>(A)->of, B);
+     }
+     return B->kind == ASTNodeKind::ptr && eqb(std::static_pointer_cast<pointer>(A)->of,
+                                               std::static_pointer_cast<pointer>(B)->of);
+     } break;
   // <:-App
   case ASTNodeKind::app: {
-      if(B->kind != ASTNodeKind::app)
+      // TODO: prop?
+      if(B->kind != ASTNodeKind::app && B->kind != ASTNodeKind::Type)
         return false;
+      else if(B->kind == ASTNodeKind::Type)
+      {
+        app::ptr aa = std::static_pointer_cast<app>(A);
 
+        return is_subtype(ctx, aa->lhs, B) && is_subtype(ctx, aa->rhs, B);
+      }
       app::ptr aa = std::static_pointer_cast<app>(A);
       app::ptr ba = std::static_pointer_cast<app>(B);
 
@@ -1106,9 +1145,27 @@ bool huml_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr 
     } break;
   // <:-Lam
   case ASTNodeKind::lambda: {
-      if(B->kind != ASTNodeKind::lambda)
+      // TODO: prop?
+      if(B->kind != ASTNodeKind::lambda && B->kind != ASTNodeKind::Type)
         return false;
+      else if(B->kind == ASTNodeKind::Type)
+      {
+        lambda::ptr al = std::static_pointer_cast<lambda>(A);
+        if(al->lhs->annot != nullptr && al->lhs->type == nullptr)
+          al->lhs->type = al->lhs->annot;
 
+        if(!is_subtype(ctx, al->lhs->type, B))
+          return false;
+
+        const auto rhs = ctx.subst(al->rhs);
+        const std::size_t size = ctx.data.size();
+        ctx.data.emplace_back(std::static_pointer_cast<identifier>(al->lhs), al->lhs->type);
+
+        const bool ok = is_subtype(ctx, rhs, B);
+        ctx.data.erase(ctx.data.begin() + size, ctx.data.end());
+
+        return ok;
+      }
       lambda::ptr al = std::static_pointer_cast<lambda>(A);
       lambda::ptr bl = std::static_pointer_cast<lambda>(B);
 
@@ -1117,8 +1174,19 @@ bool huml_ast_type_checking::is_subtype(typing_context& ctx, ast_ptr A, ast_ptr 
       if(bl->lhs->annot != nullptr && bl->lhs->type == nullptr)
         bl->lhs->type = bl->lhs->annot;
 
-      return is_subtype(ctx, bl->lhs->type, al->lhs->type)
-        && is_subtype(ctx, ctx.subst(al->rhs), ctx.subst(bl->rhs));
+      if(!is_subtype(ctx, bl->lhs->type, al->lhs->type))
+        return false;
+
+      const auto arhs = ctx.subst(al->rhs);
+      const auto brhs = ctx.subst(bl->rhs);
+      const std::size_t size = ctx.data.size();
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(al->lhs), al->lhs->type);
+      ctx.data.emplace_back(std::static_pointer_cast<identifier>(bl->rhs), bl->lhs->type);
+
+      const bool ok = is_subtype(ctx, arhs, brhs);
+      ctx.data.erase(ctx.data.begin() + size, ctx.data.end());
+
+      return ok;
     } break;
   // <:-Exist / <:-InstL
   default: {
