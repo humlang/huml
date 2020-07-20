@@ -950,7 +950,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       {
         // TODO: Add parameters to context
         // TODO: Do we enforce Type parameters to trait?
-        if(!is_wellformed(ctx, x->annot))
+        if(x->annot && !is_wellformed(ctx, x->annot))
         {
           std::stringstream a;
           huml_ast::print(a, x->annot);
@@ -960,10 +960,10 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       }
       for(auto& x : tr->methods)
       {
-        if(!is_wellformed(ctx, x))
+        if(x->annot && !is_wellformed(ctx, x->annot))
         {
           std::stringstream a;
-          huml_ast::print(a, x);
+          huml_ast::print(a, x->annot);
 
           diagnostic <<= diagnostic_db::sema::not_wellformed(source_range { }, a.str());
         }
@@ -992,7 +992,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       }
       for(auto& x : im->methods)
       {
-        if(!is_wellformed(ctx, x))
+        if(x->annot && !is_wellformed(ctx, x->annot))
         {
           std::stringstream a;
           huml_ast::print(a, x);

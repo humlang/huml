@@ -34,7 +34,7 @@ struct CoGen
   ir::Node::cRef cogen(prop::ptr p)
   { return mach.prop(); }
 
-  ir::Node::cRef cogen(lambda::ptr l)
+  ir::Node::cRef cogen(lambda::ptr l, symbol name)
   {
     // TODO: what about recursion
 
@@ -47,11 +47,11 @@ struct CoGen
     auto bdy = dispatch(uncurried.second);
 
     // 2. Add return continuation, arg type is our return type, new return type is ⊥
-    auto ret = (l->name == symbol("main") ? mach.entry_ret() : mach.fn({ dispatch(uncurried.second->type) }, mach.bot()));
+    auto ret = (name == symbol("main") ? mach.entry_ret() : mach.fn({ dispatch(uncurried.second->type) }, mach.bot()));
     args.emplace_back(ret);
 
     auto lm = mach.fn(args, bdy);
-    lm->make_external(l->name);
+    lm->make_external(name);
 
     return lm;
   }
@@ -86,6 +86,8 @@ struct CoGen
   ir::Node::cRef cogen(assign::ptr a)
   {
     assert(false && "Unimplemented");
+
+    // TODO: also consider lambdas
   }
 
   ir::Node::cRef cogen(expr_stmt::ptr e)
@@ -109,6 +111,8 @@ struct CoGen
     ir::Node::cRef to_ret = nullptr;
     switch(node->kind)
     {
+    default: assert(false && "unhandled case");
+
     case ASTNodeKind::Kind: to_ret = cogen(std::static_pointer_cast<kind>(node));
     case ASTNodeKind::Prop: to_ret = cogen(std::static_pointer_cast<prop>(node));
     case ASTNodeKind::Type: to_ret = cogen(std::static_pointer_cast<type>(node));

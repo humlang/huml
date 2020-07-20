@@ -124,39 +124,20 @@ void huml_ast::print(std::ostream& os, ast_ptr node)
   case ASTNodeKind::lambda:      {
       lambda::ptr lam = std::static_pointer_cast<lambda>(node);
 
-      if(lam->name != "")
+      if(lam->lhs->annot != nullptr && !huml_ast::used(lam->lhs, lam->rhs))
       {
-        os << lam->name.get_string() << " ";
-
-        auto uncurried = lam->uncurry();
-        for(auto& a : uncurried.first)
-        {
-          os << "(";
-          print(os, a);
-          os << " : ";
-          print(os, a->annot);
-          os << ") ";
-        }
-        os << ":= ";
-        print(os, uncurried.second);
+        os << "(";
+        print(os, lam->lhs->annot);
+        os << " -> ";
+        print(os, lam->rhs);
+        os << ")";
       }
       else
       {
-        if(lam->lhs->annot != nullptr && !huml_ast::used(lam->lhs, lam->rhs))
-        {
-          os << "(";
-          print(os, lam->lhs->annot);
-          os << " -> ";
-          print(os, lam->rhs);
-          os << ")";
-        }
-        else
-        {
-          os << "\\";
-          print(os, lam->lhs);
-          os << ". ";
-          print(os, lam->rhs);
-        }
+        os << "\\";
+        print(os, lam->lhs);
+        os << ". ";
+        print(os, lam->rhs);
       }
     } break;
   case ASTNodeKind::app:         {
@@ -424,7 +405,6 @@ void huml_ast::print_as_type(std::ostream& os, ast_ptr node)
   case ASTNodeKind::lambda:      {
       lambda::ptr lam = std::static_pointer_cast<lambda>(node);
 
-      assert(lam->name != symbol("") && "must not be external");
       if(lam->lhs->type != nullptr && !huml_ast::used(lam->lhs, lam->rhs))
       {
         os << "(";
@@ -503,6 +483,10 @@ struct Scope : std::enable_shared_from_this<Scope>
 ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
 {
   ast_ptr to_ret = nullptr;
+
+  if(seen.contains(p))
+    return p;
+  seen.emplace(p);
   switch(p->kind)
   {
     default: assert(false && "Unconsidered case"); break;
@@ -633,6 +617,16 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
       auto x = std::static_pointer_cast<assign_type>(p);
 
       x->rhs = consider_scoping(x->rhs, seen, sc);
+      auto id = std::static_pointer_cast<identifier>(x->lhs)->symb;
+      if(id != symbol("_"))
+      {
+        if(sc->contains(id))
+        {
+          // TODO: emit diagnostic
+          assert(false && "Redefinition of existing identifier.");
+        }
+        sc->binders.emplace(id, x->lhs);
+      }
 
       to_ret = x;
     } break;
@@ -641,6 +635,16 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
 
       x->rhs = consider_scoping(x->rhs, seen, sc);
 
+      auto id = std::static_pointer_cast<identifier>(x->lhs)->symb;
+      if(id != symbol("_"))
+      {
+        if(sc->contains(id))
+        {
+          // TODO: emit diagnostic
+          assert(false && "Redefinition of existing identifier.");
+        }
+        sc->binders.emplace(id, x->lhs);
+      }
       to_ret = x;
     } break;
     case ASTNodeKind::expr_stmt: {
@@ -687,8 +691,8 @@ bool huml_ast::type_checks()
   /// nat
   auto nat_id = std::make_shared<identifier>(symbol("nat"));
   auto nat_type = std::make_shared<type>();
-  auto nat_type_assign = std::make_shared<assign_type>(nat_id, nat_type);
 
+  data.insert(data.begin() + 1, std::make_shared<assign_type>(nat_id, nat_type));
   tctx.data.emplace_back(nat_id, nat_type);
   /// bytes
   auto bytes_id   = std::make_shared<identifier>(symbol("bytes"));
@@ -697,7 +701,7 @@ bool huml_ast::type_checks()
   bytes_underscore->annot = nat_id;
   auto bytes_type = std::make_shared<lambda>(bytes_underscore, std::make_shared<type>());
 
-  data.insert(data.begin(), std::make_shared<assign_type>(bytes_id, bytes_type));
+  data.insert(data.begin() + 2, std::make_shared<assign_type>(bytes_id, bytes_type));
   tctx.data.emplace_back(bytes_id, std::make_shared<type>());
   /// __nat_to_bytes_signed   ~     \(A : Type). \(n : Nat). \(a : A). bytes n
   auto nat_to_bytes_signed_id = std::make_shared<identifier>(symbol("__nat_to_bytes_signed"));
@@ -710,7 +714,7 @@ bool huml_ast::type_checks()
                                     std::make_shared<lambda>(n,
                                       std::make_shared<lambda>(a, bytes_n)));
   tctx.data.emplace_back(nat_to_bytes_signed_id, nat_to_bytes_signed_type);
-  data.insert(data.begin(), std::make_shared<assign_data>(nat_to_bytes_signed_id, nat_to_bytes_signed_type));
+  data.insert(data.begin() + 3, std::make_shared<assign_data>(nat_to_bytes_signed_id, nat_to_bytes_signed_type));
   }
   /// __nat_to_bytes_unsigned   ~     \(A : Type). \(n : Nat). \(a : A). bytes n
   auto nat_to_bytes_unsigned_id = std::make_shared<identifier>(symbol("__nat_to_bytes_unsigned"));
@@ -723,7 +727,7 @@ bool huml_ast::type_checks()
                                       std::make_shared<lambda>(n,
                                         std::make_shared<lambda>(a, bytes_n)));
   tctx.data.emplace_back(nat_to_bytes_unsigned_id, nat_to_bytes_unsigned_type);
-  data.insert(data.begin(), std::make_shared<assign_data>(nat_to_bytes_unsigned_id, nat_to_bytes_unsigned_type));
+  data.insert(data.begin() + 4, std::make_shared<assign_data>(nat_to_bytes_unsigned_id, nat_to_bytes_unsigned_type));
   }
   //// fixup
   consider_scoping();

@@ -133,15 +133,10 @@ struct lambda : ast_base
   lambda(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs)
   {  }
 
-  lambda(ast_ptr lhs, ast_ptr rhs, symbol external_name) : ast_base(ASTNodeKind::lambda), lhs(lhs), rhs(rhs), name(external_name)
-  {  }
-
   std::pair<std::vector<ast_ptr>, ast_ptr> uncurry() const;
 
   ast_ptr lhs;
   ast_ptr rhs;
-
-  symbol name { "" };
 };
 
 struct match : ast_base

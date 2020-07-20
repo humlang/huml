@@ -194,10 +194,10 @@ ast_ptr huml_reader::parse_lambda()
 // s := id (a : type)...(z : type) := e ;
 ast_ptr huml_reader::parse_function(bool no_body)
 {
-  auto id = parse_identifier();
+  auto fn_id = parse_identifier();
   auto fn_name = old.data;
 
-  bool error = id == error_ref;
+  bool error = fn_id == error_ref;
 
   std::vector<ast_ptr> params;
   if(!expect('(', diagnostic_db::parser::type_expects_lparen))
@@ -254,11 +254,11 @@ ast_ptr huml_reader::parse_function(bool no_body)
 
     if(error)
       return mk_error();
-    lambda::ptr lam = std::make_shared<lambda>(params.back(), return_type, fn_name);
+    lambda::ptr lam = std::make_shared<lambda>(params.back(), return_type);
 
     for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
-      lam = std::make_shared<lambda>(*it, lam, fn_name);
-    return lam;
+      lam = std::make_shared<lambda>(*it, lam);
+    return std::make_shared<assign>(fn_id, lam, nullptr);
   }
   if(!expect(token_kind::ColonEqual, diagnostic_db::parser::function_expects_colon_eq))
     error = true;
@@ -266,13 +266,12 @@ ast_ptr huml_reader::parse_function(bool no_body)
   auto expr = parse_expression();
   if(!expect(';', diagnostic_db::parser::statement_expects_semicolon_at_end) || expr == error_ref)
     error = true;
-
   if(error)
     return mk_error();
-  lambda::ptr lam = std::make_shared<lambda>(params.back(), expr, fn_name);
+  lambda::ptr lam = std::make_shared<lambda>(params.back(), expr);
   for(auto it = params.rbegin() + 1; it != params.rend(); ++it)
-    lam = std::make_shared<lambda>(*it, lam, fn_name);
-  return lam;
+    lam = std::make_shared<lambda>(*it, lam);
+  return std::make_shared<assign>(fn_id, lam, nullptr);
 }
 
 // e := Kind
