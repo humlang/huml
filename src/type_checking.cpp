@@ -1351,8 +1351,11 @@ bool huml_ast_type_checking::is_wellformed(typing_context& ctx, ast_ptr A)
     return ctx.lookup_ex(A) != ctx.data.end();
 
   case ASTNodeKind::identifier:
+    {
+      auto id = std::static_pointer_cast<identifier>(A)->symb.get_string();
     return ctx.lookup_id(std::static_pointer_cast<identifier>(A)) != ctx.data.end()
         && (A->annot ? is_wellformed(ctx, A->annot) : true);
+    }
 
   case ASTNodeKind::app: {
       app::ptr a = std::static_pointer_cast<app>(A);

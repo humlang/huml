@@ -538,6 +538,10 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
           }
           sc->binders.emplace(id, v);
         }
+        if(v->annot)
+          v->annot = consider_scoping(v->annot, seen, sc);
+        if(v->type)
+          v->type = consider_scoping(v->type, seen, sc);
       }
       for(auto& v : x->methods)
         v = consider_scoping(v, seen, sc);
@@ -579,6 +583,11 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
         }
         sc->binders.emplace(id, x->lhs);
       }
+      if(x->lhs->annot)
+        x->lhs->annot = consider_scoping(x->lhs->annot, seen, sc);
+      if(x->lhs->type)
+        x->lhs->type = consider_scoping(x->lhs->type, seen, sc);
+
       x->rhs = consider_scoping(x->rhs, seen, sc);
       to_ret = x;
     } break;
@@ -610,6 +619,11 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
         }
         sc->binders.emplace(id, x->identifier);
       }
+      if(x->identifier->annot)
+        x->identifier->annot = consider_scoping(x->identifier->annot, seen, sc);
+      if(x->identifier->type)
+        x->identifier->type = consider_scoping(x->identifier->type, seen, sc);
+
       x->definition = consider_scoping(x->definition, seen, sc);
       to_ret = x;
     } break;
@@ -627,7 +641,10 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
         }
         sc->binders.emplace(id, x->lhs);
       }
-
+      if(x->lhs->annot)
+        x->lhs->annot = consider_scoping(x->lhs->annot, seen, sc);
+      if(x->lhs->type)
+        x->lhs->type = consider_scoping(x->lhs->type, seen, sc);
       to_ret = x;
     } break;
     case ASTNodeKind::assign_data: {
@@ -645,6 +662,10 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
         }
         sc->binders.emplace(id, x->lhs);
       }
+      if(x->lhs->annot)
+        x->lhs->annot = consider_scoping(x->lhs->annot, seen, sc);
+      if(x->lhs->type)
+        x->lhs->type = consider_scoping(x->lhs->type, seen, sc);
       to_ret = x;
     } break;
     case ASTNodeKind::expr_stmt: {
@@ -655,8 +676,10 @@ ast_ptr consider_scoping(ast_ptr p, ASTSet& seen, std::shared_ptr<Scope> sc)
       to_ret = x;
     } break;
   }
-  if(p->annot && !seen.count(p))
+  if(p->annot)
     p->annot = consider_scoping(p->annot, seen, sc);
+  if(p->type)
+    p->type = consider_scoping(p->type, seen, sc);
   return to_ret;
 }
 
@@ -666,7 +689,7 @@ void huml_ast::consider_scoping()
   std::shared_ptr<Scope> sc = std::make_shared<Scope>();
   for(auto& p : data)
   {
-    ::consider_scoping(p, seen, sc);
+    p = ::consider_scoping(p, seen, sc);
   }
 }
 
@@ -690,10 +713,9 @@ bool huml_ast::type_checks()
       // TODO: do we need to add stuff to `ctx.cur_scope->bindings`?
   /// nat
   auto nat_id = std::make_shared<identifier>(symbol("nat"));
-  auto nat_type = std::make_shared<type>();
 
-  data.insert(data.begin() + 1, std::make_shared<assign_type>(nat_id, nat_type));
-  tctx.data.emplace_back(nat_id, nat_type);
+  data.insert(data.begin() + 1, std::make_shared<assign_type>(nat_id, std::make_shared<type>()));
+  tctx.data.emplace_back(nat_id, std::make_shared<type>());
   /// bytes
   auto bytes_id   = std::make_shared<identifier>(symbol("bytes"));
 
