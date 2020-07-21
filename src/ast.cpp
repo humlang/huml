@@ -496,6 +496,7 @@ ast_ptr consider_scoping(ast_ptr p, ASTMap<ast_ptr>& seen, std::shared_ptr<Scope
     case ASTNodeKind::Prop:
     case ASTNodeKind::number:
     case ASTNodeKind::trait_type:
+    case ASTNodeKind::directive:
         to_ret = p;
       break;
 

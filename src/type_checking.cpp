@@ -789,7 +789,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
         diagnostic <<= diagnostic_db::sema::no_nat_in_context(source_range { }, a.str());
         return nullptr;
       }
-      return what->type = it->type;
+      return what->type = it->id_def;
     } break;
 
   // S-App
@@ -895,7 +895,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
       ctx.data.emplace_back(std::static_pointer_cast<identifier>(as->identifier), A);
       what->type = A;
 
-      return synthesize(ctx, as->in);
+      return as->in ? synthesize(ctx, as->in) : what->type;
     } break;
 
   // S-AssignData
