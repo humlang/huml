@@ -42,6 +42,8 @@ struct typing_context
   pos lookup_ex(pos begin, ast_ptr ex) const;
 
   std::vector<CTXElement> data;
+
+  ASTMap<ast_ptr> coercibles;
 };
 
 struct huml_ast_type_checking

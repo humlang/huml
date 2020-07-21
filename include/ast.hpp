@@ -120,7 +120,7 @@ struct app : ast_base
   using ptr = std::shared_ptr<app>;
 
   app(ast_ptr lhs, ast_ptr rhs) : ast_base(ASTNodeKind::app), lhs(lhs), rhs(rhs)
-  {  }
+  { assert(lhs && rhs); }
 
   ast_ptr lhs;
   ast_ptr rhs;

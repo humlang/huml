@@ -233,6 +233,7 @@ ast_ptr clone_ast_part_graph(ast_ptr what, tsl::robin_map<ast_ptr, ast_ptr>& clo
   case ASTNodeKind::Prop: ret = std::make_shared<prop>(); break;
   case ASTNodeKind::Type: ret = std::make_shared<type>(); break;
   case ASTNodeKind::unit: ret = std::make_shared<unit>(); break;
+  case ASTNodeKind::number: ret = std::make_shared<number>(std::static_pointer_cast<number>(what)->symb); break;
   case ASTNodeKind::trait_type: ret = std::make_shared<trait_type>(); break;
   case ASTNodeKind::ptr: ret = std::make_shared<pointer>(clone_ast_part_graph(std::static_pointer_cast<pointer>(what)->of,
                                                                               cloned_ids)); break;
@@ -509,6 +510,7 @@ ast_ptr typing_context::subst(ast_ptr what)
   case ASTNodeKind::Prop: 
   case ASTNodeKind::Type: 
   case ASTNodeKind::unit:
+  case ASTNodeKind::number:
   case ASTNodeKind::trait_type:
   case ASTNodeKind::identifier:
     return what;
@@ -566,6 +568,7 @@ ast_ptr typing_context::subst(ast_ptr what)
       return ex;
     } break;
 
+  default: assert(false && "unimplemented");
 
   case ASTNodeKind::directive:
   case ASTNodeKind::expr_stmt:
@@ -718,15 +721,18 @@ c_sub:
 
       if(!is_subtype(ctx, A, type))
       {
-        std::stringstream a, b;
-        huml_ast::print(a, A);
-        huml_ast::print(b, type);
+        if(auto it = ctx.coercibles.find(A); it != ctx.coercibles.end() && !is_subtype(ctx, it->second, type))
+        {
+          std::stringstream a, b;
+          huml_ast::print(a, A);
+          huml_ast::print(b, type);
 
-        // TODO: fix diagnostic location
-        assert(false);
-        diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
+          // TODO: fix diagnostic location
+          assert(false);
+          diagnostic <<= diagnostic_db::sema::not_a_subtype(source_range { }, a.str(), b.str());
 
-        return false;
+          return false;
+        }
       }
       what->type = type;
       return true;
@@ -987,7 +993,7 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
   case ASTNodeKind::implement: {
       implement::ptr im = std::static_pointer_cast<implement>(what);
 
-      auto trait = im->trait; // TODO: subst //ctx.subst(subst(lm->lhs, e, lm->rhs));
+      auto trait = im->trait;
       if(!check(ctx, trait, std::make_shared<trait_type>()))
       {
         std::stringstream a;
@@ -995,7 +1001,6 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
 
         diagnostic <<= diagnostic_db::sema::not_a_trait(source_range { }, a.str());
       }
-      /*
       for(auto& x : im->methods)
       {
         assert(x->kind == ASTNodeKind::assign && "bug in parser");
@@ -1011,7 +1016,23 @@ ast_ptr huml_ast_type_checking::synthesize(typing_context& ctx, ast_ptr what)
           diagnostic <<= diagnostic_db::sema::impl_illformed(source_range { }, a.str(), b.str());
         }
       }
-      */ // TODO: uncomment and debug using valgrind...
+      if(trait->kind == ASTNodeKind::app)
+      {
+        auto ap = std::static_pointer_cast<app>(trait);
+
+        if(ap->lhs->kind == ASTNodeKind::app)
+        {
+          auto tmp = std::static_pointer_cast<app>(ap->lhs);
+
+          if(tmp->lhs->kind == ASTNodeKind::identifier && std::static_pointer_cast<identifier>(tmp->lhs)->symb == symbol("Coercible"))
+          {
+            auto from_type = tmp->rhs;
+            auto to_type = ap->rhs;
+
+            ctx.coercibles.emplace(from_type, to_type);
+          }
+        }
+      }
       return what->type = std::make_shared<unit>(); // <- TODO: ok?
     } break;
   }
