@@ -70,7 +70,7 @@ void parse(int argc, const char** argv, std::FILE* out)
 
   auto map = options.parse(argc, argv);
 
-  if(std::any_cast<bool>(map["-help"]))
+  if(argc == 1 || std::any_cast<bool>(map["-help"]))
   {
     options.print_help(out);
     config.print_help = true;

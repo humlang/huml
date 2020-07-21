@@ -85,6 +85,12 @@ struct CoGen
 
   ir::Node::cRef cogen(assign::ptr a)
   {
+    if(a->in == nullptr)
+    {
+      // Function assign, i.e. main (argc : i32) (argv : **i8) -> i8 := ret 42
+      return cogen(std::static_pointer_cast<lambda>(a->definition),
+                   std::static_pointer_cast<identifier>(a->identifier)->symb);
+    }
     assert(false && "Unimplemented");
 
     // TODO: also consider lambdas
@@ -125,7 +131,7 @@ struct CoGen
     case ASTNodeKind::expr_stmt: to_ret = cogen(std::static_pointer_cast<expr_stmt>(node));
     case ASTNodeKind::directive: to_ret = cogen(std::static_pointer_cast<directive>(node));
     case ASTNodeKind::identifier: to_ret = cogen(std::static_pointer_cast<identifier>(node));
-    case ASTNodeKind::lambda: to_ret = cogen(std::static_pointer_cast<lambda>(node));
+    case ASTNodeKind::lambda: to_ret = cogen(std::static_pointer_cast<lambda>(node), "");
     case ASTNodeKind::app: to_ret = cogen(std::static_pointer_cast<app>(node));
     case ASTNodeKind::match: to_ret = cogen(std::static_pointer_cast<match>(node));
     case ASTNodeKind::pattern_matcher: to_ret = cogen(std::static_pointer_cast<pattern_matcher>(node));
