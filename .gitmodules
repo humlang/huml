@@ -10,3 +10,6 @@
 [submodule "lib/robin-map"]
 	path = lib/robin-map
 	url = git@github.com:Tessil/robin-map.git
+[submodule "lib/json2humlerr"]
+	path = lib/json2humlerr
+	url = git@github.com:humlang/json2humlerr.git
