@@ -1,0 +1,5 @@
+(env
+ (dev
+  (flags (:standard -g -w +42)))
+ (release
+  (flags (:standard -O3))))

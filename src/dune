@@ -1,0 +1,12 @@
+(executable
+  (name reml)
+  (modes byte exe)
+  (libraries llvm))
+
+(menhir
+  (infer false)
+  (flags --lalr --explain)
+  (modules parser))
+
+(ocamllex lexer)
+

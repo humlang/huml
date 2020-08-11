@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+_build/
+.merlin
+
 # Compiled Object files
 *.slo
 *.lo
