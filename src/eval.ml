@@ -1,66 +1,83 @@
 open Ast
+open Ast.HuML
+
+exception Match_error
 
 (** evaluates a binary operation *)
-let eval_op (v1:Ast.HuML.exp) (op':Ast.HuML.op) (v2:Ast.HuML.exp) : Ast.HuML.exp =
+let eval_op (v1:exp) (op':op) (v2:exp) : exp =
   match v1,op',v2 with
-  | Ast.HuML.Int_e i, Ast.HuML.Plus, Ast.HuML.Int_e j -> Ast.HuML.Int_e (i+j)
-  | Ast.HuML.Int_e i, Ast.HuML.Minus, Ast.HuML.Int_e j -> Ast.HuML.Int_e (i-j)
-  | Ast.HuML.Int_e i, Ast.HuML.Mult, Ast.HuML.Int_e j -> Ast.HuML.Int_e (i*j)
-  | Ast.HuML.Int_e i, Ast.HuML.Div, Ast.HuML.Int_e j -> Ast.HuML.Int_e (i/j)
-  | Ast.HuML.Int_e i, Ast.HuML.Le, Ast.HuML.Int_e j -> Ast.HuML.Int_e (if i<j then 1 else 0)
-  | Ast.HuML.Int_e i, Ast.HuML.LeEq, Ast.HuML.Int_e j -> Ast.HuML.Int_e (if i<=j then 1 else 0)
-  | Ast.HuML.Int_e i, Ast.HuML.GtEq, Ast.HuML.Int_e j -> Ast.HuML.Int_e (if i>=j then 1 else 0)
-  | Ast.HuML.Int_e i, Ast.HuML.Gt, Ast.HuML.Int_e j -> Ast.HuML.Int_e (if i>j then 1 else 0)
+  | Int_e i, Plus, Int_e j -> Int_e (i+j)
+  | Int_e i, Minus, Int_e j -> Int_e (i-j)
+  | Int_e i, Mult, Int_e j -> Int_e (i*j)
+  | Int_e i, Div, Int_e j -> Int_e (i/j)
+  | Int_e i, Le, Int_e j -> Int_e (if i<j then 1 else 0)
+  | Int_e i, LeEq, Int_e j -> Int_e (if i<=j then 1 else 0)
+  | Int_e i, GtEq, Int_e j -> Int_e (if i>=j then 1 else 0)
+  | Int_e i, Gt, Int_e j -> Int_e (if i>j then 1 else 0)
   | _,_,_ -> if is_value v1 && is_value v2 then
                raise Type_error
              else
                raise Not_a_value
 
 (** s an expression *)
-let rec eval (ctx:Ast.HuML.eval_ctx) (e:Ast.HuML.exp) : Ast.HuML.exp =
+let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
   match e with
-  | Ast.HuML.Int_e i -> Ast.HuML.Int_e i
-  | Ast.HuML.Type_e -> Ast.HuML.Type_e
-  | Ast.HuML.Op_e(e1,op,e2) ->
+  | Int_e i -> Int_e i
+  | Type_e -> Type_e
+  | Op_e(e1,op,e2) ->
       let v1 = eval ctx e1 in
       let v2 = eval ctx e2 in
       eval_op v1 op v2
-  | Ast.HuML.Let_e(x,e1,e2) ->
+  | Let_e(x,e1,e2) ->
       let v1 = eval ctx e1 in
       let e2' = substitute v1 x e2 in
       eval ctx e2'
-  | Ast.HuML.App_e(e1,e2) ->
+  | App_e(e1,e2) ->
     let v1 = eval ctx e1 in
     (*let v2 = eval ctx e2 in (* <- call by value! *)*)
     (match v1 with
-     | Ast.HuML.Lam_e(x,b) -> let res = eval ctx (substitute e2 x b) in (* <- using e2 here means call by name *)
+     | Lam_e(x,b) -> let res = eval ctx (substitute e2 x b) in (* <- using e2 here means call by name *)
        res
      | _ -> raise Type_error)
-  | Ast.HuML.Lam_e(x,e) -> Ast.HuML.Lam_e(x,e)
-  | Ast.HuML.Var_e x -> lookup_val ctx x
-  | Ast.HuML.If_e(c,e1,e2) ->
+  | Lam_e(x,e) -> Lam_e(x,e)
+  | Var_e x -> lookup_val ctx x
+  | If_e(c,e1,e2) ->
     let c' = eval ctx c in
     (match c' with
-     | Ast.HuML.Int_e 0 -> eval ctx e2
-     | Ast.HuML.Int_e _ -> eval ctx e1
+     | Int_e 0 -> eval ctx e2
+     | Int_e _ -> eval ctx e1
      | _ -> raise Type_error)
-  | Ast.HuML.Match_e(e,_) ->
-    e (* TODO *)
+  | Match_e(e,es) ->
+    let ev = eval ctx e in
+    let ctx_cell = ref ctx in
+    let result = List.find_opt (fun (p,_) ->
+        match p,ev with
+        | Int_p x,Int_e y -> if x = y then true else false
+        | Int_p _,_ -> raise Match_error
+        | Var_p x,_ -> ctx_cell := Evalcontext.Value_c(x, ev, !ctx_cell); true
+        | App_p _,_ -> false (* TODO: Implement this *)
+        | Ignore_p,_ -> true
+      ) es
+    in
+    match result with
+    | Option.None -> raise Match_error
+    | Option.Some (_,e') -> eval !ctx_cell e'
 
 (** runs a program *)
-let run (p:Ast.HuML.program) : Ast.HuML.eval_ctx =
+let run (p:program) : Evalcontext.t =
+  Evalcontext.constructors := Ast.collect_constructors p;
   List.fold_left (fun ctx -> fun x ->
       match x with
-      | Ast.HuML.Expr_s x' ->
+      | Expr_s x' ->
         let _ = eval ctx x' in
         ctx
-      | Ast.HuML.Assign_s(s,e) ->
+      | Assign_s(s,e) ->
         let v = eval ctx e in
-        Ast.HuML.Value_c(s,v,ctx)
-      | Ast.HuML.Type_s(s,e) ->
+        Evalcontext.Value_c(s,v,ctx)
+      | Type_s(s,e) ->
         let v = eval ctx e in
-        Ast.HuML.Type_c(s,v,ctx)
-      | Ast.HuML.Data_s(s,e) ->
+        Evalcontext.Type_c(s,v,ctx)
+      | Data_s(s,e) ->
         let v = eval ctx e in
-        Ast.HuML.Data_c(s,v,ctx)
-    ) Ast.HuML.Empty_c p
+        Evalcontext.Data_c(s,v,ctx)
+    ) Evalcontext.Empty_c p

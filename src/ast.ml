@@ -44,11 +44,16 @@ module HuML = struct
 
   type program = stmt list
 
-  type eval_ctx =
-    | Empty_c
-    | Value_c of var * exp * eval_ctx
-    | Type_c of var * exp * eval_ctx
-    | Data_c of var * exp * eval_ctx
+
+  module Evalcontext = struct
+    type t =
+      | Empty_c
+      | Value_c of var * exp * t
+      | Type_c of var * exp * t
+      | Data_c of var * exp * t
+
+    let constructors = ref ConstructorSet.empty
+  end
 
 end
 
@@ -68,13 +73,13 @@ exception Type_error
 exception Not_a_value
 
 (** looksup a variable in the evaluation context *)
-let lookup_val (ctx:HuML.eval_ctx) (s:HuML.var) : HuML.exp =
-  let rec lookup_val' (ctx':HuML.eval_ctx) : HuML.exp =
+let lookup_val (ctx:HuML.Evalcontext.t) (s:HuML.var) : HuML.exp =
+  let rec lookup_val' (ctx':HuML.Evalcontext.t) : HuML.exp =
     match ctx' with
-    | HuML.Empty_c -> raise (Unbound_variable s)
-    | HuML.Value_c(z,x,c) -> if s = z then x else lookup_val' c
-    | HuML.Type_c(_,_,c) -> lookup_val' c
-    | HuML.Data_c(_,_,c) -> lookup_val' c
+    | HuML.Evalcontext.Empty_c -> raise (Unbound_variable s)
+    | HuML.Evalcontext.Value_c(z,x,c) -> if s = z then x else lookup_val' c
+    | HuML.Evalcontext.Type_c(_,_,c) -> lookup_val' c
+    | HuML.Evalcontext.Data_c(_,_,c) -> lookup_val' c
   in
     lookup_val' ctx
 
@@ -239,21 +244,21 @@ let print_stmt (s:HuML.stmt) : unit =
     Printf.printf ";"
 
 (** Pretty prints the context of an evaluation context *)
-let print_ctx (ctx:HuML.eval_ctx) : unit =
-  let rec print_ctx' (ctx':HuML.eval_ctx) : unit =
+let print_ctx (ctx:HuML.Evalcontext.t) : unit =
+  let rec print_ctx' (ctx':HuML.Evalcontext.t) : unit =
     match ctx' with
-    | HuML.Empty_c -> ()
-    | HuML.Value_c(z,x,c) ->
+    | HuML.Evalcontext.Empty_c -> ()
+    | HuML.Evalcontext.Value_c(z,x,c) ->
       Printf.printf "%s <- " z;
       print_exp x;
       Printf.printf ", ";
       print_ctx' c
-    | HuML.Data_c(z,x,c) ->
+    | HuML.Evalcontext.Data_c(z,x,c) ->
       Printf.printf "%s : " z;
       print_exp x;
       Printf.printf ", ";
       print_ctx' c
-    | HuML.Type_c(z,x,c) ->
+    | HuML.Evalcontext.Type_c(z,x,c) ->
       Printf.printf "%s type of " z;
       print_exp x;
       Printf.printf ", ";
