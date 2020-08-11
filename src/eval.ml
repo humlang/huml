@@ -51,21 +51,65 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
     let ev = eval ctx e in
     let ctx_cell = ref ctx in
     let result = List.find_opt (fun (p,_) ->
-        match p,ev with
-        | Int_p x,Int_e y -> if x = y then true else false
-        | Int_p _,_ -> raise Match_error
-        | Var_p x,_ -> ctx_cell := Evalcontext.Value_c(x, ev, !ctx_cell); true
-        | App_p _,_ -> false (* TODO: Implement this *)
-        | Ignore_p,_ -> true
+        let rec inner (p':pattern) (e':exp) : bool =
+          match p',e' with
+          | Int_p x,Int_e y -> if x = y then true else false
+          | Int_p _,_ -> raise Match_error
+          | Var_p x,y ->
+            if Ast.find_datactor x then
+              (match y with
+               | Var_e y' -> if x = y' then true else false
+               | _ -> raise Match_error)
+            else
+              (ctx_cell := ((x,ev) :: !ctx_cell); true)
+          | App_p (p1,p2),App_e(e1,e2) ->
+            (match p1,e1 with
+            | Var_p x,Var_e y ->
+              if x = y then
+                inner p2 e2
+              else
+                false
+            | _,_ -> raise Match_error)
+          | App_p _,_ -> false
+          | Ignore_p,_ -> true
+in
+inner p ev
       ) es
     in
     match result with
     | Option.None -> raise Match_error
     | Option.Some (_,e') -> eval !ctx_cell e'
 
+
+
+(** collects all constructors occuring in the program *)
+let collect_constructors (p:HuML.program) : unit =
+  let rec collect (ct:HuML.ConstructorSet.t) (cd:HuML.ConstructorSet.t) (p':HuML.program)
+    : HuML.ConstructorSet.t * HuML.ConstructorSet.t =
+    match p' with
+    | [] -> (ct,cd)
+    | (HuML.Expr_s _ | HuML.Assign_s _) :: xs -> collect ct cd xs
+    | HuML.Type_s(v,e) :: xs ->
+      let e' = eval [] e in
+      let (ct',cd') = collect (HuML.ConstructorSet.union ct (HuML.ConstructorSet.singleton (v,e'))) cd xs
+      in
+        (ct',cd')
+    | HuML.Data_s(v,e) :: xs ->
+      let e' = eval [] e in
+      let (ct',cd') = collect ct (HuML.ConstructorSet.union cd (HuML.ConstructorSet.singleton (v,e'))) xs
+      in
+        (ct',cd')
+  in
+    let (ct, cd) = collect HuML.ConstructorSet.empty HuML.ConstructorSet.empty p
+  in
+    HuML.Evalcontext.typectors := ct;
+    HuML.Evalcontext.datactors := cd;
+    ()
+
+
 (** runs a program *)
 let run (p:program) : Evalcontext.t =
-  Evalcontext.constructors := Ast.collect_constructors p;
+  collect_constructors p;
   List.fold_left (fun ctx -> fun x ->
       match x with
       | Expr_s x' ->
@@ -73,11 +117,7 @@ let run (p:program) : Evalcontext.t =
         ctx
       | Assign_s(s,e) ->
         let v = eval ctx e in
-        Evalcontext.Value_c(s,v,ctx)
-      | Type_s(s,e) ->
-        let v = eval ctx e in
-        Evalcontext.Type_c(s,v,ctx)
-      | Data_s(s,e) ->
-        let v = eval ctx e in
-        Evalcontext.Data_c(s,v,ctx)
-    ) Evalcontext.Empty_c p
+        (s,v) :: ctx
+      | (Type_s _ | Data_s _) -> ctx (* HACK: collect_constructors already deals with those *)
+                                     (* TODO: Types might be declared later but known earlier *)
+    ) [] p

@@ -28,45 +28,29 @@ module HuML = struct
     | If_e of exp * exp * exp
     | Match_e of exp * ((pattern * exp) list)
 
-  module Constructor = struct
-    type t = var * exp
-
-    let compare = compare
-  end
-
   type stmt =
     | Expr_s of exp
     | Assign_s of var * exp
     | Type_s of var * exp
     | Data_s of var * exp
 
+  module Constructor = struct
+    type t = var * exp
+
+    let compare = compare
+  end
   module ConstructorSet = Set.Make(Constructor)
 
   type program = stmt list
 
-
   module Evalcontext = struct
-    type t =
-      | Empty_c
-      | Value_c of var * exp * t
-      | Type_c of var * exp * t
-      | Data_c of var * exp * t
+    type t = (var * exp) list
 
-    let constructors = ref ConstructorSet.empty
+    let typectors = ref ConstructorSet.empty
+    let datactors = ref ConstructorSet.empty
   end
 
 end
-
-(** collects all constructors occuring in the program *)
-let collect_constructors (p:HuML.program) : HuML.ConstructorSet.t =
-  let rec collect (c:HuML.ConstructorSet.t) (p':HuML.program) : HuML.ConstructorSet.t =
-    match p' with
-    | [] -> c
-    | (HuML.Expr_s _ | HuML.Assign_s _) :: xs -> collect c xs
-    | HuML.Type_s(v,e) :: xs -> collect (HuML.ConstructorSet.union c (HuML.ConstructorSet.singleton (v,e))) xs
-    | HuML.Data_s(v,e) :: xs -> collect (HuML.ConstructorSet.union c (HuML.ConstructorSet.singleton (v,e))) xs
-  in
-    collect HuML.ConstructorSet.empty p
 
 exception Unbound_variable of HuML.var
 exception Type_error
@@ -76,12 +60,30 @@ exception Not_a_value
 let lookup_val (ctx:HuML.Evalcontext.t) (s:HuML.var) : HuML.exp =
   let rec lookup_val' (ctx':HuML.Evalcontext.t) : HuML.exp =
     match ctx' with
-    | HuML.Evalcontext.Empty_c -> raise (Unbound_variable s)
-    | HuML.Evalcontext.Value_c(z,x,c) -> if s = z then x else lookup_val' c
-    | HuML.Evalcontext.Type_c(_,_,c) -> lookup_val' c
-    | HuML.Evalcontext.Data_c(_,_,c) -> lookup_val' c
+    | [] -> raise (Unbound_variable s)
+    | (v,e) :: xs -> if s = v then e else lookup_val' xs
   in
     lookup_val' ctx
+
+(** finds a data ctor in the evaluation context *)
+let find_datactor (s:HuML.var) : bool =
+  let w = HuML.ConstructorSet.find_first_opt
+      (fun (z,_) -> if s = z then true else false)
+      !HuML.Evalcontext.datactors
+  in
+  match w with
+  | Option.None -> false
+  | _ -> true
+
+(** finds a type ctor in the evaluation context *)
+let find_typector (s:HuML.var) : bool =
+  let w = HuML.ConstructorSet.find_first_opt
+      (fun (z,_) -> if s = z then true else false)
+      !HuML.Evalcontext.typectors
+  in
+  match w with
+  | Option.None -> false
+  | _ -> true
 
 (** [fv e] is a set-like list of the free variables of [e]. *)
 let rec fv (e:HuML.exp) : HuML.VarSet.t =
@@ -247,22 +249,12 @@ let print_stmt (s:HuML.stmt) : unit =
 let print_ctx (ctx:HuML.Evalcontext.t) : unit =
   let rec print_ctx' (ctx':HuML.Evalcontext.t) : unit =
     match ctx' with
-    | HuML.Evalcontext.Empty_c -> ()
-    | HuML.Evalcontext.Value_c(z,x,c) ->
+    | [] -> ()
+    | (z,x) :: xs ->
       Printf.printf "%s <- " z;
       print_exp x;
       Printf.printf ", ";
-      print_ctx' c
-    | HuML.Evalcontext.Data_c(z,x,c) ->
-      Printf.printf "%s : " z;
-      print_exp x;
-      Printf.printf ", ";
-      print_ctx' c
-    | HuML.Evalcontext.Type_c(z,x,c) ->
-      Printf.printf "%s type of " z;
-      print_exp x;
-      Printf.printf ", ";
-      print_ctx' c
+      print_ctx' xs
   in
     Printf.printf "[";
     print_ctx' ctx;
