@@ -1,6 +1,7 @@
 (executable
   (name reml)
   (modes byte exe)
+  (flags (:standard -g))
   (libraries llvm))
 
 (menhir

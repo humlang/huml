@@ -40,7 +40,14 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
        res
      | _ -> raise Type_error)
   | Lam_e(x,e) -> Lam_e(x,e)
-  | Var_e x -> lookup_val ctx x
+  | Var_e x ->
+    begin
+      match find_datactor x, find_typector x with
+      | Option.None,Option.None -> lookup_val ctx x
+      | Option.Some _,Option.None -> Var_e x
+      | Option.None,Option.Some _ -> Var_e x
+      | _,_ -> raise (Unbound_variable x)
+    end
   | If_e(c,e1,e2) ->
     let c' = eval ctx c in
     (match c' with
@@ -56,7 +63,7 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
           | Int_p x,Int_e y -> if x = y then true else false
           | Int_p _,_ -> raise Match_error
           | Var_p x,y ->
-            if Ast.find_datactor x then
+            if Ast.find_datactor x <> Option.None then
               (match y with
                | Var_e y' -> if x = y' then true else false
                | _ -> raise Match_error)
@@ -81,35 +88,16 @@ inner p ev
     | Option.Some (_,e') -> eval !ctx_cell e'
 
 
-
-(** collects all constructors occuring in the program *)
-let collect_constructors (p:HuML.program) : unit =
-  let rec collect (ct:HuML.ConstructorSet.t) (cd:HuML.ConstructorSet.t) (p':HuML.program)
-    : HuML.ConstructorSet.t * HuML.ConstructorSet.t =
-    match p' with
-    | [] -> (ct,cd)
-    | (HuML.Expr_s _ | HuML.Assign_s _) :: xs -> collect ct cd xs
-    | HuML.Type_s(v,e) :: xs ->
-      let e' = eval [] e in
-      let (ct',cd') = collect (HuML.ConstructorSet.union ct (HuML.ConstructorSet.singleton (v,e'))) cd xs
-      in
-        (ct',cd')
-    | HuML.Data_s(v,e) :: xs ->
-      let e' = eval [] e in
-      let (ct',cd') = collect ct (HuML.ConstructorSet.union cd (HuML.ConstructorSet.singleton (v,e'))) xs
-      in
-        (ct',cd')
+(** prints constructors *)
+let print_constructors (_:unit) : unit =
+  let printer = HuML.ConstructorSet.iter (fun (s,e) -> Printf.printf "%s -> " s; print_exp e)
   in
-    let (ct, cd) = collect HuML.ConstructorSet.empty HuML.ConstructorSet.empty p
-  in
-    HuML.Evalcontext.typectors := ct;
-    HuML.Evalcontext.datactors := cd;
-    ()
+  printer !HuML.Evalcontext.typectors;
+  printer !HuML.Evalcontext.datactors
 
 
 (** runs a program *)
 let run (p:program) : Evalcontext.t =
-  collect_constructors p;
   List.fold_left (fun ctx -> fun x ->
       match x with
       | Expr_s x' ->
@@ -118,6 +106,14 @@ let run (p:program) : Evalcontext.t =
       | Assign_s(s,e) ->
         let v = eval ctx e in
         (s,v) :: ctx
-      | (Type_s _ | Data_s _) -> ctx (* HACK: collect_constructors already deals with those *)
-                                     (* TODO: Types might be declared later but known earlier *)
+      | Type_s(s,e) ->
+        let v = eval [] e in
+        HuML.Evalcontext.typectors := HuML.ConstructorSet.union (!HuML.Evalcontext.typectors)
+            (HuML.ConstructorSet.singleton (s,v));
+        ctx
+      | Data_s(s,e) ->
+        let v = eval [] e in
+        HuML.Evalcontext.datactors := HuML.ConstructorSet.union (!HuML.Evalcontext.datactors)
+            (HuML.ConstructorSet.singleton (s,v));
+        ctx
     ) [] p

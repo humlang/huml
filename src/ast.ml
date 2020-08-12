@@ -66,24 +66,24 @@ let lookup_val (ctx:HuML.Evalcontext.t) (s:HuML.var) : HuML.exp =
     lookup_val' ctx
 
 (** finds a data ctor in the evaluation context *)
-let find_datactor (s:HuML.var) : bool =
-  let w = HuML.ConstructorSet.find_first_opt
+let find_datactor (s:HuML.var) : HuML.exp option =
+  let w = List.find_opt
       (fun (z,_) -> if s = z then true else false)
-      !HuML.Evalcontext.datactors
+      (HuML.ConstructorSet.elements !HuML.Evalcontext.datactors)
   in
   match w with
-  | Option.None -> false
-  | _ -> true
+  | Option.None -> Option.None
+  | Option.Some(_,v) -> Option.Some v
 
 (** finds a type ctor in the evaluation context *)
-let find_typector (s:HuML.var) : bool =
-  let w = HuML.ConstructorSet.find_first_opt
+let find_typector (s:HuML.var) : HuML.exp option =
+  let w = List.find_opt
       (fun (z,_) -> if s = z then true else false)
-      !HuML.Evalcontext.typectors
+      (HuML.ConstructorSet.elements !HuML.Evalcontext.typectors)
   in
   match w with
-  | Option.None -> false
-  | _ -> true
+  | Option.None -> Option.None
+  | Option.Some(_,v) -> Option.Some v
 
 (** [fv e] is a set-like list of the free variables of [e]. *)
 let rec fv (e:HuML.exp) : HuML.VarSet.t =
