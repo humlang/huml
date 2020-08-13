@@ -62,30 +62,36 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
   | Match_e(e,es) ->
     let ev = eval ctx e in
     let ctx_cell = ref ctx in
-    let result = List.find_opt (fun (p,_) ->
+    let result = List.find_opt
+        (fun (p,_) ->
         let rec inner (p':pattern) (e':exp) : bool =
-          match p',e' with
-          | Int_p x,Int_e y -> if x = y then true else false
-          | Int_p _,_ -> raise Match_error
-          | Var_p x,y ->
-            if Ast.find_datactor x <> Option.None then
-              (match y with
-               | Var_e y' -> if x = y' then true else false
-               | _ -> raise Match_error)
-            else
-              (ctx_cell := ((x,ev) :: !ctx_cell); true)
-          | App_p (p1,p2),App_e(e1,e2) ->
-            (match p1,e1 with
-            | Var_p x,Var_e y ->
-              if x = y then
-                inner p2 e2
+          begin
+            match p',e' with
+            | Int_p x,Int_e y -> if x = y then true else false
+            | Int_p _,_ -> raise Match_error
+            | Var_p x,y ->
+              if Ast.find_datactor x <> Option.None then
+                (match y with
+                | Var_e y' -> if x = y' then true else false
+                | _ -> false)
               else
-                false
-            | _,_ -> raise Match_error)
-          | App_p _,_ -> false
-          | Ignore_p,_ -> true
-in
-inner p ev
+                begin
+                  ctx_cell := ((x,y) :: !ctx_cell);
+                  true
+                end
+            | App_p (p1,p2),App_e(e1,e2) ->
+              (match p1,e1 with
+              | Var_p x,Var_e y ->
+                if x = y then
+                  inner p2 e2
+                else
+                  false
+              | _,_ -> raise Match_error)
+            | App_p _,_ -> false
+            | Ignore_p,_ -> true
+          end
+        in
+        inner p ev
       ) es
     in
     match result with
