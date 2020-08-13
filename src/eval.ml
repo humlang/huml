@@ -38,6 +38,11 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
     (match v1 with
      | Lam_e(x,b) -> let res = eval ctx (substitute e2 x b) in (* <- using e2 here means call by name *)
        res
+     | Var_e x ->
+       if find_datactor x <> Option.None || find_typector x <> Option.None then
+         App_e(v1, eval ctx e2)
+       else
+         raise Type_error
      | _ -> raise Type_error)
   | Lam_e(x,e) -> Lam_e(x,e)
   | Var_e x ->
