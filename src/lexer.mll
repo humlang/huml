@@ -22,6 +22,8 @@ rule token = parse
   | ">=" { GREATEREQUAL }
   | '>' { GREATER }
   | '\\' { BACKSLASH }
+  | "->" { ARROW }
+  | "=>" { EQUALARROW }
   | '.' { DOT }
   | ':' { COLON }
   | '+' { PLUS }
@@ -34,7 +36,6 @@ rule token = parse
   | ']' { RBRACKET }
   | '|' { PIPE }
   | '_' { UNDERSCORE }
-  | "=>" { EQUALARROW }
   | '=' { EQUAL }
   | eof { EOF }
   | _ { raise (Error (Printf.sprintf "%d: unexpected character.\n" (Lexing.lexeme_start lexbuf))) }

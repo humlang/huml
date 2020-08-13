@@ -9,7 +9,7 @@
 %token LESS LESSEQUAL GREATEREQUAL GREATER
 %token LPAREN RPAREN LBRACKET RBRACKET PIPE
 %token EQUAL SEMICOLON EOF EQUALARROW
-%token LET BACKSLASH DOT COLON
+%token LET BACKSLASH DOT COLON ARROW
 %token IF THEN ELSE MATCH UNDERSCORE
 %token APP
 
@@ -23,6 +23,8 @@
 %left STAR SLASH
 %left LESS LESSEQUAL GREATER GREATEREQUAL
 %left COLON
+
+%right ARROW
 
 %nonassoc INT TYPE_VAL IDENTIFIER LPAREN LET BACKSLASH IF
 %nonassoc MATCH UNDERSCORE
@@ -63,6 +65,8 @@ expr:
     { Ast.HuML.Lam_e(x,e) }
   | BACKSLASH x = IDENTIFIER COLON t = expr DOT e = expr
     { Ast.HuML.LamWithAnnot_e(x,t,e) }
+  | t = expr ARROW e = expr
+    { Ast.HuML.LamWithAnnot_e("_",t,e) }
   | LET x = IDENTIFIER EQUAL e1 = expr SEMICOLON e2 = expr
     { Ast.HuML.Let_e(x,e1,e2) }
   | MATCH e = expr LBRACKET es = separated_list(PIPE, match_arm) RBRACKET
