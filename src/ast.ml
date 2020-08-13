@@ -243,7 +243,7 @@ let rec print_exp (e:HuML.exp) : unit =
         Printf.printf " => ";
         print_exp e;
         if i + 1 < len then
-          Printf.printf " | HuML."
+          Printf.printf " | "
         else
           ()
       ) es;

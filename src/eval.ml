@@ -24,7 +24,7 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
   match e with
   | Int_e i -> Int_e i
   | Type_e -> Type_e
-  | TypeAnnot_e(e,t) -> TypeAnnot_e(eval ctx e,t)
+  | TypeAnnot_e(e,_) -> eval ctx e
   | Op_e(e1,op,e2) ->
       let v1 = eval ctx e1 in
       let v2 = eval ctx e2 in
