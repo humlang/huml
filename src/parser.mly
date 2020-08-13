@@ -22,6 +22,7 @@
 %left PLUS MINUS
 %left STAR SLASH
 %left LESS LESSEQUAL GREATER GREATEREQUAL
+%left COLON
 
 %nonassoc INT TYPE_VAL IDENTIFIER LPAREN LET BACKSLASH IF
 %nonassoc MATCH UNDERSCORE
@@ -52,12 +53,16 @@ expr:
     { Ast.HuML.Var_e id }
   | LPAREN e = expr RPAREN
     { e }
+  | e = expr COLON t = expr
+    { Ast.HuML.TypeAnnot_e(e,t) }
   | IF c = expr THEN e1 = expr ELSE e2 = expr
     { Ast.HuML.If_e(c, e1, e2) }
   | e1 = expr e2 = expr
     { Ast.HuML.App_e(e1,e2) } %prec APP
   | BACKSLASH x = IDENTIFIER DOT e = expr
     { Ast.HuML.Lam_e(x,e) }
+  | BACKSLASH x = IDENTIFIER COLON t = expr DOT e = expr
+    { Ast.HuML.LamWithAnnot_e(x,t,e) }
   | LET x = IDENTIFIER EQUAL e1 = expr SEMICOLON e2 = expr
     { Ast.HuML.Let_e(x,e1,e2) }
   | MATCH e = expr LBRACKET es = separated_list(PIPE, match_arm) RBRACKET

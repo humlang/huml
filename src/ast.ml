@@ -18,12 +18,14 @@ module HuML = struct
     | App_p of pattern * pattern
     | Ignore_p
   and exp =
+    | TypeAnnot_e of exp * exp
     | Int_e of int
     | Type_e
     | Op_e of exp * op * exp
     | Var_e of var
     | Let_e of var * exp * exp
     | Lam_e of var * exp
+    | LamWithAnnot_e of var * exp * exp
     | App_e of exp * exp
     | If_e of exp * exp * exp
     | Match_e of exp * ((pattern * exp) list)
@@ -89,9 +91,11 @@ let find_typector (s:HuML.var) : HuML.exp option =
 let rec fv (e:HuML.exp) : HuML.VarSet.t =
   match e with
   | HuML.(Type_e | HuML.Int_e _) -> HuML.VarSet.empty
+  | HuML.TypeAnnot_e(e',t) -> HuML.VarSet.union (fv e') (fv t)
   | HuML.Var_e x -> HuML.VarSet.singleton x
-  | HuML.App_e (e1, e2) -> HuML.VarSet.union (fv e1) (fv e2)
-  | HuML.Lam_e (x,e') -> HuML.VarSet.diff (fv e') (HuML.VarSet.singleton x)
+  | HuML.App_e(e1, e2) -> HuML.VarSet.union (fv e1) (fv e2)
+  | HuML.Lam_e(x,e') -> HuML.VarSet.diff (fv e') (HuML.VarSet.singleton x)
+  | HuML.LamWithAnnot_e(x,t,e') -> HuML.VarSet.union (fv t) (HuML.VarSet.diff (fv e') (HuML.VarSet.singleton x))
   | HuML.Op_e(e1,_,e2) -> HuML.VarSet.union (fv e1) (fv e2)
   | HuML.Let_e(z,e1,e2) -> HuML.VarSet.union (fv e1) (HuML.VarSet.diff (fv e2) (HuML.VarSet.singleton z))
   | HuML.If_e(c,e1,e2) -> HuML.VarSet.union (fv c) (HuML.VarSet.union (fv e1) (fv e2))
@@ -110,11 +114,13 @@ let rec rename (x:HuML.var) (y:HuML.var) (e:HuML.exp) : HuML.exp =
   in
   match e with
   | HuML.Type_e -> HuML.Type_e
+  | HuML.TypeAnnot_e(e,t) -> HuML.TypeAnnot_e(rename x y e, rename x y t)
   | HuML.Op_e(e1, op, e2) ->  HuML.Op_e(rename x y e1, op, rename x y e2)
   | HuML.Var_e z -> if z = x then HuML.Var_e y else e
   | HuML.Int_e i-> HuML.Int_e i
   | HuML.Let_e(z,e1,e2) -> HuML.Let_e(z, rename x y e1,  if z = x then e2 else rename x y e2)
   | HuML.Lam_e(z,e) -> HuML.Lam_e(z, if z = x then e else rename x y e)
+  | HuML.LamWithAnnot_e(z,t,e) -> HuML.LamWithAnnot_e(z, rename x y t, if z = x then e else rename x y e)
   | HuML.App_e(e1,e2) -> HuML.App_e(rename x y e1, rename x y e2)
   | HuML.If_e(c,e1,e2) -> HuML.If_e(rename x y c, rename x y e1, rename x y e2)
   | HuML.Match_e(e,es) -> HuML.Match_e(rename x y e, List.map (fun (p,e) ->
@@ -123,9 +129,11 @@ let rec rename (x:HuML.var) (y:HuML.var) (e:HuML.exp) : HuML.exp =
 (** checks whether e is a value *)
 let is_value (e:HuML.exp) : bool =
   match e with
-  | HuML.(Type_e
+  |(HuML.Type_e
+   | HuML.TypeAnnot_e _
    | HuML.Int_e _
-   | HuML.Lam_e _) -> true
+   | HuML.Lam_e _
+   | HuML.LamWithAnnot_e _) -> true
   | HuML.(Op_e _
    | HuML.Let_e _
    | HuML.App_e _
@@ -139,6 +147,7 @@ let substitute (v:HuML.exp) (x:HuML.var) (e:HuML.exp) : HuML.exp =
         match e with
         | HuML.Int_e _ -> e
         | HuML.Type_e -> e
+        | HuML.TypeAnnot_e(e,t) -> HuML.TypeAnnot_e(subst e, subst t)
         | HuML.Op_e(e1,op,e2) -> HuML.Op_e(subst e1,op,subst e2)
         | HuML.Var_e y -> if x = y then v else e
         | HuML.Let_e(y,e1,e2) -> HuML.Let_e(y,
@@ -156,6 +165,15 @@ let substitute (v:HuML.exp) (x:HuML.var) (e:HuML.exp) : HuML.exp =
             let fresh = HuML.gensym () in
             let new_body = rename y fresh e' in
             HuML.Lam_e (fresh, subst new_body)
+        | HuML.LamWithAnnot_e(y,t,e') ->
+          if x = y then
+            HuML.LamWithAnnot_e(y, subst t, e')
+          else if not (HuML.VarSet.mem y (fv v)) then
+            HuML.LamWithAnnot_e(y, subst t, subst e')
+          else
+            let fresh = HuML.gensym () in
+            let new_body = rename y fresh e' in
+            HuML.LamWithAnnot_e (fresh, subst t, subst new_body)
   in
     subst e
 
@@ -172,6 +190,12 @@ let rec print_exp (e:HuML.exp) : unit =
   match e with
   | HuML.Int_e i -> Printf.printf "%d" i
   | HuML.Type_e -> Printf.printf "Type"
+  | HuML.TypeAnnot_e(e,t) ->
+    Printf.printf "(";
+    print_exp e;
+    Printf.printf " : ";
+    print_exp t;
+    Printf.printf ")"
   | HuML.Op_e(e1,op,e2) ->
     Printf.printf "(";
     print_exp e1;
@@ -197,6 +221,12 @@ let rec print_exp (e:HuML.exp) : unit =
     print_exp e1;
     Printf.printf " ";
     print_exp e2;
+    Printf.printf ")"
+  | HuML.LamWithAnnot_e(x,t,e) ->
+    Printf.printf "(\\%s : " x;
+    print_exp t;
+    Printf.printf ". ";
+    print_exp e;
     Printf.printf ")"
   | HuML.Lam_e(x,e) ->
     Printf.printf "(\\%s. " x;

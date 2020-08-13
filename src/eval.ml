@@ -24,6 +24,7 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
   match e with
   | Int_e i -> Int_e i
   | Type_e -> Type_e
+  | TypeAnnot_e(e,t) -> TypeAnnot_e(eval ctx e,t)
   | Op_e(e1,op,e2) ->
       let v1 = eval ctx e1 in
       let v2 = eval ctx e2 in
@@ -45,6 +46,7 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
          raise Type_error
      | _ -> raise Type_error)
   | Lam_e(x,e) -> Lam_e(x,e)
+  | LamWithAnnot_e(x,t,e) -> LamWithAnnot_e(x,t,e)
   | Var_e x ->
     begin
       match find_datactor x, find_typector x with
