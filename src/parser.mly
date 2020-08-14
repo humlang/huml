@@ -88,8 +88,6 @@ expr:
   | e1 = expr LESS e2 = expr
     { Ast.HuML.Op_e(e1,Ast.HuML.Le,e2) }
 
-
-(* TODO: Allow underscores and such stuff *)
 pattern:
   | i = INT
     { Ast.HuML.Int_p i }
