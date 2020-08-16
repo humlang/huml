@@ -37,8 +37,8 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
     let v1 = eval ctx e1 in
     (*let v2 = eval ctx e2 in (* <- call by value! *)*)
     (match v1 with
-     | Lam_e(x,b) -> let res = eval ctx (substitute e2 x b) in (* <- using e2 here means call by name *)
-       res
+     | Lam_e(x,b) -> eval ctx (substitute e2 x b) (* <- using e2 here means call by name *)
+     | LamWithAnnot_e(x,_,b) -> eval ctx (substitute e2 x b) (* <- using e2 here means call by name *)
      | Var_e x ->
        if find_datactor x <> Option.None || find_typector x <> Option.None then
          App_e(v1, eval ctx e2)
@@ -50,7 +50,12 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
   | Var_e x ->
     begin
       match find_datactor x, find_typector x with
-      | Option.None,Option.None -> lookup_val ctx x
+      | Option.None,Option.None ->
+        begin
+          match lookup_val ctx x with
+          | Option.None -> raise (Unbound_variable x)
+          | Option.Some e' -> e'
+        end
       | Option.Some _,Option.None -> Var_e x
       | Option.None,Option.Some _ -> Var_e x
       | _,_ -> raise (Unbound_variable x)

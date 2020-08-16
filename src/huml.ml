@@ -19,8 +19,23 @@ let main () =
     Printf.printf "\nInput\n-----\n";
     print_list prog;
     Printf.printf "\nContext\n-------\n";
-    Ast.print_ctx (Eval.run prog);
-    Printf.printf "\n"
+    let ctx = (Eval.run prog) in
+    begin
+      Ast.print_ctx ctx;
+      Printf.printf "\n";
+      List.iter (fun a ->
+                  match a with
+                  | Ast.HuML.Expr_s e ->
+                    begin
+                      Printf.printf "\n\nSupercompiling \"";
+                      Ast.print_exp e;
+                      Printf.printf "\"\nResult: ";
+                      Ast.print_exp (Sc.sc ctx [] (Sc.empty_state e));
+                      Printf.printf "\n"
+                    end
+                  | _ -> ()
+                ) prog
+    end
   with
   | Lexer.Error msg ->
       Printf.eprintf "%s%!" msg

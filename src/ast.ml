@@ -59,11 +59,11 @@ exception Type_error
 exception Not_a_value
 
 (** looksup a variable in the evaluation context *)
-let lookup_val (ctx:HuML.Evalcontext.t) (s:HuML.var) : HuML.exp =
-  let rec lookup_val' (ctx':HuML.Evalcontext.t) : HuML.exp =
+let lookup_val (ctx:HuML.Evalcontext.t) (s:HuML.var) : HuML.exp option =
+  let rec lookup_val' (ctx':HuML.Evalcontext.t) : HuML.exp option =
     match ctx' with
-    | [] -> raise (Unbound_variable s)
-    | (v,e) :: xs -> if s = v then e else lookup_val' xs
+    | [] -> Option.None
+    | (v,e) :: xs -> if s = v then Option.Some e else lookup_val' xs
   in
     lookup_val' ctx
 
