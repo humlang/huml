@@ -9,8 +9,6 @@ type holeexp =
   | TypeAnnot_h of holeexp * exp
   | LOp_h of holeexp * op * exp
   | ROp_h of exp * op * holeexp
-  | App_h of exp * holeexp
-
 
 type state = exp * holeexp
 type history = state list
@@ -27,18 +25,14 @@ let state_to_exp (s : state) : exp =
   let rec fill_hole (h : holeexp) (e : exp) : exp =
     match h with
     | Hole_h -> e
-    | Lam_h (x,h') -> Lam_e(x,fill_hole h' e)
-    | LamWithAnnot_h (x,t,h') -> LamWithAnnot_e(x,t, fill_hole h' e)
-    | TypeAnnot_h (h',t) -> TypeAnnot_e(fill_hole h' e,t)
-    | LOp_h (h',op,e') -> Op_e(fill_hole h' e,op,e')
-    | ROp_h (e',op,h') -> Op_e(e',op,fill_hole h' e)
-    | App_h (e',h') -> fill_hole h' (App_e(e', e))
+    | Lam_h (x,h') -> fill_hole h' (Lam_e(x, e))
+    | LamWithAnnot_h (x,t,h') -> fill_hole h' (LamWithAnnot_e(x,t,e))
+    | TypeAnnot_h (h',t) -> fill_hole h' (TypeAnnot_e(e,t))
+    | LOp_h (h',op,e') -> fill_hole h' (Op_e(e,op,e'))
+    | ROp_h (e',op,h') -> fill_hole h' (Op_e(e',op,e))
   in
   let (e, h) = s
   in
-  Printf.printf "final exp: \"";
-  print_exp e;
-  Printf.printf "\"\n";
     fill_hole h e
 
 (** Checks whether supercompilation should terminate here or not *)
@@ -67,9 +61,6 @@ let reduce_op (v1:exp) (op':op) (v2:exp) (h:holeexp) : state =
 (** This partially evaluates until one cannot proceed any further *)
 let rec reduce (ctx:Evalcontext.t) (s : state) : state =
   let (e,h) = s in
-  Printf.printf "Reduce \"";
-  print_exp e;
-  Printf.printf "\"\n";
   match e with
   | Int_e i -> (Int_e i, h)
   | Type_e -> (Type_e, h)
@@ -81,19 +72,13 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state =
   | Let_e(x,e1,e2) -> (Let_e(x,e1,e2), h) (* TODO *)
   | App_e(e1,e2) ->
     let v1 = state_to_exp (reduce ctx (e1,Hole_h)) in
-    Printf.printf "  Reduce [App] : v1=\"";
-    print_exp v1;
-    Printf.printf "\"   e2=\"";
-    print_exp e2;
-    Printf.printf "\"\n";
     begin
       match v1 with
       | Lam_e(x,b) -> reduce ctx ((substitute e2 x b), h)
       | LamWithAnnot_e(x,_,b) -> reduce ctx ((substitute e2 x b), h)
       | Var_e x ->
         if find_datactor x <> Option.None || find_typector x <> Option.None then
-          (Printf.printf "\nOHNO\n";
-          reduce ctx (e2, App_h(v1,h)))
+          (App_e (v1, e2), h)
         else
           raise Type_error  (* If we don't know the function, we also cannot supercompile it *)
       | _ -> raise Type_error
