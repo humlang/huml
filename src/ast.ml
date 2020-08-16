@@ -127,18 +127,18 @@ let rec rename (x:HuML.var) (y:HuML.var) (e:HuML.exp) : HuML.exp =
       (rename' p, rename x y e)) es) (* TODO: consider binding of patterns *)
 
 (** checks whether e is a value *)
-let is_value (e:HuML.exp) : bool =
+let rec is_value (e:HuML.exp) : bool =
   match e with
   |(HuML.Type_e
    | HuML.TypeAnnot_e _
    | HuML.Int_e _
    | HuML.Lam_e _
    | HuML.LamWithAnnot_e _) -> true
-  | HuML.(Op_e _
+  | HuML.App_e(a,b) -> is_value a && is_value b
+  | HuML.Var_e x -> find_datactor x <> Option.None || find_typector x <> Option.None
+  | (HuML.Op_e _
    | HuML.Let_e _
-   | HuML.App_e _
    | HuML.If_e _
-   | HuML.Var_e _
    | HuML.Match_e _) -> false
 
 (** substitutes v for x in e *)
