@@ -94,7 +94,15 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state =
          | Option.Some y -> y), h)
       | _,_ -> (Var_e x, h)
     end
-  | If_e(c,e1,e2) -> (If_e(c,e1,e2), h) (* TODO *)
+  | If_e(c,e1,e2) ->
+    let c' = state_to_exp (reduce ctx (c,Hole_h)) in
+    begin
+      match c' with
+      | Int_e 0 -> reduce ctx (e2,h)
+      | Int_e _ -> reduce ctx (e1,h)
+      | Var_e _ -> (If_e(c',e1,e2),h)
+      | _ -> raise Type_error
+    end
   | Match_e(e,es) ->
     let ev = state_to_exp (reduce ctx (e,Hole_h)) in
     if is_value ev = false then
