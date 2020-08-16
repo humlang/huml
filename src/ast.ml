@@ -109,7 +109,7 @@ let rec rename (x:HuML.var) (y:HuML.var) (e:HuML.exp) : HuML.exp =
     match p with
     | HuML.Int_p i -> HuML.Int_p(i)
     | HuML.App_p(e1,e2) -> HuML.App_p(rename' e1, rename' e2)
-    | HuML.Var_p z -> if z = x then HuML.Var_p z else HuML.Var_p y
+    | HuML.Var_p z -> if z = x then HuML.Var_p y else HuML.Var_p z
     | HuML.Ignore_p -> HuML.Ignore_p
   in
   match e with
@@ -155,7 +155,9 @@ let substitute (v:HuML.exp) (x:HuML.var) (e:HuML.exp) : HuML.exp =
                                   if x = y then e2 else subst e2)
         | HuML.App_e(e1,e2) -> HuML.App_e(subst e1,subst e2)
         | HuML.If_e(c,e1,e2) -> HuML.If_e(subst c, subst e1, subst e2)
-        | HuML.Match_e(e,es) -> HuML.Match_e(subst e, List.map (fun (p,e) -> (p, subst e)) es) (* TODO: consider binding from patterns *)
+        | HuML.Match_e(e,es) ->
+          HuML.Match_e(subst e, List.map (fun (p,e) -> (p, subst e)) es)
+         (* TODO: consider binding from patterns *)
         | HuML.Lam_e(y,e') ->
           if x = y then
             HuML.Lam_e(y, e')
@@ -176,6 +178,7 @@ let substitute (v:HuML.exp) (x:HuML.var) (e:HuML.exp) : HuML.exp =
             HuML.LamWithAnnot_e (fresh, subst t, subst new_body)
   in
     subst e
+
 
 (** prints a pattern *)
 let rec print_pattern (p:HuML.pattern) : unit =
@@ -274,6 +277,8 @@ let print_stmt (s:HuML.stmt) : unit =
     Printf.printf "data %s : " x;
     print_exp e;
     Printf.printf ";"
+
+
 
 (** Pretty prints the context of an evaluation context *)
 let print_ctx (ctx:HuML.Evalcontext.t) : unit =

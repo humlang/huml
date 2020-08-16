@@ -67,6 +67,9 @@ let reduce_op (v1:exp) (op':op) (v2:exp) (h:holeexp) : state =
 (** This partially evaluates until one cannot proceed any further *)
 let rec reduce (ctx:Evalcontext.t) (s : state) : state =
   let (e,h) = s in
+  Printf.printf "Reduce \"";
+  print_exp e;
+  Printf.printf "\"\n";
   match e with
   | Int_e i -> (Int_e i, h)
   | Type_e -> (Type_e, h)
@@ -77,14 +80,20 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state =
     reduce_op v1 op v2 h
   | Let_e(x,e1,e2) -> (Let_e(x,e1,e2), h) (* TODO *)
   | App_e(e1,e2) ->
-    let v1 = state_to_exp (reduce ctx (e1,h)) in
+    let v1 = state_to_exp (reduce ctx (e1,Hole_h)) in
+    Printf.printf "  Reduce [App] : v1=\"";
+    print_exp v1;
+    Printf.printf "\"   e2=\"";
+    print_exp e2;
+    Printf.printf "\"\n";
     begin
       match v1 with
       | Lam_e(x,b) -> reduce ctx ((substitute e2 x b), h)
       | LamWithAnnot_e(x,_,b) -> reduce ctx ((substitute e2 x b), h)
       | Var_e x ->
         if find_datactor x <> Option.None || find_typector x <> Option.None then
-          reduce ctx (e2, App_h(v1,h))
+          (Printf.printf "\nOHNO\n";
+          reduce ctx (e2, App_h(v1,h)))
         else
           raise Type_error  (* If we don't know the function, we also cannot supercompile it *)
       | _ -> raise Type_error
