@@ -95,7 +95,47 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state =
       | _,_ -> (Var_e x, h)
     end
   | If_e(c,e1,e2) -> (If_e(c,e1,e2), h) (* TODO *)
-  | Match_e(e,es) -> (Match_e(e,es), h) (* TODO *)
+  | Match_e(e,es) ->
+    let ev = state_to_exp (reduce ctx (e,Hole_h)) in
+    if is_value ev = false then
+      (Match_e(ev,es),h)
+    else
+      let ctx_cell = ref ctx in
+      let result = List.find_opt
+          (fun (p,_) ->
+          let rec inner (p':pattern) (e':exp) : bool =
+            begin
+              match p',e' with
+              | Int_p x,Int_e y -> if x = y then true else false
+              | Int_p _,_ -> raise Eval.Match_error
+              | Var_p x,y ->
+                if Ast.find_datactor x <> Option.None then
+                  (match y with
+                  | Var_e y' -> if x = y' then true else false
+                  | _ -> false)
+                else
+                  begin
+                    ctx_cell := ((x,y) :: !ctx_cell);
+                    true
+                  end
+              | App_p (p1,p2),App_e(e1,e2) ->
+                (match p1,e1 with
+                | Var_p x,Var_e y ->
+                  if x = y then
+                    inner p2 e2
+                  else
+                    false
+                | _,_ -> raise Eval.Match_error)
+              | App_p _,_ -> false
+              | Ignore_p,_ -> true
+            end
+          in
+          inner p ev
+        ) es
+      in
+      match result with
+      | Option.None -> raise Eval.Match_error
+      | Option.Some (_,e') -> reduce !ctx_cell (e',h)
 
 (** The entry point for our supercompilation *)
 let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
