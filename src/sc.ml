@@ -95,7 +95,9 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state =
       | _,_ -> (Var_e x, h)
     end
   | If_e(c,e1,e2) ->
-    let c' = state_to_exp (reduce ctx (c,Hole_h)) in
+    (* TODO: We ignore the hole here, but it might be something like `$x1 <= 0`,
+     *       Perhaps incorporate a SAT solver for "complex patterns", i.e. if *)
+    let (c',_) = reduce ctx (c,Hole_h) in
     begin
       match c' with
       | Int_e 0 -> reduce ctx (e2,h)
@@ -147,9 +149,26 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state =
 
 (** The entry point for our supercompilation *)
 let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
-  let rec sc' (h' : history) (s' : state) : exp =
+  let rec sc' (h' : history) (s' : state) : state =
     match terminate h' s' with
-    | Continue h'' -> sc' h'' (reduce ctx s') (* TODO: change this to something more meaningful *)
-    | Stop -> state_to_exp s'
+    | Continue h'' -> sc' h'' (split h'' (reduce ctx s')) (* TODO: change this to something more meaningful *)
+    | Stop -> s'
+    and split (h':history) (s:state) : state =
+    begin
+      let (e,eh) = s in
+      match e with
+      | If_e(c,e1,e2) ->
+        Printf.printf "split for condition "; print_exp c; Printf.printf "\n";
+        let a = state_to_exp (sc' h' (e1,eh)) in
+        let b = state_to_exp (sc' h' (e2,eh)) in
+        (If_e(c,a,b), eh)
+      | Match_e(c,_) ->
+        begin
+          Printf.printf "split for match on "; print_exp c; Printf.printf "\n";
+          match c with
+          | _ -> raise Eval.Match_error
+        end
+      | _ -> s
+    end
   in
-    sc' h s
+    state_to_exp (sc' h s)
