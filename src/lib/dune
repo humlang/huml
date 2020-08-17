@@ -1,0 +1,10 @@
+(library (name Lib))
+
+(menhir
+  (infer false)
+  (flags --lalr --explain)
+  (modules parser))
+
+(ocamllex lexer)
+
+

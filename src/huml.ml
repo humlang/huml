@@ -1,6 +1,8 @@
 
 (* the name of the file which contains the expressions *)
 
+open Lib
+
 let print_list = List.iter (fun a -> let _ = Ast.print_stmt a in Printf.printf "\n")
 
 let maybe_read_line () =

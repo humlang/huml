@@ -2,12 +2,5 @@
   (name huml)
   (modes byte exe)
   (flags (:standard -g))
-  (libraries llvm))
-
-(menhir
-  (infer false)
-  (flags --lalr --explain)
-  (modules parser))
-
-(ocamllex lexer)
+  (libraries Lib llvm))
 
