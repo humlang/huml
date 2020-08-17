@@ -59,26 +59,26 @@ let reduce_op (v1:exp) (op':op) (v2:exp) (h:holeexp) : state =
   | _,_,_ -> (v1, LOp_h(h, op', v2)) (* TODO: this is nondeterministically chosen. we want to actually analyze both paths! *)
 
 (** This partially evaluates until one cannot proceed any further *)
-let rec reduce (ctx:Evalcontext.t) (s : state) : state =
+let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
   let (e,h) = s in
   match e with
-  | Int_e i -> (Int_e i, h)
-  | Type_e -> (Type_e, h)
+  | Int_e i -> (Int_e i, h), ctx
+  | Type_e -> (Type_e, h), ctx
   | TypeAnnot_e(e,t) -> reduce ctx (e, TypeAnnot_h(h, t))
   | Op_e(e1,op,e2) ->
-    let v1 = state_to_exp (reduce ctx (e1,h)) in
-    let v2 = state_to_exp (reduce ctx (e2,h)) in
-    reduce_op v1 op v2 h
-  | Let_e(x,e1,e2) -> (Let_e(x,e1,e2), h) (* TODO *)
+    let v1 = state_to_exp (let x,_ = reduce ctx (e1,h) in x) in
+    let v2 = state_to_exp (let x,_ = reduce ctx (e2,h) in x) in
+    reduce_op v1 op v2 h, ctx
+  | Let_e(x,e1,e2) -> (Let_e(x,e1,e2), h),ctx (* TODO *)
   | App_e(e1,e2) ->
-    let v1 = state_to_exp (reduce ctx (e1,Hole_h)) in
+    let v1 = state_to_exp (let x,_ = reduce ctx (e1,Hole_h) in x) in
     begin
       match v1 with
       | Lam_e(x,b) -> reduce ctx ((substitute e2 x b), h)
       | LamWithAnnot_e(x,_,b) -> reduce ctx ((substitute e2 x b), h)
       | Var_e x ->
         if find_datactor x <> Option.None || find_typector x <> Option.None then
-          (App_e (v1, e2), h)
+          (App_e (v1, e2), h),ctx
         else
           raise Type_error  (* If we don't know the function, we also cannot supercompile it *)
       | _ -> raise Type_error
@@ -91,84 +91,82 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state =
       | Option.None,Option.None ->
         ((match lookup_val ctx x with
          | Option.None -> Var_e x
-         | Option.Some y -> y), h)
-      | _,_ -> (Var_e x, h)
+         | Option.Some y -> y), h),ctx
+      | _,_ -> (Var_e x, h),ctx
     end
   | If_e(c,e1,e2) ->
     (* TODO: We ignore the hole here, but it might be something like `$x1 <= 0`,
      *       Perhaps incorporate a SAT solver for "complex patterns", i.e. if *)
-    let (c',_) = reduce ctx (c,Hole_h) in
+    let (c',_),_ = reduce ctx (c,Hole_h) in
     begin
       match c' with
       | Int_e 0 -> reduce ctx (e2,h)
       | Int_e _ -> reduce ctx (e1,h)
-      | Var_e _ -> (If_e(c',e1,e2),h)
+      | Var_e _ -> (If_e(c',e1,e2),h),ctx
       | _ -> raise Type_error
     end
   | Match_e(e,es) ->
-    let ev = state_to_exp (reduce ctx (e,Hole_h)) in
+    let ev = state_to_exp (let (x,_) = reduce ctx (e,Hole_h) in x) in
     if is_value ev = false then
-      (Match_e(ev,es),h)
+      (Match_e(ev,es),h),ctx
     else
       let ctx_cell = ref ctx in
       let result = List.find_opt
-          (fun (p,_) ->
-          let rec inner (p':pattern) (e':exp) : bool =
-            begin
-              match p',e' with
-              | Int_p x,Int_e y -> if x = y then true else false
-              | Int_p _,_ -> raise Eval.Match_error
-              | Var_p x,y ->
-                if Ast.find_datactor x <> Option.None then
-                  (match y with
-                  | Var_e y' -> if x = y' then true else false
-                  | _ -> false)
-                else
-                  begin
-                    ctx_cell := ((x,y) :: !ctx_cell);
-                    true
-                  end
-              | App_p (p1,p2),App_e(e1,e2) ->
-                (match p1,e1 with
-                | Var_p x,Var_e y ->
-                  if x = y then
-                    inner p2 e2
-                  else
-                    false
-                | _,_ -> raise Eval.Match_error)
-              | App_p _,_ -> false
-              | Ignore_p,_ -> true
-            end
-          in
-          inner p ev
+          (fun (p,_) -> Eval.is_matching_pattern false p ev (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
         ) es
       in
       match result with
       | Option.None -> raise Eval.Match_error
       | Option.Some (_,e') -> reduce !ctx_cell (e',h)
 
+
+let eliminate_duplicates_from_list (lst : ('a * 'b) list) =
+  let ln = List.length lst in
+  let seen = Hashtbl.create ln in
+  List.filter (fun (_,y) -> let tmp = not (Hashtbl.mem seen y) in
+                        Hashtbl.replace seen y ();
+                        tmp) lst
+
 (** The entry point for our supercompilation *)
 let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
-  let rec sc' (h' : history) (s' : state) : state =
+  let rec sc' (h' : history) (s',ctx' : state*Evalcontext.t) : state =
     match terminate h' s' with
-    | Continue h'' -> sc' h'' (split h'' (reduce ctx s')) (* TODO: change this to something more meaningful *)
+    | Continue h'' -> sc' h'' (split h'' (reduce ctx' s')) (* TODO: change this to something more meaningful *)
     | Stop -> s'
-    and split (h':history) (s:state) : state =
+    and split (h':history) (s,ctx':state*Evalcontext.t) : state*Evalcontext.t =
     begin
       let (e,eh) = s in
       match e with
       | If_e(c,e1,e2) ->
-        Printf.printf "split for condition "; print_exp c; Printf.printf "\n";
-        let a = state_to_exp (sc' h' (e1,eh)) in
-        let b = state_to_exp (sc' h' (e2,eh)) in
-        (If_e(c,a,b), eh)
-      | Match_e(c,_) ->
+        let a = state_to_exp (sc' h' ((e1,eh),ctx')) in
+        let b = state_to_exp (sc' h' ((e2,eh),ctx')) in
+        if a <> b then
+          (If_e(c,a,b), eh),ctx'
+        else
+          (a,eh),ctx'
+        (* TODO: Unification! We need a SAT-solver here... *)
+      | Match_e(c,es) ->
         begin
           Printf.printf "split for match on "; print_exp c; Printf.printf "\n";
-          match c with
-          | _ -> raise Eval.Match_error
+          let us = state_to_exp (let x,_ = reduce ctx (c,Hole_h) in x) in
+          let xs = eliminate_duplicates_from_list
+              (List.map (fun (p, e') ->
+                   let ctx_cell = ref ctx in
+                   if Eval.is_matching_pattern true p c
+                       (fun (x,y) -> ctx_cell := (x,y) :: !ctx_cell) then
+                     p,state_to_exp (sc' h' ((e',Hole_h),!ctx_cell))
+                   else
+                     raise Eval.Match_error
+                 ) es)
+          in
+            if List.length xs == 1 then
+              (let _,x = List.hd xs in x, eh),ctx
+            else if List.length xs == 0 then
+              raise Eval.Match_error
+            else
+              (Match_e(us, xs), eh),ctx
         end
-      | _ -> s
+      | _ -> s,ctx
     end
   in
-    state_to_exp (sc' h s)
+    state_to_exp (sc' h (s,ctx))

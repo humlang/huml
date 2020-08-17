@@ -19,6 +19,50 @@ let eval_op (v1:exp) (op':op) (v2:exp) : exp =
              else
                raise Not_a_value
 
+(** checks if e' matches on p'. A mutator function can be added to manipulate the context in case
+ ** the pattern contains a free variable that should bind *)
+let rec is_matching_pattern (from_sc:bool) (p':pattern) (e':exp) (mutator : var * exp -> unit) : bool =
+  begin
+    match p',e' with
+    | Int_p x,Int_e y -> if x = y then true else false
+    | Int_p _,_ -> raise Match_error
+    | Var_p x,y ->
+      if Ast.find_datactor x <> Option.None then
+        begin
+          match y with
+          | Var_e y' -> if x = y' then true else from_sc
+          | _ -> false
+        end
+      else
+        begin
+          mutator (x,y);
+          true
+        end
+    | App_p (p1,p2),App_e(e1,e2) ->
+      begin
+        match p1,e1 with
+        | Var_p x,Var_e y ->
+          if x = y then
+            is_matching_pattern from_sc p2 e2 mutator
+          else
+            false
+        | _,_ -> raise Match_error
+      end
+    | App_p (p1,p2),_ ->
+      if from_sc then
+        begin
+          match p1 with
+          | Var_p x -> if Ast.find_datactor x <> Option.None then
+              is_matching_pattern from_sc p2 e' mutator
+            else
+              false
+          | _ -> raise Match_error
+        end
+      else
+        false
+    | Ignore_p,_ -> true
+  end
+
 (** s an expression *)
 let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
   match e with
@@ -70,35 +114,7 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
     let ev = eval ctx e in
     let ctx_cell = ref ctx in
     let result = List.find_opt
-        (fun (p,_) ->
-        let rec inner (p':pattern) (e':exp) : bool =
-          begin
-            match p',e' with
-            | Int_p x,Int_e y -> if x = y then true else false
-            | Int_p _,_ -> raise Match_error
-            | Var_p x,y ->
-              if Ast.find_datactor x <> Option.None then
-                (match y with
-                | Var_e y' -> if x = y' then true else false
-                | _ -> false)
-              else
-                begin
-                  ctx_cell := ((x,y) :: !ctx_cell);
-                  true
-                end
-            | App_p (p1,p2),App_e(e1,e2) ->
-              (match p1,e1 with
-              | Var_p x,Var_e y ->
-                if x = y then
-                  inner p2 e2
-                else
-                  false
-              | _,_ -> raise Match_error)
-            | App_p _,_ -> false
-            | Ignore_p,_ -> true
-          end
-        in
-        inner p ev
+        (fun (p,_) -> is_matching_pattern false p ev (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
       ) es
     in
     match result with
