@@ -95,6 +95,8 @@ pattern:
     { Ast.HuML.Var_p id }
   | UNDERSCORE
     { Ast.HuML.Ignore_p }
+  | LPAREN p = pattern RPAREN
+    { p }
   | p1 = pattern p2 = pattern
     { Ast.HuML.App_p(p1,p2) } %prec APP
 

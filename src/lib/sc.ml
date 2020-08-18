@@ -1,7 +1,6 @@
 open Ast
 open Ast.HuML
 
-
 type holeexp =
   | Hole_h
   | Lam_h of var * holeexp
@@ -116,7 +115,7 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
         ) es
       in
       match result with
-      | Option.None -> raise Eval.Match_error
+      | Option.None -> Printf.printf "03 match error\n"; raise Eval.Match_error
       | Option.Some (_,e') -> reduce !ctx_cell (e',h)
 
 
@@ -147,8 +146,9 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
         (* TODO: Unification! We need a SAT-solver here... *)
       | Match_e(c,es) ->
         begin
-          Printf.printf "split for match on "; print_exp c; Printf.printf "\n";
-          let us = state_to_exp (let x,_ = reduce ctx (c,Hole_h) in x) in
+          Printf.printf "split for match on  c = "; print_exp c; Printf.printf "\n";
+          let us = state_to_exp (let x,_ = split h' (reduce ctx (c,Hole_h)) in x) in
+          Printf.printf "split for match on us = "; print_exp us; Printf.printf "\n";
           let xs = eliminate_duplicates_from_list
               (List.map (fun (p, e') ->
                    let ctx_cell = ref ctx in
@@ -156,13 +156,25 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
                        (fun (x,y) -> ctx_cell := (x,y) :: !ctx_cell) then
                      p,state_to_exp (sc' h' ((e',Hole_h),!ctx_cell))
                    else
-                     raise Eval.Match_error
+                     begin
+                       Printf.printf "02 match error: c = \"";
+                       print_exp us;
+                       Printf.printf "\"  p = \"";
+                       print_pattern p;
+                       Printf.printf "\"   e' = \"";
+                       print_exp e';
+                       Printf.printf "\"\n";
+                       raise Eval.Match_error
+                     end
                  ) es)
           in
             if List.length xs == 1 then
               (let _,x = List.hd xs in x, eh),ctx
             else if List.length xs == 0 then
-              raise Eval.Match_error
+              begin
+                Printf.printf "01 match error\n";
+                raise Eval.Match_error
+              end
             else
               (Match_e(us, xs), eh),ctx
         end
