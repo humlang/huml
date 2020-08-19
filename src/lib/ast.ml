@@ -90,7 +90,7 @@ let find_typector (s:HuML.var) : HuML.exp option =
 (** [fv e] is a set-like list of the free variables of [e]. *)
 let rec fv (e:HuML.exp) : HuML.VarSet.t =
   match e with
-  | HuML.(Type_e | HuML.Int_e _) -> HuML.VarSet.empty
+  | (HuML.Type_e | HuML.Int_e _) -> HuML.VarSet.empty
   | HuML.TypeAnnot_e(e',t) -> HuML.VarSet.union (fv e') (fv t)
   | HuML.Var_e x -> HuML.VarSet.singleton x
   | HuML.App_e(e1, e2) -> HuML.VarSet.union (fv e1) (fv e2)
@@ -102,16 +102,24 @@ let rec fv (e:HuML.exp) : HuML.VarSet.t =
   | HuML.Match_e(e, es) -> HuML.VarSet.union (fv e) (List.fold_left (fun a -> fun (_,e) ->
       HuML.VarSet.union a (fv e)) HuML.VarSet.empty es)
 
+(** [fv p] is a set-like list of the free variables of [p]. *)
+let rec fv_p (p:HuML.pattern) : HuML.VarSet.t =
+  match p with
+  | HuML.Ignore_p | HuML.Int_p _ -> HuML.VarSet.empty
+  | HuML.Var_p x -> HuML.VarSet.singleton x
+  | HuML.App_p(a,b) -> HuML.VarSet.union (fv_p a) (fv_p b)
+
+
+(** renames x to y in pattern e *)
+let rec rename_pat (x:HuML.var) (y:HuML.var) (p:HuML.pattern) : HuML.pattern =
+  match p with
+  | HuML.Int_p i -> HuML.Int_p(i)
+  | HuML.App_p(e1,e2) -> HuML.App_p(rename_pat x y e1, rename_pat x y e2)
+  | HuML.Var_p z -> if z = x then HuML.Var_p y else HuML.Var_p z
+  | HuML.Ignore_p -> HuML.Ignore_p
 
 (** reames x to y in expression e *)
 let rec rename (x:HuML.var) (y:HuML.var) (e:HuML.exp) : HuML.exp =
-  let rec rename' (p:HuML.pattern) : HuML.pattern =
-    match p with
-    | HuML.Int_p i -> HuML.Int_p(i)
-    | HuML.App_p(e1,e2) -> HuML.App_p(rename' e1, rename' e2)
-    | HuML.Var_p z -> if z = x then HuML.Var_p y else HuML.Var_p z
-    | HuML.Ignore_p -> HuML.Ignore_p
-  in
   match e with
   | HuML.Type_e -> HuML.Type_e
   | HuML.TypeAnnot_e(e,t) -> HuML.TypeAnnot_e(rename x y e, rename x y t)
@@ -124,7 +132,7 @@ let rec rename (x:HuML.var) (y:HuML.var) (e:HuML.exp) : HuML.exp =
   | HuML.App_e(e1,e2) -> HuML.App_e(rename x y e1, rename x y e2)
   | HuML.If_e(c,e1,e2) -> HuML.If_e(rename x y c, rename x y e1, rename x y e2)
   | HuML.Match_e(e,es) -> HuML.Match_e(rename x y e, List.map (fun (p,e) ->
-      (rename' p, rename x y e)) es) (* TODO: consider binding of patterns *)
+      (rename_pat x y p, rename x y e)) es)
 
 (** checks whether e is a value *)
 let rec is_value (e:HuML.exp) : bool =
@@ -140,44 +148,6 @@ let rec is_value (e:HuML.exp) : bool =
    | HuML.Let_e _
    | HuML.If_e _
    | HuML.Match_e _) -> false
-
-(** substitutes v for x in e *)
-let substitute (v:HuML.exp) (x:HuML.var) (e:HuML.exp) : HuML.exp =
-  let rec subst (e:HuML.exp) : HuML.exp =
-        match e with
-        | HuML.Int_e _ -> e
-        | HuML.Type_e -> e
-        | HuML.TypeAnnot_e(e,t) -> HuML.TypeAnnot_e(subst e, subst t)
-        | HuML.Op_e(e1,op,e2) -> HuML.Op_e(subst e1,op,subst e2)
-        | HuML.Var_e y -> if x = y then v else e
-        | HuML.Let_e(y,e1,e2) -> HuML.Let_e(y,
-                                  subst e1,
-                                  if x = y then e2 else subst e2)
-        | HuML.App_e(e1,e2) -> HuML.App_e(subst e1,subst e2)
-        | HuML.If_e(c,e1,e2) -> HuML.If_e(subst c, subst e1, subst e2)
-        | HuML.Match_e(e,es) ->
-          HuML.Match_e(subst e, List.map (fun (p,e) -> (p, subst e)) es)
-         (* TODO: consider binding from patterns *)
-        | HuML.Lam_e(y,e') ->
-          if x = y then
-            HuML.Lam_e(y, e')
-          else if not (HuML.VarSet.mem y (fv v)) then
-            HuML.Lam_e(y, subst e')
-          else
-            let fresh = HuML.gensym () in
-            let new_body = rename y fresh e' in
-            HuML.Lam_e (fresh, subst new_body)
-        | HuML.LamWithAnnot_e(y,t,e') ->
-          if x = y then
-            HuML.LamWithAnnot_e(y, subst t, e')
-          else if not (HuML.VarSet.mem y (fv v)) then
-            HuML.LamWithAnnot_e(y, subst t, subst e')
-          else
-            let fresh = HuML.gensym () in
-            let new_body = rename y fresh e' in
-            HuML.LamWithAnnot_e (fresh, subst t, subst new_body)
-  in
-    subst e
 
 
 (** prints a pattern *)
@@ -258,6 +228,65 @@ let rec print_exp (e:HuML.exp) : unit =
     print_exp e1;
     Printf.printf " else ";
     print_exp e2
+
+(** substitutes v for x in e *)
+let substitute (v:HuML.exp) (x:HuML.var) (e:HuML.exp) : HuML.exp =
+  let rec subst (e:HuML.exp) : HuML.exp =
+        match e with
+        | HuML.Int_e _ -> e
+        | HuML.Type_e -> e
+        | HuML.TypeAnnot_e(e,t) -> HuML.TypeAnnot_e(subst e, subst t)
+        | HuML.Op_e(e1,op,e2) -> HuML.Op_e(subst e1,op,subst e2)
+        | HuML.Var_e y -> if x = y then v else e
+        | HuML.Let_e(y,e1,e2) -> HuML.Let_e(y,
+                                  subst e1,
+                                  if x = y then e2 else subst e2)
+        | HuML.App_e(e1,e2) -> HuML.App_e(subst e1,subst e2)
+        | HuML.If_e(c,e1,e2) -> HuML.If_e(subst c, subst e1, subst e2)
+        | HuML.Match_e(e,es) ->
+          HuML.Match_e(subst e, List.map
+                         (fun (p,e) ->
+                            let pfv = fv_p p in
+                            let inter = HuML.VarSet.inter (fv v) pfv in
+                            (* what we want to substitute for is bound in the pattern, so no substitution occurs *)
+                            if HuML.VarSet.exists (fun v -> x = v) pfv then
+                              (p, e)
+                            (* what we substitute into here contains variables that are bound in the pattern, so renaming must happen *)
+                            else if HuML.VarSet.cardinal inter <> 0 then
+                              HuML.VarSet.fold (fun str -> fun (p',e') ->
+                                  let isctor = find_datactor str <> Option.None || find_typector str <> Option.None in
+                                  if isctor then
+                                    (p',e')
+                                  else
+                                    let fresh = HuML.gensym () in
+                                    (rename_pat str fresh p', subst (rename str fresh e'))
+                                ) inter (p,e)
+                            else
+                              (p, subst e)
+                      ) es)
+         (* TODO: consider binding from patterns *)
+        | HuML.Lam_e(y,e') ->
+          if x = y then
+            HuML.Lam_e(y, e')
+          else if not (HuML.VarSet.mem y (fv v)) then
+            HuML.Lam_e(y, subst e')
+          else
+            let fresh = HuML.gensym () in
+            let new_body = rename y fresh e' in
+            HuML.Lam_e (fresh, subst new_body)
+        | HuML.LamWithAnnot_e(y,t,e') ->
+          if x = y then
+            HuML.LamWithAnnot_e(y, subst t, e')
+          else if not (HuML.VarSet.mem y (fv v)) then
+            HuML.LamWithAnnot_e(y, subst t, subst e')
+          else
+            let fresh = HuML.gensym () in
+            let new_body = rename y fresh e' in
+            HuML.LamWithAnnot_e (fresh, subst t, subst new_body)
+  in
+    subst e
+
+
 
 (** prints a statement *)
 let print_stmt (s:HuML.stmt) : unit =

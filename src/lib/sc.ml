@@ -60,6 +60,9 @@ let reduce_op (v1:exp) (op':op) (v2:exp) (h:holeexp) : state =
 (** This partially evaluates until one cannot proceed any further *)
 let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
   let (e,h) = s in
+  Printf.printf "Reduce : ";
+  print_exp e;
+  Printf.printf "\n";
   match e with
   | Int_e i -> (Int_e i, h), ctx
   | Type_e -> (Type_e, h), ctx
@@ -72,6 +75,7 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
   | App_e(e1,e2) ->
     let v1 = state_to_exp (let x,_ = reduce ctx (e1,Hole_h) in x) in
     begin
+      Printf.printf "Reduce [App] : "; print_exp v1; Printf.printf "   "; print_exp e2; Printf.printf "\n";
       match v1 with
       | Lam_e(x,b) -> reduce ctx ((substitute e2 x b), h)
       | LamWithAnnot_e(x,_,b) -> reduce ctx ((substitute e2 x b), h)
@@ -115,7 +119,11 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
         ) es
       in
       match result with
-      | Option.None -> Printf.printf "03 match error\n"; raise Eval.Match_error
+      | Option.None ->
+        Printf.printf "03 match error  :  ";
+        print_exp (Match_e(e,es));
+        Printf.printf "\n";
+        raise Eval.Match_error
       | Option.Some (_,e') -> reduce !ctx_cell (e',h)
 
 
@@ -126,15 +134,29 @@ let eliminate_duplicates_from_list (lst : ('a * 'b) list) =
                         Hashtbl.replace seen y ();
                         tmp) lst
 
+let rec filter_map (f:'a -> 'b option) (xs:'a list) : 'b list =
+  match xs with
+  | []       -> []
+  | x :: xs' ->
+    match f x with
+    | Option.None    -> filter_map f xs'
+    | Option.Some x' -> x' :: (filter_map f xs')
+
 (** The entry point for our supercompilation *)
 let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
   let rec sc' (h' : history) (s',ctx' : state*Evalcontext.t) : state =
     match terminate h' s' with
-    | Continue h'' -> sc' h'' (split h'' (reduce ctx' s')) (* TODO: change this to something more meaningful *)
+    | Continue h'' -> let ((re,rh),rc) = reduce ctx' s'
+      in
+      Printf.printf "sc - Reduce : "; print_exp re; Printf.printf "\n";
+      let ((se,sh),zc) = split h'' ((re, rh), rc) in
+      Printf.printf "sc - Split : "; print_exp se; Printf.printf "\n";
+      sc' h'' ((se,sh),zc) (* TODO: change this to something more meaningful *)
     | Stop -> s'
     and split (h':history) (s,ctx':state*Evalcontext.t) : state*Evalcontext.t =
     begin
       let (e,eh) = s in
+      Printf.printf "sc - Split : "; print_exp (state_to_exp (e,eh)); Printf.printf "\n";
       match e with
       | If_e(c,e1,e2) ->
         let a = state_to_exp (sc' h' ((e1,eh),ctx')) in
@@ -150,11 +172,12 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
           let us = state_to_exp (let x,_ = split h' (reduce ctx (c,Hole_h)) in x) in
           Printf.printf "split for match on us = "; print_exp us; Printf.printf "\n";
           let xs = eliminate_duplicates_from_list
-              (List.map (fun (p, e') ->
+              (filter_map (fun (p, e') ->
                    let ctx_cell = ref ctx in
                    if Eval.is_matching_pattern true p c
                        (fun (x,y) -> ctx_cell := (x,y) :: !ctx_cell) then
-                     p,state_to_exp (sc' h' ((e',Hole_h),!ctx_cell))
+                     let m = state_to_exp (sc' h' ((e',Hole_h),!ctx_cell)) in
+                     Option.Some (p,m)
                    else
                      begin
                        Printf.printf "02 match error: c = \"";
@@ -164,7 +187,7 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
                        Printf.printf "\"   e' = \"";
                        print_exp e';
                        Printf.printf "\"\n";
-                       raise Eval.Match_error
+                       Option.None
                      end
                  ) es)
           in
