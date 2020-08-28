@@ -16,7 +16,6 @@ type termination =
   | Stop
   | Continue of history
 
-
 let empty_state (e : exp) : state =
   (e, Hole_h)
 
@@ -34,13 +33,68 @@ let state_to_exp (s : state) : exp =
   in
     fill_hole h e
 
-(** Checks whether supercompilation should terminate here or not *)
-let terminate (h : history) (s : state) : termination =
-  (* TODO: This equality check is wrong, we actually want the homeomorphic embedding here!! *)
-  if List.find_opt (fun a -> a = s) h <> Option.None then (* TODO: Make less conservative *)
-    Stop
+(** Print history *)
+let print_history (h : history) : unit =
+  Printf.printf "BEGIN History:\n";
+  List.iteri (fun i -> fun e ->
+      Printf.printf "  h - %d : " i;
+      print_exp (state_to_exp e);
+      Printf.printf "\n";
+    ) h;
+  Printf.printf "END History\n"
+
+
+type shell = Shell of string * (shell list)
+
+let rec hom (x:shell) (y:shell) = dive x y || couple x y
+and dive (x:shell) (Shell(_,ys):shell) = List.exists (fun z -> hom x z) ys
+and couple (Shell(x,xs):shell) (Shell(y,ys):shell) =
+  x = y
+  && List.length xs = List.length ys
+  && List.for_all2 (fun a -> fun b -> hom a b) xs ys
+
+let rec shell (e:exp): shell =
+  match e with
+  | HuML.Type_e -> Shell ("#Type", [])
+  | HuML.TypeAnnot_e(e',_) -> shell e'
+  | HuML.Op_e(e1,op,e2) -> Shell (String.concat "#BinOp" [string_of_op op], [shell e1 ; shell e2])
+  | HuML.Var_e x ->
+    if find_datactor x <> Option.None || find_typector x <> Option.None then
+      Shell (x, [])
+    else
+      Shell ("#Var", [])
+  | HuML.Int_e i -> Shell (string_of_int i, [])
+  | HuML.App_e(a,b) -> Shell ("#App", [shell a ; shell b])
+  | HuML.Let_e(_,a,b) -> Shell ("#Let", [shell a ; shell b])
+  | HuML.Lam_e(_,b) -> Shell ("#Lam", [shell b])
+  | HuML.LamWithAnnot_e(_,_,b) -> Shell ("#Lam", [shell b])
+  | HuML.If_e(c,a,b) -> Shell ("#If", shell c :: shell a :: [shell b])
+  | HuML.Match_e(id,es) -> Shell ("#Match", shell id :: List.map (fun (_,y) -> shell y) es)
+
+(** Homeomorphic embedding *)
+let homeo (x:exp) (y:exp) : bool =
+  let (Shell(sx',sx),Shell(sy',sy)) = (shell x, shell y) in
+  Printf.printf "homeo    -     %s <=?=> %s     " sx' sy';
+  let b = hom (Shell(sx',sx)) (Shell(sy',sy)) in
+  begin
+  if b then
+    Printf.printf "OK\n"
   else
-    Continue (s :: h)
+    Printf.printf "NK\n"
+  end;
+  b
+
+
+
+(** Checks whether supercompilation should terminate here or not *)
+let terminate (h : history) ((sa,sb) : state) : termination =
+  print_history h;
+  if List.find_opt (fun (a,_) -> homeo a sa) h <> Option.None then (* TODO: Make less conservative *)
+    (Printf.printf "Terminate - STOP \n";
+    Stop)
+  else
+    (Printf.printf "Terminate - Continue \n";
+    Continue ((sa,sb) :: h))
 
 (** evaluates a binary operation *)
 let reduce_op (v1:exp) (op':op) (v2:exp) (h:holeexp) : state =
@@ -60,9 +114,9 @@ let reduce_op (v1:exp) (op':op) (v2:exp) (h:holeexp) : state =
 (** This partially evaluates until one cannot proceed any further *)
 let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
   let (e,h) = s in
-  Printf.printf "Reduce : ";
+(*  Printf.printf "Reduce : ";
   print_exp e;
-  Printf.printf "\n";
+    Printf.printf "\n"; *)
   match e with
   | Int_e i -> (Int_e i, h), ctx
   | Type_e -> (Type_e, h), ctx
@@ -75,7 +129,9 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
   | App_e(e1,e2) ->
     let v1 = state_to_exp (let x,_ = reduce ctx (e1,Hole_h) in x) in
     begin
+      (*
       Printf.printf "Reduce [App] : "; print_exp v1; Printf.printf "   "; print_exp e2; Printf.printf "\n";
+       *)
       match v1 with
       | Lam_e(x,b) -> reduce ctx ((substitute e2 x b), h)
       | LamWithAnnot_e(x,_,b) -> reduce ctx ((substitute e2 x b), h)
@@ -108,23 +164,26 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
       | Var_e _ -> (If_e(c',e1,e2),h),ctx
       | _ -> raise Type_error
     end
-  | Match_e(e,es) ->
-    let ev = state_to_exp (let (x,_) = reduce ctx (e,Hole_h) in x) in
-    if is_value ev = false then
-      (Match_e(ev,es),h),ctx
-    else
-      let ctx_cell = ref ctx in
-      let result = List.find_opt
-          (fun (p,_) -> Eval.is_matching_pattern false p ev (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
-        ) es
-      in
-      match result with
-      | Option.None ->
-        Printf.printf "03 match error  :  ";
-        print_exp (Match_e(e,es));
-        Printf.printf "\n";
-        raise Eval.Match_error
-      | Option.Some (_,e') -> reduce !ctx_cell (e',h)
+  | Match_e(id,es) ->
+    let ctx_cell = ref ctx in
+    let var = state_to_exp (let (n,_) = reduce ctx ((match id with
+        | Var_e x -> (match lookup_val ctx x with
+             | Option.Some e' -> e'
+             | Option.None -> Var_e x)
+        | _ -> id),Hole_h) in n) in
+    let result = List.find_opt
+        (fun (p,_) -> Eval.is_matching_pattern true p var (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
+      ) es
+    in
+    match result with
+    | Option.None ->
+      (*
+      Printf.printf "03 match error  :  ";*)
+      print_exp (Match_e(id,es));
+      (*
+      Printf.printf "\n"; *)
+      raise Eval.Match_error
+    | Option.Some (_,e') -> reduce !ctx_cell (e',h)
 
 
 let eliminate_duplicates_from_list (lst : ('a * 'b) list) =
@@ -144,14 +203,25 @@ let rec filter_map (f:'a -> 'b option) (xs:'a list) : 'b list =
 
 (** The entry point for our supercompilation *)
 let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
+  let rec pat_to_exp_for_binding_exp (p:pattern) (e:exp) : exp =
+    match p with
+    | HuML.Int_p i -> Int_e i
+    | HuML.Var_p y -> Var_e y
+    | HuML.App_p(a,b) -> App_e (pat_to_exp_for_binding_exp a e, pat_to_exp_for_binding_exp b e)
+    | HuML.Ignore_p -> e
+  in
   let rec sc' (h' : history) (s',ctx' : state*Evalcontext.t) : state =
     match terminate h' s' with
     | Continue h'' -> let ((re,rh),rc) = reduce ctx' s'
       in
       Printf.printf "sc - Reduce : "; print_exp re; Printf.printf "\n";
+
       let ((se,sh),zc) = split h'' ((re, rh), rc) in
+
       Printf.printf "sc - Split : "; print_exp se; Printf.printf "\n";
+
       sc' h'' ((se,sh),zc) (* TODO: change this to something more meaningful *)
+
     | Stop -> s'
     and split (h':history) (s,ctx':state*Evalcontext.t) : state*Evalcontext.t =
     begin
@@ -166,9 +236,17 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
         else
           (a,eh),ctx'
         (* TODO: Unification! We need a SAT-solver here... *)
-      | Match_e(c,es) ->
+      | Match_e(matchon,es) ->
         begin
-          Printf.printf "split for match on  c = "; print_exp c; Printf.printf "\n";
+          let id = match matchon with
+            | HuML.Var_e x -> x
+            | _ -> raise Eval.Match_error
+          in
+          let c = match lookup_val ctx id with
+            | Option.Some e' -> e'
+            | Option.None -> Var_e id
+          in
+          Printf.printf "split for match on  %s = " id; print_exp c; Printf.printf "\n";
           let us = state_to_exp (let x,_ = split h' (reduce ctx (c,Hole_h)) in x) in
           Printf.printf "split for match on us = "; print_exp us; Printf.printf "\n";
           let xs = eliminate_duplicates_from_list
@@ -176,7 +254,7 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
                    let ctx_cell = ref ctx in
                    if Eval.is_matching_pattern true p c
                        (fun (x,y) -> ctx_cell := (x,y) :: !ctx_cell) then
-                     let m = state_to_exp (sc' h' ((e',Hole_h),!ctx_cell)) in
+                     let m = state_to_exp (sc' h' ((substitute (pat_to_exp_for_binding_exp p us) id e',Hole_h),!ctx_cell)) in
                      Option.Some (p,m)
                    else
                      begin
@@ -199,9 +277,9 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
                 raise Eval.Match_error
               end
             else
-              (Match_e(us, xs), eh),ctx
+              (Match_e(us,xs),eh),ctx
         end
       | _ -> s,ctx
     end
   in
-    state_to_exp (sc' h (s,ctx))
+    state_to_exp (sc' h (reduce ctx s))

@@ -54,6 +54,17 @@ module HuML = struct
 
 end
 
+let string_of_op (o:HuML.op) : string =
+  match o with
+  | HuML.Plus -> "+"
+  | HuML.Minus -> "-"
+  | HuML.Mult -> "*"
+  | HuML.Div -> "/"
+  | HuML.Le -> "<"
+  | HuML.LeEq -> "<="
+  | HuML.Gt -> ">"
+  | HuML.GtEq -> ">="
+
 exception Unbound_variable of HuML.var
 exception Type_error
 exception Not_a_value
@@ -99,7 +110,7 @@ let rec fv (e:HuML.exp) : HuML.VarSet.t =
   | HuML.Op_e(e1,_,e2) -> HuML.VarSet.union (fv e1) (fv e2)
   | HuML.Let_e(z,e1,e2) -> HuML.VarSet.union (fv e1) (HuML.VarSet.diff (fv e2) (HuML.VarSet.singleton z))
   | HuML.If_e(c,e1,e2) -> HuML.VarSet.union (fv c) (HuML.VarSet.union (fv e1) (fv e2))
-  | HuML.Match_e(e, es) -> HuML.VarSet.union (fv e) (List.fold_left (fun a -> fun (_,e) ->
+  | HuML.Match_e(id, es) -> HuML.VarSet.union (fv id) (List.fold_left (fun a -> fun (_,e) ->
       HuML.VarSet.union a (fv e)) HuML.VarSet.empty es)
 
 (** [fv p] is a set-like list of the free variables of [p]. *)
@@ -131,7 +142,7 @@ let rec rename (x:HuML.var) (y:HuML.var) (e:HuML.exp) : HuML.exp =
   | HuML.LamWithAnnot_e(z,t,e) -> HuML.LamWithAnnot_e(z, rename x y t, if z = x then e else rename x y e)
   | HuML.App_e(e1,e2) -> HuML.App_e(rename x y e1, rename x y e2)
   | HuML.If_e(c,e1,e2) -> HuML.If_e(rename x y c, rename x y e1, rename x y e2)
-  | HuML.Match_e(e,es) -> HuML.Match_e(rename x y e, List.map (fun (p,e) ->
+  | HuML.Match_e(id,es) -> HuML.Match_e(rename x y id, List.map (fun (p,e) ->
       (rename_pat x y p, rename x y e)) es)
 
 (** checks whether e is a value *)
@@ -206,9 +217,9 @@ let rec print_exp (e:HuML.exp) : unit =
     print_exp e;
     Printf.printf ")"
   | HuML.Var_e(x) -> Printf.printf "%s" x
-  | HuML.Match_e(e,es) ->
+  | HuML.Match_e(id,es) ->
     Printf.printf "match ";
-    print_exp e;
+    print_exp id;
     Printf.printf " [";
     let len = List.length es in
     List.iteri (fun i -> fun (p,e) ->
@@ -264,7 +275,6 @@ let substitute (v:HuML.exp) (x:HuML.var) (e:HuML.exp) : HuML.exp =
                             else
                               (p, subst e)
                       ) es)
-         (* TODO: consider binding from patterns *)
         | HuML.Lam_e(y,e') ->
           if x = y then
             HuML.Lam_e(y, e')

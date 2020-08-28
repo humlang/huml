@@ -25,7 +25,12 @@ let rec is_matching_pattern (from_sc:bool) (p':pattern) (e':exp) (mutator : var 
   begin
     match p',e' with
     | Int_p x,Int_e y -> if x = y then true else false
-    | Int_p _,_ -> raise Match_error
+    | Int_p _,_ -> if from_sc then
+        match e' with
+        | Var_e _ -> true (* TODO: unification *)
+        | _ -> raise Match_error
+      else
+        raise Match_error
     | Var_p x,y ->
       if Ast.find_datactor x <> Option.None then
         begin
@@ -110,11 +115,12 @@ let rec eval (ctx:Evalcontext.t) (e:exp) : exp =
      | Int_e 0 -> eval ctx e2
      | Int_e _ -> eval ctx e1
      | _ -> raise Type_error)
-  | Match_e(e,es) ->
-    let ev = eval ctx e in
+  | Match_e(id,es) ->
     let ctx_cell = ref ctx in
+    let var = eval !ctx_cell id in
     let result = List.find_opt
-        (fun (p,_) -> is_matching_pattern false p ev (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
+        (fun (p,_) ->
+           is_matching_pattern false p var (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
       ) es
     in
     match result with
