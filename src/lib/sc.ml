@@ -114,9 +114,9 @@ let reduce_op (v1:exp) (op':op) (v2:exp) (h:holeexp) : state =
 (** This partially evaluates until one cannot proceed any further *)
 let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
   let (e,h) = s in
-(*  Printf.printf "Reduce : ";
+  Printf.printf "Reduce : ";
   print_exp e;
-    Printf.printf "\n"; *)
+  Printf.printf "\n";
   match e with
   | Int_e i -> (Int_e i, h), ctx
   | Type_e -> (Type_e, h), ctx
@@ -172,17 +172,15 @@ let rec reduce (ctx:Evalcontext.t) (s : state) : state * Evalcontext.t =
              | Option.None -> Var_e x)
         | _ -> id),Hole_h) in n) in
     let result = List.find_opt
-        (fun (p,_) -> Eval.is_matching_pattern true p var (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
+        (fun (p,_) -> Eval.is_matching_pattern false p var (fun (x,y) -> ctx_cell := ((x,y) :: !ctx_cell))
       ) es
     in
     match result with
     | Option.None ->
-      (*
-      Printf.printf "03 match error  :  ";*)
+      Printf.printf "03 match error  :  ";
       print_exp (Match_e(id,es));
-      (*
-      Printf.printf "\n"; *)
-      raise Eval.Match_error
+      Printf.printf "\n";
+      (Match_e(id,es),h),!ctx_cell
     | Option.Some (_,e') -> reduce !ctx_cell (e',h)
 
 
@@ -214,7 +212,8 @@ let sc (ctx:Evalcontext.t) (h : history) (s : state) : exp =
     match terminate h' s' with
     | Continue h'' -> let ((re,rh),rc) = reduce ctx' s'
       in
-      Printf.printf "sc - Reduce : "; print_exp re; Printf.printf "\n";
+      Printf.printf "sc - "; print_exp (let (e,_) = s in e);
+      Printf.printf " reduces to "; print_exp re; Printf.printf "\n";
 
       let ((se,sh),zc) = split h'' ((re, rh), rc) in
 
