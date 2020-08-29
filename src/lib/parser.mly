@@ -91,10 +91,10 @@ expr:
 pattern:
   | i = INT
     { Ast.HuML.Int_p i }
-  | id = IDENTIFIER
-    { Ast.HuML.Var_p id }
   | UNDERSCORE
     { Ast.HuML.Ignore_p }
+  | id = IDENTIFIER
+    { Ast.HuML.Var_p id }
   | LPAREN p = pattern RPAREN
     { p }
   | p1 = pattern p2 = pattern

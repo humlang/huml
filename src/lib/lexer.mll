@@ -16,6 +16,7 @@ rule token = parse
   | "else" { ELSE }
   | "match" { MATCH }
   | "let" { LET }
+  | '_' { UNDERSCORE }
   | ['a'-'z''A'-'Z''_']['a'-'z''A'-'Z''0'-'9''_']* as i { IDENTIFIER i }
   | '<' { LESS }
   | "<=" { LESSEQUAL }
@@ -35,7 +36,6 @@ rule token = parse
   | '[' { LBRACKET }
   | ']' { RBRACKET }
   | '|' { PIPE }
-  | '_' { UNDERSCORE }
   | '=' { EQUAL }
   | eof { EOF }
   | _ { raise (Error (Printf.sprintf "%d: unexpected character.\n" (Lexing.lexeme_start lexbuf))) }
